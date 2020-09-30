@@ -7,8 +7,13 @@ use app\components\parser\NewsPostItem;
 use app\components\parser\NewsPost;
 use lanfix\parser\src\Element;
 use yii\base\ErrorException;
+use app\components\Helper;
 use lanfix\parser\Parser;
 
+/**
+ * Парсер новостей с сайта https://www.mordovmedia.ru/
+ * @author lanfix
+ */
 class MordovMediaParser implements ParserInterface
 {
 
@@ -103,10 +108,7 @@ class MordovMediaParser implements ParserInterface
             if ($photoHtmlNode = $newContain->findOne('.img-cont img')) {
                 $photoUrl = trim($photoHtmlNode->getAttribute('src') ?: '');
             }
-            if ($photoUrl && substr($photoUrl, 0, 1) === '/') {
-                /** Если есть фотка, то делаем абсолютный Url */
-                $photoUrl = static::SRC . substr($photoUrl, 1);
-            }
+            Helper::handleUrl($photoUrl, static::SRC);
             /**
              * Получаем текстовое содержимое
              */
