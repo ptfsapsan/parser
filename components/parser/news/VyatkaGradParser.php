@@ -35,7 +35,9 @@ class VyatkaGradParser implements ParserInterface
          * ### Стадия #1 - Получение ссылок на статьи
          * Получаем содержимое страницы новостей
          */
-        $newsPageParser = new Parser(static::SRC . 'zapisi');
+        $curl = Helper::getCurl();
+        $curlResult = $curl->get(static::SRC . 'zapisi');
+        $newsPageParser = new Parser($curlResult, true);
         $newsPageBody = $newsPageParser->document->getBody();
         $newsContainer = $newsPageBody->findOne('#main');
         /** Если проблемы с получением, то выбрасываем ошибку */
@@ -70,7 +72,9 @@ class VyatkaGradParser implements ParserInterface
              * Создание парсера и получение данных со страницы
              * конкретной новости
              */
-            $newPageParser = new Parser($newLink);
+            $curl = Helper::getCurl();
+            $curlResult = $curl->get($newLink);
+            $newPageParser = new Parser($curlResult, true);
             $newPageBody = $newPageParser->document->getBody();
             $newPageHead = $newPageParser->document->getHead();
             /**

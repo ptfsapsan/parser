@@ -38,7 +38,9 @@ class MordovMediaParser implements ParserInterface
          * ### Стадия #1 - Получение ссылок на статьи
          * Получаем содержимое страницы новостей
          */
-        $newsPageParser = new Parser(static::SRC . 'news/');
+        $curl = Helper::getCurl();
+        $curlResult = $curl->get(static::SRC . 'news/');
+        $newsPageParser = new Parser($curlResult, true);
         $newsPageBody = $newsPageParser->document->getBody();
         $newsContainer = $newsPageBody->findOne('.news-list');
         /** Если проблемы с получением, то выбрасываем ошибку */
@@ -75,7 +77,9 @@ class MordovMediaParser implements ParserInterface
              * Создание парсера и получение данных со страницы
              * конкретной новости
              */
-            $newPageParser = new Parser($pageParams['link']);
+            $curl = Helper::getCurl();
+            $curlResult = $curl->get($pageParams['link']);
+            $newPageParser = new Parser($curlResult, true);
             $newPageBody = $newPageParser->document->getBody();
             $newPageHead = $newPageParser->document->getHead();
             /**
