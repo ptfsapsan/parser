@@ -9,7 +9,9 @@
     "yiisoft/yii2-bootstrap": "~2.0.0",
     "yiisoft/yii2-swiftmailer": "~2.0.0 || ~2.1.0",
     "linslin/yii2-curl": "^1.4",
-    "electrolinux/phpquery": "^0.9.6"
+    "electrolinux/phpquery": "^0.9.6",
+    "symfony/css-selector": "^5.1",
+    "symfony/dom-crawler": "^5.1"
   },
   "config": {
     "process-timeout": 1800,
