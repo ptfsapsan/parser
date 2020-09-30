@@ -39,7 +39,9 @@ class Helper
      */
     public static function getCurl(): Curl
     {
-        return new Curl();
+        $curl = new Curl();
+        $curl->setOption(CURLOPT_FOLLOWLOCATION, true);
+        return $curl;
     }
 
 
