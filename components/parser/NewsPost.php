@@ -10,17 +10,18 @@ use yii\base\Exception;
 
 
 /**
+ * Class NewsPost
+ * @package app\components\parser
  * @property string parser
  * @property string title
  * @property string description
  * @property DateTime createDate
  * @property string original
- * @property string|null image
+ * @property ?string image
  * @property array items
  */
 class NewsPost
 {
-
     public string $parser;
     public string $title;
     public string $description;
@@ -28,6 +29,7 @@ class NewsPost
     public string $original;
     public ?string $image;
     public array $items = [];
+
 
     /**
      * NewsPost constructor
