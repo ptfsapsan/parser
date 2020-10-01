@@ -2,13 +2,13 @@
 
 namespace app\components\parser\news;
 
-use app\components\Helper;
-use app\components\parser\NewsPost;
-use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
+use app\components\parser\NewsPostItem;
+use app\components\parser\NewsPost;
 use lanfix\parser\src\Element;
-use yii\base\ErrorException;
+use app\components\Helper;
 use lanfix\parser\Parser;
+use yii\base\Exception;
 
 /**
  * Парсер новостей с сайта https://vyatka-grad.ru/
@@ -27,9 +27,7 @@ class VyatkaGradParser implements ParserInterface
      */
     public static function run(): array
     {
-        /**
-         * Вырубаем нотисы
-         */
+        /** Вырубаем нотисы */
         error_reporting(E_ALL & ~E_NOTICE);
         /**
          * ### Стадия #1 - Получение ссылок на статьи
@@ -37,12 +35,15 @@ class VyatkaGradParser implements ParserInterface
          */
         $curl = Helper::getCurl();
         $curlResult = $curl->get(static::SRC . 'zapisi');
+        if (!$curlResult) {
+            throw new Exception('Can not get hypertext');
+        }
         $newsPageParser = new Parser($curlResult, true);
         $newsPageBody = $newsPageParser->document->getBody();
         $newsContainer = $newsPageBody->findOne('#main');
         /** Если проблемы с получением, то выбрасываем ошибку */
         if (!$newsContainer) {
-            throw new ErrorException('Не удалось получить список новостей');
+            throw new Exception('Can not get news list');
         }
         /** Ищем новостные плашки на странице */
         $newsCardsOnPage = $newsContainer->find('.post');
@@ -78,13 +79,13 @@ class VyatkaGradParser implements ParserInterface
             $newPageBody = $newPageParser->document->getBody();
             $newPageHead = $newPageParser->document->getHead();
             /**
-             * Пропускаем статью если нема контента
+             * Пропускаем статью если контент отсутствует
              */
             if (!$newContain = $newPageBody->findOne('article')) {
                 continue;
             }
             /**
-             * Дергаем заголовок
+             * Получаем заголовок
              */
             $titleHtmlNode = $newContain->findOne('.entry-title');
             if (!$header = ($titleHtmlNode ? $titleHtmlNode->asText() : '')) {
