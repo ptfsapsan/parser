@@ -2,6 +2,8 @@
 
 namespace app\components;
 
+use linslin\yii2\curl\Curl;
+
 class Helper
 {
     /**
