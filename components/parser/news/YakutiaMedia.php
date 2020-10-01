@@ -16,6 +16,8 @@ use Symfony\Component\DomCrawler\Crawler;
  */
 class YakutiaMedia implements ParserInterface
 {
+    const USER_ID = 2;
+    const FEED_ID = 2;
     /**
      * CSS  класс для параграфов - цитат
      */
@@ -39,6 +41,11 @@ class YakutiaMedia implements ParserInterface
     const UL_PREFIX = '-';
 
     /**
+     * Кол-во новостей, которое необходимо парсить
+     */
+    const MAX_NEWS_COUNT = 10;
+
+    /**
      * @return array
      * @throws Exception
      */
@@ -48,10 +55,8 @@ class YakutiaMedia implements ParserInterface
         $curl = Helper::getCurl();
         $rss = $curl->get(self::FEED_URL);
 
-
         $crawler = new Crawler($rss);
-        $crawler->filter('rss channel item')->each(function ($node) use ($curl) {
-
+        $crawler->filter('rss channel item')->slice(0, self::MAX_NEWS_COUNT)->each(function ($node) use (&$curl, &$posts) {
             $newPost = new NewsPost(
                 self::class,
                 $node->filter('title')->text(),
