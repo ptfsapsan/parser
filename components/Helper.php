@@ -42,22 +42,5 @@ class Helper
         return new Curl();
     }
 
-    /**
-     * Обработать Url и превратить его в абсолютный,
-     * если он таковым не является
-     * @param string $url Урл, который обработать
-     * @param string $baseUrl Бозовый урл страницы
-     */
-    public static function handleUrl(string &$url, string $baseUrl)
-    {
-        if (substr($baseUrl, strlen($baseUrl) - 1, 1) !== '/') {
-            $baseUrl .= '/';
-        }
-        if ($url && substr($url, 0, 1) === '/') {
-            /** Если есть фотка, то делаем абсолютный Url */
-            $url = $baseUrl . substr($url, 1);
-        }
-    }
-
 }
 

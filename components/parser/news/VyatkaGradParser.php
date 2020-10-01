@@ -107,7 +107,7 @@ class VyatkaGradParser implements ParserInterface
             if ($photoHtmlNode = $newContain->findOne('.single-thumb img')) {
                 $photoUrl = trim($photoHtmlNode->getAttribute('src') ?: '');
             }
-            Helper::handleUrl($photoUrl, static::SRC);
+            static::handleUrl($photoUrl, static::SRC);
             /**
              * Получаем время создания статьи
              */
@@ -130,7 +130,7 @@ class VyatkaGradParser implements ParserInterface
             foreach ($textOfCurrentNew->getChildren() ?: [] as $containBlock) {
                 if ($containBlock->tag === 'p' && $img = $containBlock->findOne('img')) {
                     if ($pathToImage = $img->getAttribute('src') ?: '') {
-                        Helper::handleUrl($pathToImage, static::SRC);
+                        static::handleUrl($pathToImage, static::SRC);
                         /** Пропускаем фотографию, если она стоит на обложке */
                         if ($pathToImage === $photoUrl) {
                             continue;
@@ -150,12 +150,23 @@ class VyatkaGradParser implements ParserInterface
             /** Докидываем пост в список */
             $posts[] = $post;
         }
-
-        print_r($posts ?? []);
-        die;
-
-
         return $posts ?? [];
+    }
+
+    /**
+     * Обработать Url и превратить его в абсолютный, если он таковым не является.
+     * @param string $url Урл, который обработать
+     * @param string $baseUrl Бозовый урл страницы
+     */
+    public static function handleUrl(string &$url, string $baseUrl)
+    {
+        if (substr($baseUrl, strlen($baseUrl) - 1, 1) !== '/') {
+            $baseUrl .= '/';
+        }
+        if ($url && substr($url, 0, 1) === '/') {
+            /** Если есть фотка, то делаем абсолютный Url */
+            $url = $baseUrl . substr($url, 1);
+        }
     }
 
 }
