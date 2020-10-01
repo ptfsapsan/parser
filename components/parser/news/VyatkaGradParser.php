@@ -165,7 +165,6 @@ class VyatkaGradParser implements ParserInterface
             $baseUrl .= '/';
         }
         if ($url && substr($url, 0, 1) === '/') {
-            /** Если есть фотка, то делаем абсолютный Url */
             $url = $baseUrl . substr($url, 1);
         }
     }
