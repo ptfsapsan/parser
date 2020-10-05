@@ -31,7 +31,7 @@ class NewsPostItem
     const TYPE_IMAGE = 2;
     const TYPE_QUOTE = 3;
     const TYPE_LINK = 4;
-    const TYPE_AUDIO = 5;
+    //const TYPE_AUDIO = 5;
     const TYPE_VIDEO = 6;
 
     const AVAILABLE_TYPES = [
@@ -41,6 +41,14 @@ class NewsPostItem
         self::TYPE_QUOTE,
         self::TYPE_LINK,
         self::TYPE_VIDEO,
+    ];
+    const TYPES_NAMES = [
+        self::TYPE_HEADER => "Header",
+        self::TYPE_TEXT => "Text",
+        self::TYPE_IMAGE => "Image",
+        self::TYPE_QUOTE => "Quote",
+        self::TYPE_LINK => "Link",
+        self::TYPE_VIDEO => "Video"
     ];
 
     /**
@@ -52,8 +60,13 @@ class NewsPostItem
      * @param int|null $headerLevel header level for type HEADER
      * @param string|null $youtubeId video youtube id
      */
-    public function __construct(int $type, ?string $text, ?string $image, ?string $link, ?int $headerLevel,
-                                ?string $youtubeId)
+    public function __construct(int $type,
+                                ?string $text = null,
+                                ?string $image = null,
+                                ?string $link = null,
+                                ?int $headerLevel = null,
+                                ?string $youtubeId = null
+    )
     {
         $this->type = $type;
         $this->text = Helper::prepareString($text);
