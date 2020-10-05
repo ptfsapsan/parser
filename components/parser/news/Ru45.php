@@ -13,10 +13,10 @@ use Exception;
 use Symfony\Component\DomCrawler\Crawler;
 
 /**
- * Парсер новостей из RSS ленты yakutiamedia.ru
+ * Парсер новостей из RSS ленты 45.ru
  *
  */
-class YakutiaMedia implements ParserInterface
+class Ru45 implements ParserInterface
 {
     const USER_ID = 2;
     const FEED_ID = 2;
@@ -24,22 +24,34 @@ class YakutiaMedia implements ParserInterface
     /**
      * CSS класс, где хранится содержимое новости
      */
-    const BODY_CONTAINER_CSS_SELECTOR = '.io-article-body';
+    const BODY_CONTAINER_CSS_SELECTOR = '[itemprop="articleBody"]';
 
     /**
      * CSS  класс для параграфов - цитат
      */
-    const QUOTE_CSS_CLASS = 'fn-quote';
+    const QUOTE_CSS_CLASS = 'article-reference';
+
+    /**
+     * Классы эоементов, которые не нужно парсить, например блоки с рекламой и т.п.
+     * в формате RegExp
+     */
+    const EXCLUDE_CSS_CLASSES_PATTERN = '/Jbl|Jbn|Jcr|Jcv/';
+
+    /**
+     * Класс элемента после которого парсить страницу не имеет смысла (контент статьи закончился)
+     */
+    const CUT_CSS_CLASS = 'I1an7';
+
 
     /**
      * Ссылка на RSS фид (XML)
      */
-    const FEED_URL = 'https://yakutiamedia.ru/rss/feed';
+    const FEED_URL = 'https://45.ru/text/rss.xml';
 
     /**
      *  Максимальная глубина для парсинга <div> тегов
      */
-    const DIV_MAX_PARSE_DEPTH = 3;
+    const MAX_PARSE_DEPTH = 3;
 
     /**
      * Префикс для элементов списков (ul, ol и т.п.)
@@ -78,50 +90,37 @@ class YakutiaMedia implements ParserInterface
              * Получаем полный html новости
              */
             $newsContent = $curl->get($newPost->original);
-            if (!empty($newsContent)) {
-                $newsContent = (new Crawler($newsContent))->filter('.page-fullnews');
-                /**
-                 * Основное фото ( всегда одно в начале статьи)
-                 */
-                $mainImage = $newsContent->filter('.main_foto img');
-                if ($mainImage->count()) {
-                    if (self::checkImg($newPost->image, $mainImage->attr('src'))) {
-                        $newPost->addItem(
-                            new NewsPostItem(
-                                NewsPostItem::TYPE_IMAGE,
-                                null,
-                                $mainImage->attr('src'),
-                                null,
-                                null,
-                                null
-                            ));
-                    }
 
-                    /**
-                     * Подпись под основным фото
-                     */
-                    $annotation = $newsContent->filter('.main_foto')->siblings()->filter('small');
-                    if ($annotation->count() && !empty($annotation->text())) {
-                        $newPost->addItem(
-                            new NewsPostItem(
-                                NewsPostItem::TYPE_TEXT,
-                                $annotation->text(),
-                                null,
-                                null,
-                                null,
-                                null
-                            ));
-                    }
+            if (!empty($newsContent)) {
+                $newsContent = (new Crawler($newsContent))->filter(self::BODY_CONTAINER_CSS_SELECTOR);
+                /**
+                 * Подпись под основным фото
+                 */
+                $annotation = $newsContent->filter('.itemImageCredits');
+                if ($annotation->count() && !empty($annotation->text())) {
+                    $newPost->addItem(
+                        new NewsPostItem(
+                            NewsPostItem::TYPE_TEXT,
+                            $annotation->text(),
+                            null,
+                            null,
+                            null,
+                            null
+                        ));
                 }
 
                 /**
                  * Текст статьи, может содержать цитаты ( все полезное содержимое в тегах <p> )
                  * Не знаю нужно или нет, но сделал более универсально, с рекурсией
                  */
-                $articleContent = $newsContent->filter(self::BODY_CONTAINER_CSS_SELECTOR);
+                $articleContent = $newsContent->children();
+                $stopParsing = false;
                 if ($articleContent->count()) {
-                    $articleContent->each(function ($node) use ($newPost) {
-                        self::parseNode($node, $newPost, self::DIV_MAX_PARSE_DEPTH);
+                    $articleContent->each(function ($node) use ($newPost, &$stopParsing) {
+                        if ($stopParsing) {
+                            return;
+                        }
+                        self::parseNode($node, $newPost, self::MAX_PARSE_DEPTH, $stopParsing);
                     });
                 }
             }
@@ -132,20 +131,52 @@ class YakutiaMedia implements ParserInterface
         return $posts;
     }
 
-    protected static function parseNode(Crawler $node, NewsPost $newPost, int $maxDepth): void
+    protected static function parseNode(Crawler $node, NewsPost $newPost, int $maxDepth, bool &$stopParsing): void
     {
-        $maxDepth--;
+        /**
+         * Пропускаем элемент, если элемент имеет определенный класс
+         * @see EXCLUDE_CSS_CLASSES_PATTERN
+         */
+        if (self::EXCLUDE_CSS_CLASSES_PATTERN
+            && preg_match(self::EXCLUDE_CSS_CLASSES_PATTERN, $node->attr('class'))) {
+            return;
+        }
+
+        /**
+         * Прекращаем парсить страницу, если дошли до конца статьи
+         * (до определенного элемента с классом указанным в @see CUT_CSS_CLASS )
+         *
+         */
+        if (self::CUT_CSS_CLASS && stristr($node->attr('class'), self::CUT_CSS_CLASS)) {
+            $maxDepth = 0;
+            $stopParsing = true;
+        }
+
+        /**
+         * Ограничение максимальной глубины парсинга
+         * @see MAX_PARSE_DEPTH
+         */
+        if (!$maxDepth) {
+            return;
+        }
+
         switch ($node->nodeName()) {
             case 'div': //запускаем рекурсивно на дочерние ноды, если есть, если нет то там обычно ненужный шлак
+            case 'span':
                 $nodes = $node->children();
                 if ($nodes->count()) {
-                    $nodes->each(function ($node) use ($newPost, $maxDepth) {
-                        self::parseNode($node, $newPost, $maxDepth);
+                    $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing) {
+                        self::parseNode($node, $newPost, $maxDepth, $stopParsing);
                     });
                 }
                 break;
             case 'p':
                 self::parseParagraph($node, $newPost);
+                if ($nodes = $node->children()) {
+                    $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing) {
+                        self::parseNode($node, $newPost, $maxDepth, $stopParsing);
+                    });
+                }
                 break;
             case 'img':
                 self::parseImage($node, $newPost);
@@ -156,6 +187,11 @@ class YakutiaMedia implements ParserInterface
                 break;
             case 'a':
                 self::parseLink($node, $newPost);
+                if ($nodes = $node->children()) {
+                    $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing) {
+                        self::parseNode($node, $newPost, $maxDepth, $stopParsing);
+                    });
+                }
                 break;
             case 'iframe':
                 $videoId = self::extractYouTubeId($node->attr('src'));
@@ -166,9 +202,8 @@ class YakutiaMedia implements ParserInterface
                 self::parseUl($node, $newPost);
                 break;
         }
-        if (!$maxDepth) {
-            return;
-        }
+        $maxDepth--;
+
     }
 
     /**
@@ -223,7 +258,8 @@ class YakutiaMedia implements ParserInterface
      */
     protected static function parseLink(Crawler $node, NewsPost $newPost)
     {
-        if (filter_var($node->attr('href'), FILTER_VALIDATE_URL)) {
+        if (filter_var($node->attr('href'), FILTER_VALIDATE_URL)
+            && !stristr($node->attr('class'), 'link-more')) {
             $newPost->addItem(
                 new NewsPostItem(
                     NewsPostItem::TYPE_LINK,
@@ -263,6 +299,7 @@ class YakutiaMedia implements ParserInterface
     {
         if (!empty($node->text())) {
             $type = NewsPostItem::TYPE_TEXT;
+            echo $node->attr('class');
             if (stristr($node->attr('class'), self::QUOTE_CSS_CLASS)) {
                 $type = NewsPostItem::TYPE_QUOTE;
             }
