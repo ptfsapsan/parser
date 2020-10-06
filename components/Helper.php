@@ -2,6 +2,10 @@
 
 namespace app\components;
 
+use app\components\parser\NewsPost;
+use app\components\parser\NewsPostItem;
+use linslin\yii2\curl\Curl;
+
 class Helper
 {
     /**
@@ -42,20 +46,33 @@ class Helper
         return $curl;
     }
 
-    /**
-     * Обработать Url и превратить его в абсолютный,
-     * если он таковым не является
-     * @param string $url Урл, который обработать
-     * @param string $baseUrl Бозовый урл страницы
-     */
-    public static function handleUrl(string &$url, string $baseUrl)
+    public static function printPosts(array $posts)
     {
-        if (substr($baseUrl, strlen($baseUrl) - 1, 1) !== '/') {
-            $baseUrl .= '/';
-        }
-        if ($url && substr($url, 0, 1) === '/') {
-            /** Если есть фотка, то делаем абсолютный Url */
-            $url = $baseUrl . substr($url, 1);
+        /** @var NewsPost $post */
+        foreach ($posts as $post) {
+            echo PHP_EOL . "---------------------" . PHP_EOL;
+            echo $post->title . PHP_EOL;
+            echo $post->description . PHP_EOL;
+            echo $post->image . PHP_EOL;
+            echo $post->createDate->format('Y-m-d H:i:s') . PHP_EOL;
+            /** @var NewsPostItem $item */
+            foreach ($post->items as $item) {
+                echo "---" . NewsPostItem::TYPES_NAMES [$item->type] . PHP_EOL;
+                if (in_array($item->type, [
+                    NewsPostItem::TYPE_HEADER,
+                    NewsPostItem::TYPE_TEXT,
+                    NewsPostItem::TYPE_QUOTE,
+                    NewsPostItem::TYPE_LINK,
+
+                ]))
+                    echo "\t $item->text" . PHP_EOL;
+                if ($item->type == NewsPostItem::TYPE_LINK)
+                    echo "\t $item->link" . PHP_EOL;
+                if ($item->type == NewsPostItem::TYPE_IMAGE)
+                    echo "\t $item->image" . PHP_EOL;
+                if ($item->type == NewsPostItem::TYPE_VIDEO)
+                    echo "\t $item->youtubeId" . PHP_EOL;
+            }
         }
     }
 

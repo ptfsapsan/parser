@@ -6,9 +6,9 @@ use app\components\parser\ParserInterface;
 use app\components\parser\NewsPostItem;
 use app\components\parser\NewsPost;
 use lanfix\parser\src\Element;
-use yii\base\ErrorException;
 use app\components\Helper;
 use lanfix\parser\Parser;
+use yii\base\Exception;
 
 /**
  * Парсер новостей с сайта https://www.mordovmedia.ru/
@@ -30,9 +30,7 @@ class MordovMediaParser implements ParserInterface
      */
     public static function run(): array
     {
-        /**
-         * Вырубаем нотисы
-         */
+        /** Вырубаем нотисы */
         error_reporting(E_ALL & ~E_NOTICE);
         /**
          * ### Стадия #1 - Получение ссылок на статьи
@@ -40,12 +38,15 @@ class MordovMediaParser implements ParserInterface
          */
         $curl = Helper::getCurl();
         $curlResult = $curl->get(static::SRC . 'news/');
+        if (!$curlResult) {
+            throw new Exception('Can not get hypertext');
+        }
         $newsPageParser = new Parser($curlResult, true);
         $newsPageBody = $newsPageParser->document->getBody();
         $newsContainer = $newsPageBody->findOne('.news-list');
         /** Если проблемы с получением, то выбрасываем ошибку */
         if (!$newsContainer) {
-            throw new ErrorException('Не удалось получить список новостей');
+            throw new Exception('Can not get news list');
         }
         /** Ищем новостные плашки на странице */
         $newsCardsOnPage = $newsContainer->find('.news_item');
@@ -83,13 +84,13 @@ class MordovMediaParser implements ParserInterface
             $newPageBody = $newPageParser->document->getBody();
             $newPageHead = $newPageParser->document->getHead();
             /**
-             * Пропускаем статью если нема контента
+             * Пропускаем статью если контент отсутствует
              */
             if (!$newContain = $newPageBody->findOne('.news_detail')) {
                 continue;
             }
             /**
-             * Дергаем заголовок
+             * Получаем заголовок
              */
             $titleHtmlNode = $newContain->findOne('#news-title');
             if (!$header = ($titleHtmlNode ? $titleHtmlNode->asText() : '')) {
@@ -112,7 +113,7 @@ class MordovMediaParser implements ParserInterface
             if ($photoHtmlNode = $newContain->findOne('.img-cont img')) {
                 $photoUrl = trim($photoHtmlNode->getAttribute('src') ?: '');
             }
-            Helper::handleUrl($photoUrl, static::SRC);
+            static::handleUrl($photoUrl, static::SRC);
             /**
              * Получаем текстовое содержимое
              */
@@ -140,5 +141,19 @@ class MordovMediaParser implements ParserInterface
         return $posts ?? [];
     }
 
+    /**
+     * Обработать Url и превратить его в абсолютный, если он таковым не является.
+     * @param string $url Урл, который обработать
+     * @param string $baseUrl Бозовый урл страницы
+     */
+    public static function handleUrl(string &$url, string $baseUrl)
+    {
+        if (substr($baseUrl, strlen($baseUrl) - 1, 1) !== '/') {
+            $baseUrl .= '/';
+        }
+        if ($url && substr($url, 0, 1) === '/') {
+            $url = $baseUrl . substr($url, 1);
+        }
+    }
 
 }
