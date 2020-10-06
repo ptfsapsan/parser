@@ -41,8 +41,12 @@ class NewsPost
      * @param string|null $image url to news image
      * @throws \Exception
      */
-    public function __construct(string $parser, string $title, string $description,
-                                string $createDate, string $original, ?string $image)
+    public function __construct(string $parser,
+                                string $title,
+                                string $description,
+                                string $createDate,
+                                string $original,
+                                ?string $image)
     {
         $this->parser = $parser;
         $this->title = Helper::prepareString($title);

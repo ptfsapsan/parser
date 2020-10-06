@@ -3,6 +3,7 @@
 
 namespace app\commands;
 
+use app\components\Helper;
 use yii\console\Controller;
 
 class ParserController extends Controller
@@ -20,6 +21,7 @@ class ParserController extends Controller
         foreach ($posts as $post)
             $post->validate();
         echo "Ok" . PHP_EOL;
+        //Helper::printPosts($posts);
     }
 
 
