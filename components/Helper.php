@@ -54,6 +54,7 @@ class Helper
             echo $post->title . PHP_EOL;
             echo $post->description . PHP_EOL;
             echo $post->image . PHP_EOL;
+            echo $post->original . PHP_EOL;
             echo $post->createDate->format('Y-m-d H:i:s') . PHP_EOL;
             /** @var NewsPostItem $item */
             foreach ($post->items as $item) {
