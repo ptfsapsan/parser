@@ -21,7 +21,7 @@ class ParserController extends Controller
         foreach ($posts as $post)
             $post->validate();
         echo "Ok" . PHP_EOL;
-        //Helper::printPosts($posts);
+        Helper::printPosts($posts);
     }
 
 

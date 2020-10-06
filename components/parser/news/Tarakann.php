@@ -4,11 +4,10 @@
 namespace app\components\parser\news;
 
 use app\components\Helper;
+use app\components\helper\TyRunBaseParser;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
-use DateTime;
-use DateTimeZone;
 use Exception;
 use Symfony\Component\DomCrawler\Crawler;
 
@@ -16,7 +15,7 @@ use Symfony\Component\DomCrawler\Crawler;
  * Парсер новостей из RSS ленты yakutiamedia.ru
  *
  */
-class Tarakann implements ParserInterface
+class Tarakann extends TyRunBaseParser implements ParserInterface
 {
     const USER_ID = 2;
     const FEED_ID = 2;
@@ -170,6 +169,7 @@ class Tarakann implements ParserInterface
         if (!$maxDepth) {
             return;
         }
+        $maxDepth--;
 
         switch ($node->nodeName()) {
             case 'div': //запускаем рекурсивно на дочерние ноды, если есть, если нет то там обычно ненужный шлак
@@ -213,53 +213,7 @@ class Tarakann implements ParserInterface
                 self::parseUl($node, $newPost);
                 break;
         }
-        $maxDepth--;
 
-    }
-
-    /**
-     * Парсер для тегов <ul>, <ol> и т.п.
-     * Разбирает списки в текст с переносом строки
-     * @param Crawler $node
-     * @param NewsPost $newPost
-     */
-    protected static function parseUl(Crawler $node, NewsPost $newPost): void
-    {
-        $parsedUl = '';
-        $node->filter('li')->each(function ($node) use (&$parsedUl) {
-            $parsedUl .= self::UL_PREFIX . $node->text() . PHP_EOL;
-        });
-        if (!empty($parsedUl)) {
-            $newPost->addItem(
-                new NewsPostItem(
-                    NewsPostItem::TYPE_TEXT,
-                    $parsedUl,
-                    null,
-                    null,
-                    null,
-                    null
-                ));
-        }
-    }
-
-    /**
-     * Добавляет элемент "видео" в статью
-     * @param string $videoId
-     * @param NewsPost $newPost
-     */
-    protected static function addVideo(string $videoId, NewsPost $newPost)
-    {
-        if ($videoId) {
-            $newPost->addItem(
-                new NewsPostItem(
-                    NewsPostItem::TYPE_VIDEO,
-                    null,
-                    null,
-                    null,
-                    null,
-                    $videoId
-                ));
-        }
     }
 
     /**
@@ -267,7 +221,7 @@ class Tarakann implements ParserInterface
      * @param Crawler $node
      * @param NewsPost $newPost
      */
-    protected static function parseLink(Crawler $node, NewsPost $newPost)
+    protected static function parseLink(Crawler $node, NewsPost $newPost): void
     {
         if (filter_var($node->attr('href'), FILTER_VALIDATE_URL)
             && !stristr($node->attr('class'), 'link-more')) {
@@ -284,29 +238,11 @@ class Tarakann implements ParserInterface
     }
 
     /**
-     * Парсер для тегов <img>
-     * @param Crawler $node
-     * @param NewsPost $newPost
-     */
-    protected static function parseImage(Crawler $node, NewsPost $newPost)
-    {
-        $newPost->addItem(
-            new NewsPostItem(
-                NewsPostItem::TYPE_IMAGE,
-                null,
-                $node->attr('src'),
-                null,
-                null,
-                null
-            ));
-    }
-
-    /**
      * Парсер для тегов <p>
      * @param Crawler $node
      * @param NewsPost $newPost
      */
-    private static function parseParagraph(Crawler $node, NewsPost $newPost)
+    private static function parseParagraph(Crawler $node, NewsPost $newPost): void
     {
         if (!empty($node->text())) {
             $type = NewsPostItem::TYPE_TEXT;
@@ -324,40 +260,6 @@ class Tarakann implements ParserInterface
                     null
                 ));
         }
-    }
-
-    /**
-     * Возвращает id видео на youtube из url, если он есть
-     * @param string $str
-     * @return string|null
-     */
-    protected static function extractYouTubeId(string $str): ?string
-    {
-        /**
-         * @see https://stackoverflow.com/questions/2936467/parse-youtube-video-id-using-preg-match
-         */
-        $pattern = '/(?:youtube(?:-nocookie)?\.com/(?:[^/]+/.+/|(?:v|e(?:mbed)?)/|.*[?&]v=)|youtu\.be/)([^"&?/\s]{11})/i';
-        if (preg_match($pattern, $str, $match)) {
-            return $match[1];
-        }
-        return null;
-    }
-
-    private static function checkImg(string $rssImage, string $parsedImg)
-    {
-        $rssImagePath = str_replace('https://yakutiamedia.ru', '', $rssImage);
-        return !stristr($parsedImg, $rssImagePath);
-    }
-
-    private static function stringToDateTime(string $date, string $format = 'D, d M Y H:i:s O')
-    {
-        $dateTime = DateTime::createFromFormat($format, $date);
-        if (is_a($dateTime, DateTime::class)) {
-            $tz = new DateTimeZone('UTC');
-            $dateTime->setTimezone($tz);
-            return $dateTime->format('d-m-y H:i:s');
-        }
-        return $date;
     }
 
 }
