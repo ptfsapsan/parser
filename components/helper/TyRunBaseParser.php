@@ -1,4 +1,5 @@
 <?php
+
 namespace app\components\helper;
 
 use app\components\parser\NewsPost;
@@ -66,15 +67,19 @@ abstract class TyRunBaseParser
      */
     protected static function parseImage(Crawler $node, NewsPost $newPost): void
     {
-        $newPost->addItem(
-            new NewsPostItem(
-                NewsPostItem::TYPE_IMAGE,
-                null,
-                $node->attr('src'),
-                null,
-                null,
-                null
-            ));
+
+        if ($srs = self::getProperImageSrc($node)) {
+            $newPost->addItem(
+                new NewsPostItem(
+                    NewsPostItem::TYPE_IMAGE,
+                    null,
+                    $srs,
+                    null,
+                    null,
+                    null
+                ));
+        }
+
     }
 
     /**
@@ -110,4 +115,29 @@ abstract class TyRunBaseParser
         }
         return $date;
     }
+
+    /**
+     * Исправляет ссылку на изборажение:
+     * - если атрибут src пустой, проверяем data-src (lazyload)
+     * - если итоговый src не пустой и в классе указана константа MAIN_PAGE_UTI,
+     * пробуем исправить ссылку, возможно ссылка относительная
+     * @param Crawler $node элемент изображения
+     * @return string|null
+     */
+    protected static function getProperImageSrc(Crawler $node): ?string
+    {
+        $src = $node->attr('src') ?? $node->attr('data-src');
+        if ($src && !filter_var($src, FILTER_VALIDATE_URL)) {
+            if (static::MAIN_PAGE_URI) {
+                if (strpos($src, '/') == 0) {
+                    return static::MAIN_PAGE_URI . $src;
+                } else {
+                    return static::MAIN_PAGE_URI . '/' . $src;
+                }
+            }
+            return false;
+        }
+        return $src;
+    }
+
 }
