@@ -264,7 +264,7 @@ class OmskPress extends TyRunBaseParser implements ParserInterface
     {
         $description = Helper::prepareString($description);
         preg_match('/(.*)\.(.*)(\[&#8230;]|Сообщение)(.*)ОмскПресс\./', $description, $matches);
-        return $matches[1];
+        return !empty($matches[1]) ? $matches[1] : $description;
     }
 
 }
