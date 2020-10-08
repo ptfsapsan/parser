@@ -3,8 +3,8 @@
 namespace app\components\parser\news;
 
 use app\components\Helper;
-use app\components\nai4rus\DOMNodeRecursiveIterator;
-use app\components\nai4rus\PreviewNewsDTO;
+use app\components\helper\nai4rus\DOMNodeRecursiveIterator;
+use app\components\helper\nai4rus\PreviewNewsDTO;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;

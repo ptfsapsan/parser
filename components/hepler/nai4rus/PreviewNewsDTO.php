@@ -1,6 +1,6 @@
 <?php
 
-namespace app\components\nai4rus;
+namespace app\components\helper\nai4rus;
 
 use DateTimeInterface;
 
