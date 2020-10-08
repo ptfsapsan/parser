@@ -51,8 +51,8 @@ class Helper
         /** @var NewsPost $post */
         foreach ($posts as $post) {
             echo PHP_EOL . "---------------------" . PHP_EOL;
-            echo $post->title . PHP_EOL;
-            echo $post->description . PHP_EOL;
+            echo 'title: ' . $post->title . PHP_EOL;
+            echo 'description: ' . $post->description . PHP_EOL;
             echo $post->image . PHP_EOL;
             echo $post->original . PHP_EOL;
             echo $post->createDate->format('Y-m-d H:i:s') . PHP_EOL;
@@ -76,7 +76,6 @@ class Helper
             }
         }
     }
-
 
 }
 
