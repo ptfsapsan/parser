@@ -12,10 +12,10 @@ use Exception;
 use Symfony\Component\DomCrawler\Crawler;
 
 /**
- * Парсер новостей из RSS ленты tvtver.ru
+ * Парсер новостей из RSS ленты omskpress.ru
  *
  */
-class TvTver extends TyRunBaseParser implements ParserInterface
+class OmskPress extends TyRunBaseParser implements ParserInterface
 {
     const USER_ID = 2;
     const FEED_ID = 2;
@@ -23,7 +23,7 @@ class TvTver extends TyRunBaseParser implements ParserInterface
     /**
      * CSS класс, где хранится содержимое новости
      */
-    const BODY_CONTAINER_CSS_SELECTOR = '.single_render';
+    const BODY_CONTAINER_CSS_SELECTOR = '.article-post';
 
     /**
      * CSS  класс для параграфов - цитат
@@ -45,7 +45,7 @@ class TvTver extends TyRunBaseParser implements ParserInterface
     /**
      * Ссылка на RSS фид (XML)
      */
-    const FEED_URL = 'https://tvtver.ru/feed/';
+    const FEED_URL = 'https://omskpress.ru/feed/';
 
     /**
      *  Максимальная глубина для парсинга <div> тегов
@@ -75,7 +75,7 @@ class TvTver extends TyRunBaseParser implements ParserInterface
         $rss = $curl->get(self::FEED_URL);
 
         $crawler = new Crawler($rss);
-        $crawler->filter('rss channel item')->slice(0, self::MAX_NEWS_COUNT)->each(function ($node) use (&$curl, &$posts) {
+        $crawler->filter('rss channel item')->slice(0, self::MAX_NEWS_COUNT)->each(function (Crawler $node) use (&$curl, &$posts) {
 
             $newPost = new NewsPost(
                 self::class,
@@ -96,7 +96,7 @@ class TvTver extends TyRunBaseParser implements ParserInterface
                 /**
                  * Основное фото ( всегда одно в начале статьи)
                  */
-                $mainImage = $newsContent->filter('#content_foto img');
+                $mainImage = $newsContent->filter('.entry-image img');
                 if ($mainImage->count()) {
                     if ($mainImage->attr('src')) {
                         $newPost->image = $mainImage->attr('src');
@@ -107,7 +107,7 @@ class TvTver extends TyRunBaseParser implements ParserInterface
                  * Текст статьи, может содержать цитаты ( все полезное содержимое в тегах <p> )
                  * Не знаю нужно или нет, но сделал более универсально, с рекурсией
                  */
-                $articleContent = $newsContent->filter('#publication_text')->children();
+                $articleContent = $newsContent->filter('.entry-content')->children();
                 $stopParsing = false;
                 if ($articleContent->count()) {
                     $articleContent->each(function ($node) use ($newPost, &$stopParsing) {
@@ -263,7 +263,7 @@ class TvTver extends TyRunBaseParser implements ParserInterface
     private static function prepareDescription(string $description): string
     {
         $description = Helper::prepareString($description);
-        preg_match('/(.*)\.(.*)(\[&#8230;]|The post)(.*)TVTver\.ru\./', $description, $matches);
+        preg_match('/(.*)\.(.*)(\[&#8230;]|Сообщение)(.*)ОмскПресс\./', $description, $matches);
         return !empty($matches[1]) ? $matches[1] : $description;
     }
 

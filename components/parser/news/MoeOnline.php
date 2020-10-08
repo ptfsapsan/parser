@@ -12,10 +12,10 @@ use Exception;
 use Symfony\Component\DomCrawler\Crawler;
 
 /**
- * Парсер новостей из RSS ленты tvtver.ru
+ * Парсер новостей из RSS ленты moe-belgorod.ru
  *
  */
-class TvTver extends TyRunBaseParser implements ParserInterface
+class MoeOnline extends TyRunBaseParser implements ParserInterface
 {
     const USER_ID = 2;
     const FEED_ID = 2;
@@ -23,7 +23,7 @@ class TvTver extends TyRunBaseParser implements ParserInterface
     /**
      * CSS класс, где хранится содержимое новости
      */
-    const BODY_CONTAINER_CSS_SELECTOR = '.single_render';
+    const BODY_CONTAINER_CSS_SELECTOR = '.stat_centr_wr';
 
     /**
      * CSS  класс для параграфов - цитат
@@ -34,7 +34,7 @@ class TvTver extends TyRunBaseParser implements ParserInterface
      * Классы эоементов, которые не нужно парсить, например блоки с рекламой и т.п.
      * в формате RegExp
      */
-    const EXCLUDE_CSS_CLASSES_PATTERN = '/date_social/';
+    const EXCLUDE_CSS_CLASSES_PATTERN = '/plitka_wr|vrezka_1/';
 
     /**
      * Класс элемента после которого парсить страницу не имеет смысла (контент статьи закончился)
@@ -45,7 +45,7 @@ class TvTver extends TyRunBaseParser implements ParserInterface
     /**
      * Ссылка на RSS фид (XML)
      */
-    const FEED_URL = 'https://tvtver.ru/feed/';
+    const FEED_URL = 'https://moe-belgorod.ru/rss';
 
     /**
      *  Максимальная глубина для парсинга <div> тегов
@@ -75,15 +75,15 @@ class TvTver extends TyRunBaseParser implements ParserInterface
         $rss = $curl->get(self::FEED_URL);
 
         $crawler = new Crawler($rss);
-        $crawler->filter('rss channel item')->slice(0, self::MAX_NEWS_COUNT)->each(function ($node) use (&$curl, &$posts) {
+        $crawler->filter('rss channel item')->slice(0, self::MAX_NEWS_COUNT)->each(function (Crawler $node) use (&$curl, &$posts) {
 
             $newPost = new NewsPost(
                 self::class,
                 $node->filter('title')->text(),
-                self::prepareDescription($node->filter('description')->text()),
+                $node->filter('description')->text(),
                 self::stringToDateTime($node->filter('pubDate')->text()),
                 $node->filter('link')->text(),
-                null
+                $node->filter('enclosure')->attr('url')
             );
 
             /**
@@ -94,20 +94,27 @@ class TvTver extends TyRunBaseParser implements ParserInterface
             if (!empty($newsContent)) {
                 $newsContent = (new Crawler($newsContent))->filter(self::BODY_CONTAINER_CSS_SELECTOR);
                 /**
-                 * Основное фото ( всегда одно в начале статьи)
+                 * Подпись под основным фото
                  */
-                $mainImage = $newsContent->filter('#content_foto img');
-                if ($mainImage->count()) {
-                    if ($mainImage->attr('src')) {
-                        $newPost->image = $mainImage->attr('src');
-                    }
+                $annotation = $newsContent->filter('.author_main_photo');
+                if ($annotation->count() && !empty($annotation->text())) {
+                    $newPost->addItem(
+                        new NewsPostItem(
+                            NewsPostItem::TYPE_TEXT,
+                            $annotation->text(),
+                            null,
+                            null,
+                            null,
+                            null
+                        ));
                 }
 
+
+
                 /**
-                 * Текст статьи, может содержать цитаты ( все полезное содержимое в тегах <p> )
-                 * Не знаю нужно или нет, но сделал более универсально, с рекурсией
+                 * Блок с содержимым статьи
                  */
-                $articleContent = $newsContent->filter('#publication_text')->children();
+                $articleContent = $newsContent->filter('.app_in_text')->children();
                 $stopParsing = false;
                 if ($articleContent->count()) {
                     $articleContent->each(function ($node) use ($newPost, &$stopParsing) {
@@ -263,8 +270,8 @@ class TvTver extends TyRunBaseParser implements ParserInterface
     private static function prepareDescription(string $description): string
     {
         $description = Helper::prepareString($description);
-        preg_match('/(.*)\.(.*)(\[&#8230;]|The post)(.*)TVTver\.ru\./', $description, $matches);
-        return !empty($matches[1]) ? $matches[1] : $description;
+        preg_match('/(.*)\.(.*)(\[&#8230;]|Сообщение)(.*)ОмскПресс\./', $description, $matches);
+        return $matches[1];
     }
 
 }

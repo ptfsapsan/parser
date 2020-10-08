@@ -12,18 +12,28 @@ use Exception;
 use Symfony\Component\DomCrawler\Crawler;
 
 /**
- * Парсер новостей из RSS ленты tvtver.ru
+ * Парсер новостей из RSS ленты www.osp.ru
  *
  */
-class TvTver extends TyRunBaseParser implements ParserInterface
+class Osp extends TyRunBaseParser implements ParserInterface
 {
     const USER_ID = 2;
     const FEED_ID = 2;
 
     /**
-     * CSS класс, где хранится содержимое новости
+     * Ссылка на главную страницу сайта
      */
-    const BODY_CONTAINER_CSS_SELECTOR = '.single_render';
+    const MAIN_PAGE_URI = 'https://www.osp.ru';
+
+    /**
+     * CSS класс, где хранится содержимое статьи "Добродата"
+     */
+    const DOBRODATA_BODY_CONTAINER_CSS_SELECTOR = '.dd-publication';
+
+    /**
+     * CSS класс, где хранится содержимое обычной новости
+     */
+    const BODY_CONTAINER_CSS_SELECTOR = '.article-full';
 
     /**
      * CSS  класс для параграфов - цитат
@@ -34,7 +44,7 @@ class TvTver extends TyRunBaseParser implements ParserInterface
      * Классы эоементов, которые не нужно парсить, например блоки с рекламой и т.п.
      * в формате RegExp
      */
-    const EXCLUDE_CSS_CLASSES_PATTERN = '/date_social/';
+    const EXCLUDE_CSS_CLASSES_PATTERN = '';
 
     /**
      * Класс элемента после которого парсить страницу не имеет смысла (контент статьи закончился)
@@ -45,7 +55,7 @@ class TvTver extends TyRunBaseParser implements ParserInterface
     /**
      * Ссылка на RSS фид (XML)
      */
-    const FEED_URL = 'https://tvtver.ru/feed/';
+    const FEED_URL = 'https://www.osp.ru/rss/allarticles.rss';
 
     /**
      *  Максимальная глубина для парсинга <div> тегов
@@ -75,12 +85,12 @@ class TvTver extends TyRunBaseParser implements ParserInterface
         $rss = $curl->get(self::FEED_URL);
 
         $crawler = new Crawler($rss);
-        $crawler->filter('rss channel item')->slice(0, self::MAX_NEWS_COUNT)->each(function ($node) use (&$curl, &$posts) {
+        $crawler->filter('rss channel item')->slice(0, self::MAX_NEWS_COUNT)->each(function (Crawler $node) use (&$curl, &$posts) {
 
             $newPost = new NewsPost(
                 self::class,
                 $node->filter('title')->text(),
-                self::prepareDescription($node->filter('description')->text()),
+                $node->filter('description')->text(),
                 self::stringToDateTime($node->filter('pubDate')->text()),
                 $node->filter('link')->text(),
                 null
@@ -92,22 +102,58 @@ class TvTver extends TyRunBaseParser implements ParserInterface
             $newsContent = $curl->get($newPost->original);
 
             if (!empty($newsContent)) {
-                $newsContent = (new Crawler($newsContent))->filter(self::BODY_CONTAINER_CSS_SELECTOR);
+                $newsContent = new Crawler($newsContent);
+
+                /**
+                 * Определяем статью какого типа мы парсим в данный момент,
+                 * статья из раздела "Добродата" или обычная новость и
+                 * указываем соответствующие классы для фильтрации DOM
+                 */
+                $bodySelector = self::BODY_CONTAINER_CSS_SELECTOR;
+                if ($newsContent->filter(self::DOBRODATA_BODY_CONTAINER_CSS_SELECTOR)->count()) {
+                    $articleSelector = '.pub-content';
+                    $bodySelector = self::DOBRODATA_BODY_CONTAINER_CSS_SELECTOR;
+                    $mainImageSelector = '.img-wrapper img';
+                } else {
+                    $articleSelector = '.article-body';
+                    $mainImageSelector = '.article-picture-block img';
+                }
+
+                $articleContent = $newsContent->filter($articleSelector);//->children();
+                $newsContent = $newsContent->filter($bodySelector);
+
                 /**
                  * Основное фото ( всегда одно в начале статьи)
                  */
-                $mainImage = $newsContent->filter('#content_foto img');
+                $mainImage = $newsContent->filter($mainImageSelector);
+
                 if ($mainImage->count()) {
                     if ($mainImage->attr('src')) {
                         $newPost->image = $mainImage->attr('src');
+                    } elseif ($mainImage->attr('data-src')) {
+                        $newPost->image = $mainImage->attr('data-src');
                     }
                 }
 
                 /**
-                 * Текст статьи, может содержать цитаты ( все полезное содержимое в тегах <p> )
-                 * Не знаю нужно или нет, но сделал более универсально, с рекурсией
+                 * Подпись под основным фото
                  */
-                $articleContent = $newsContent->filter('#publication_text')->children();
+                $annotation = $newsContent->filter('.img-source-wrapper span');
+                if ($annotation->count() && !empty($annotation->text())) {
+                    $newPost->addItem(
+                        new NewsPostItem(
+                            NewsPostItem::TYPE_TEXT,
+                            $annotation->text(),
+                            null,
+                            null,
+                            null,
+                            null
+                        ));
+                }
+
+                /**
+                 * Блок с содержимым статьи
+                 */
                 $stopParsing = false;
                 if ($articleContent->count()) {
                     $articleContent->each(function ($node) use ($newPost, &$stopParsing) {
@@ -247,24 +293,6 @@ class TvTver extends TyRunBaseParser implements ParserInterface
                     null
                 ));
         }
-    }
-
-
-
-    /**
-     * В RSS битый дескрипшн, в конце всегда идет коприайт, в виде ссылки на сайт
-     * Например ( после обработки @see Helper::prepareString ) :
-     * [&#8230;] The post В Тверской области лишили прав водителя, ездившего " под кайфом" first appeared on TVTver.ru.
-     * Обрезаем описание до последнего законченного предложения
-     *
-     * @param string $description
-     * @return mixed
-     */
-    private static function prepareDescription(string $description): string
-    {
-        $description = Helper::prepareString($description);
-        preg_match('/(.*)\.(.*)(\[&#8230;]|The post)(.*)TVTver\.ru\./', $description, $matches);
-        return !empty($matches[1]) ? $matches[1] : $description;
     }
 
 }
