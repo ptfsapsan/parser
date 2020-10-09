@@ -9,8 +9,10 @@ use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use DateTimeImmutable;
+use DateTimeZone;
 use DOMElement;
 use DOMNode;
+use InvalidArgumentException;
 use RuntimeException;
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\DomCrawler\UriResolver;
@@ -75,13 +77,17 @@ class VlukiParser implements ParserInterface
 
             $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$previewList, $uri) {
                 $titleCrawler = $newsPreview->filterXPath('//h3/a');
-                $publishedAt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $newsPreview->attr('data-pubdate'));
                 $uri = UriResolver::resolve($titleCrawler->attr('href'), $uri);
+
+                $publishedAtString = $newsPreview->attr('data-pubdate');
+                $timezone = new DateTimeZone('Europe/Moscow');
+                $publishedAt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $publishedAtString, $timezone);
+                $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
 
                 $previewCrawler = $newsPreview->filterXPath('//div[contains(@class, "news-obj__desc")]');
                 $preview = $previewCrawler->count() >= 1 ? $previewCrawler->text() : null;
 
-                $previewList[] = new PreviewNewsDTO($uri, $publishedAt, $titleCrawler->text(), $preview);
+                $previewList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $titleCrawler->text(), $preview);
             });
 
             $pageNumber++;
@@ -106,7 +112,7 @@ class VlukiParser implements ParserInterface
 
         try {
             $image = $newsPostCrawler->filterXPath('//div[contains(@class, "fancybox")]/a')->attr('href');
-        } catch (\InvalidArgumentException $exception) {
+        } catch (InvalidArgumentException $exception) {
             $firstNewsImageCrawler = $newsPostCrawler->filterXPath('//img')->first();
             $image = $firstNewsImageCrawler->count() >= 1 ? $firstNewsImageCrawler->attr('src') : null;
         }
