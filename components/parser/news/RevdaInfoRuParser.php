@@ -131,16 +131,19 @@ class RevdaInfoRuParser implements ParserInterface
                             ));
                     }
 
-                    if ($isVideo) {
-                        $post->addItem(
-                            new NewsPostItem(
-                                NewsPostItem::TYPE_VIDEO,
-                                null,
-                                null,
-                                null,
-                                null,
-                                basename(parse_url($targetNode->attr('src'), PHP_URL_PATH))
-                            ));
+                    if ($isVideo ) {
+                        $src = $targetNode->attr('src');
+                        if (strpos($src, 'youtube') !== false) {
+                            $post->addItem(
+                                new NewsPostItem(
+                                    NewsPostItem::TYPE_VIDEO,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    basename(parse_url($targetNode->attr('src'), PHP_URL_PATH))
+                                ));
+                        }
                     }
 
                     if ($isQuote) {
