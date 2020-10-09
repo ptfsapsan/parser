@@ -171,6 +171,7 @@ class VestiKamazaParser implements ParserInterface
             return $crawler->nodeName() !== 'style' && !str_contains($class, 'teg') && !str_contains($class,
                     'ikon_stat');
         });
+
         foreach ($contentCrawler as $item) {
             $nodeIterator = new DOMNodeRecursiveIterator($item->childNodes);
 
@@ -229,10 +230,15 @@ class VestiKamazaParser implements ParserInterface
         $isImage = $this->isImageType($node);
         $isPicture = $this->isPictureType($node);
         if ($node instanceof DOMElement && ($isImage || $isPicture)) {
-            if ($isImage) {
-                $imageLink = $node->getAttribute('src');
-            } else {
-                $imageLink = $node->getAttribute('srcset');
+            $imageLink = $node->getAttribute('src');
+
+            if ($isPicture) {
+                $pictureCrawler = new Crawler($node->parentNode);
+                $imgCrawler = $pictureCrawler->filterXPath('//img');
+
+                if($imgCrawler->count()){
+                    $imageLink = $imgCrawler->first()->attr('src');
+                }
             }
 
             if ($imageLink === '') {
