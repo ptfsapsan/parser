@@ -131,7 +131,7 @@ class RevdaInfoRuParser implements ParserInterface
                             ));
                     }
 
-                    if ($isVideo ) {
+                    if ($isVideo) {
                         $src = $targetNode->attr('src');
                         if (strpos($src, 'youtube') !== false) {
                             $post->addItem(
