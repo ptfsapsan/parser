@@ -72,7 +72,7 @@ class KoParser implements ParserInterface
     private function getPreviewList(int $minNewsCount = 10, int $maxNewsCount = 100): array
     {
         $previewList = [];
-        $pageNumber = null;
+        $pageNumber = 1;
 
         while (count($previewList) < $maxNewsCount) {
             $uriPreviewPage = "{$this->getSiteUri()}/news/?page={$pageNumber}";
