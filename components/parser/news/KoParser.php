@@ -92,7 +92,7 @@ class KoParser implements ParserInterface
             $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$previewList) {
                 $title = $newsPreview->filterXPath('//div[contains(@class, "search-result__title")]')->text();
                 $uriCrawler = $newsPreview->filterXPath('//a[contains(@class, "search-result-item__link")]');
-                $uri = UriResolver::resolve($uriCrawler->attr('href'), "{$this->getSiteUri()}/lenta");
+                $uri = UriResolver::resolve($uriCrawler->attr('href'), "{$this->getSiteUri()}/news");
 
                 $publishedAtString = $newsPreview->filterXPath('//span[@class="search-result__date"]')->text();
 
