@@ -116,17 +116,6 @@ class RoemParser implements ParserInterface
         $newsPageCrawler = new Crawler($newsPage);
         $newsPostCrawler = $newsPageCrawler->filterXPath('//div[@itemprop="articleBody"]');
 
-
-        $mainImageCrawler = $newsPageCrawler->filterXPath('//*[@itemprop="thumbnailUrl"]')->first();
-        if ($this->crawlerHasNodes($mainImageCrawler)) {
-            $image = $mainImageCrawler->attr('href');
-        }
-
-        if ($image !== null) {
-            $image = UriResolver::resolve($image, $uri);
-            $image = Helper::encodeUrl($image);
-        }
-
         $description = $newsPageCrawler->filterXPath('//meta[@property="og:description"]')->attr('content');
 
         $newsPost = new NewsPost(self::class, $title, $description, $publishedAt->format('Y-m-d H:i:s'), $uri, $image);
