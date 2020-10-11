@@ -433,7 +433,7 @@ class KoParser implements ParserInterface
     private function encodeUri(string $uri): string
     {
         $uri = urlencode(utf8_encode($uri));
-        $uri = str_replace(["%3A", "%2F"], [":", "/"], $uri);
+        $uri = str_replace(['%3A', '%2F', '%3F'], [':', '/', '?'], $uri)
 
         return $uri;
     }
