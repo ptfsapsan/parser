@@ -19,6 +19,7 @@ class Parser
 
     protected $glued     = [];
     protected $callbacks = [];
+    protected $subNode   = './*/node()';
 
     public static function flatten(array $blocks)
     {
@@ -31,6 +32,22 @@ class Parser
         }
 
         return array_filter($result);
+    }
+
+    public function setDeep(int $deep)
+    {
+        if ($deep > 0) {
+            $this->subNode = '.'.str_repeat('/*', $deep).'/node()';
+        }
+
+        return $this;
+    }
+
+    public function setSubNode(string $subNode)
+    {
+        $this->subNode = $subNode;
+
+        return $this;
     }
 
     public function parseMany(Crawler $node)
@@ -95,7 +112,7 @@ class Parser
 
     protected function parseSubnodes(Crawler $node, int $i)
     {
-        $items = array_filter($node->filterXpath('./*/node()')->each(function ($node, $i) {
+        $items = array_filter($node->filterXpath($this->subNode)->each(function ($node, $i) {
             foreach ($this->selectors as $type => $value) {
                 $method = 'parse'.ucfirst($type);
 
