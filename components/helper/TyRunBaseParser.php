@@ -13,7 +13,20 @@ use Symfony\Component\DomCrawler\Crawler;
  */
 abstract class TyRunBaseParser
 {
-    abstract protected static function parseNode(Crawler $node, NewsPost $newPost, int $maxDepth, bool &$stopParsing);
+    /**
+     * Базовый метод для разбора элемента, в основном запускается рекурсивно
+     * @param Crawler $node текущий элемент
+     * @param NewsPost $newPost объект новости
+     * @param int $maxDepth максимальная глубина парсинга дочерних элементов
+     * @param bool $stopParsing флаг о прекращении парсинга, передаваемый по ссылке, т.к. метод может быть вызван внутри замыкания
+     * @return mixed
+     */
+    abstract protected static function parseNode(
+        Crawler $node,
+        NewsPost $newPost,
+        int $maxDepth,
+        bool &$stopParsing
+    );
 
     /**
      * Парсер для тегов <ul>, <ol> и т.п.
@@ -45,7 +58,7 @@ abstract class TyRunBaseParser
      * @param string $videoId
      * @param NewsPost $newPost
      */
-    protected static function addVideo(string $videoId, NewsPost $newPost): void
+    protected static function addVideo(?string $videoId, NewsPost $newPost): void
     {
         if ($videoId) {
             $newPost->addItem(
@@ -67,13 +80,13 @@ abstract class TyRunBaseParser
      */
     protected static function parseImage(Crawler $node, NewsPost $newPost): void
     {
-
-        if ($srs = self::getProperImageSrc($node)) {
+        $src = self::getProperImageSrc($node);
+        if ($src && $src != $newPost->image) {
             $newPost->addItem(
                 new NewsPostItem(
                     NewsPostItem::TYPE_IMAGE,
                     null,
-                    $srs,
+                    $src,
                     null,
                     null,
                     null
@@ -92,7 +105,7 @@ abstract class TyRunBaseParser
         /**
          * @see https://stackoverflow.com/questions/2936467/parse-youtube-video-id-using-preg-match
          */
-        $pattern = '/(?:youtube(?:-nocookie)?\.com/(?:[^/]+/.+/|(?:v|e(?:mbed)?)/|.*[?&]v=)|youtu\.be/)([^"&?/\s]{11})/i';
+        $pattern = '/(?:youtube(?:-nocookie)?\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i';
         if (preg_match($pattern, $str, $match)) {
             return $match[1];
         }
