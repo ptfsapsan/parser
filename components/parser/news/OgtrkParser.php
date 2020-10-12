@@ -285,16 +285,23 @@ class OgtrkParser implements ParserInterface
 
     private function searchYoutubeVideoNewsItem(DOMNode $node): ?NewsPostItem
     {
+        if ($node->nodeName === '#text') {
+            $parentNode = $this->getRecursivelyParentNode($node, function (DOMNode $parentNode) {
+                return $parentNode->nodeName === 'iframe';
+            }, 3);
+            $node = $parentNode ?: $node;
+        }
+
         if (!$node instanceof DOMElement || $node->nodeName !== 'iframe') {
             return null;
         }
 
-        $iframeLink = $node->getAttribute('src');
-        if (!str_contains($iframeLink, 'youtube')) {
+        $youtubeVideoId = $this->getYoutubeVideoId($node->getAttribute('src'));
+        if (!$youtubeVideoId) {
             return null;
         }
 
-        return new NewsPostItem(NewsPostItem::TYPE_VIDEO, null, null, null, null, basename($iframeLink));
+        return new NewsPostItem(NewsPostItem::TYPE_VIDEO, null, null, null, null, $youtubeVideoId);
     }
 
     private function searchImageNewsItem(DOMNode $node, PreviewNewsDTO $previewNewsItem): ?NewsPostItem
@@ -377,8 +384,11 @@ class OgtrkParser implements ParserInterface
     }
 
 
-    private function removeParentsFromStorage(DOMNode $node, int $maxLevel = 5, array $exceptNewsPostItemTypes = null): void
-    {
+    private function removeParentsFromStorage(
+        DOMNode $node,
+        int $maxLevel = 5,
+        array $exceptNewsPostItemTypes = null
+    ): void {
         if ($maxLevel <= 0 || !$node->parentNode) {
             return;
         }
@@ -574,6 +584,14 @@ class OgtrkParser implements ParserInterface
         $date = str_replace($ruMonthShort, $enMonth, $date);
 
         return $date;
+    }
+
+    private function getYoutubeVideoId(string $link): ?string
+    {
+        $youtubeRegex = '/(youtu\.be\/|youtube\.com\/(watch\?(.*&)?v=|(embed|v)\/))([\w-]{11})/iu';
+        preg_match($youtubeRegex, $link, $matches);
+
+        return $matches[5] ?? null;
     }
 
     private function getSiteUri(): string
