@@ -4,13 +4,8 @@ namespace app\components;
 
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
-use League\Uri\Components\Path;
-use League\Uri\Contracts\UriComponentInterface;
 use League\Uri\Uri;
-use League\Uri\UriModifier;
-use League\Uri\UriString;
 use linslin\yii2\curl\Curl;
-use TrueBV\Punycode;
 
 class Helper
 {
@@ -21,9 +16,8 @@ class Helper
      */
     public static function prepareString($string)
     {
-        if ($string == '') {
+        if ($string == '')
             return null;
-        }
         return strip_tags(trim($string));
     }
 
@@ -88,21 +82,16 @@ class Helper
                     NewsPostItem::TYPE_QUOTE,
                     NewsPostItem::TYPE_LINK,
 
-                ])) {
+                ]))
                     echo "\t $item->text" . PHP_EOL;
-                }
-                if ($item->type == NewsPostItem::TYPE_LINK) {
+                if ($item->type == NewsPostItem::TYPE_LINK)
                     echo "\t $item->link" . PHP_EOL;
-                }
-                if ($item->type == NewsPostItem::TYPE_IMAGE) {
+                if ($item->type == NewsPostItem::TYPE_IMAGE)
                     echo "\t $item->image" . PHP_EOL;
-                }
-                if ($item->type == NewsPostItem::TYPE_VIDEO) {
+                if ($item->type == NewsPostItem::TYPE_VIDEO)
                     echo "\t $item->youtubeId" . PHP_EOL;
-                }
             }
         }
     }
 
 }
-
