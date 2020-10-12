@@ -20,7 +20,7 @@ trait Cacheable
     public static function request(string $url)
     {
         $cacheKey = md5(__METHOD__.$url);
-        $cache    = Yii::$app->parserCache;
+        $cache    = Yii::$app->parserCache ?? null;
 
         if (!$cache || false === ($data = $cache->get($cacheKey))) {
             $curl = Helper::getCurl();
