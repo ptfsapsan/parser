@@ -130,7 +130,6 @@ class FomagParser implements ParserInterface
 
         if ($image !== null) {
             $image = UriResolver::resolve($image, $uri);
-//            $image = Helper::encodeUrl($image);
         }
 
         $newsPost = new NewsPost(self::class, $title, $description, $publishedAt->format('Y-m-d H:i:s'), $uri, $image);
@@ -159,7 +158,6 @@ class FomagParser implements ParserInterface
                 $newsPost->addItem($newsPostItem);
             }
         }
-        dd($newsPost);
         return $newsPost;
     }
 
