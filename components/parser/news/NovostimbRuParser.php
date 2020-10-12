@@ -2,8 +2,7 @@
 
 namespace app\components\parser\news;
 
-use app\components\Helper;
-use app\components\helper\metallizzer\Text;
+use app\components\helper\metallizzer\Parser;
 use app\components\helper\metallizzer\Url;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
@@ -15,18 +14,18 @@ use Symfony\Component\DomCrawler\Crawler;
 
 class NovostimbRuParser implements ParserInterface
 {
-    const USER_ID       = 2;
-    const FEED_ID       = 2;
-    const SITE_URL      = 'https://novostimb.ru/';
-    const YOUTUBE_REGEX = '/(youtu\.be\/|youtube\.com\/(watch\?(.*&)?v=|(embed|v)\/))([\w-]{11})/';
-    const SKIP_FIRST    = true; // Пропускать первый параграф, он совпадает с описанием
+    use \app\components\helper\metallizzer\Cacheable;
+
+    const USER_ID    = 2;
+    const FEED_ID    = 2;
+    const SITE_URL   = 'https://novostimb.ru/';
+    const SKIP_FIRST = true; // Пропускать первый параграф, он совпадает с описанием
 
     protected static $posts = [];
 
     public static function run(): array
     {
-        $curl = Helper::getCurl();
-        $xml  = $curl->get(self::SITE_URL.'news/feed');
+        $xml = self::request(self::SITE_URL.'news/feed');
 
         if (!$xml) {
             throw new Exception('Не удалось загрузить rss ленту.');
@@ -34,11 +33,18 @@ class NovostimbRuParser implements ParserInterface
 
         $feed = new Crawler(html_entity_decode($xml));
 
-        $feed->filter('item')->each(function ($item) {
+        $feed->filter('item')->each(function ($item, $i) {
             $url = $item->filter('link')->text();
 
             $tz = new DateTimeZone('UTC');
             $dt = new DateTime($item->filter('pubDate')->text(), $tz);
+
+            if (!$html = self::request($url)) {
+                throw new Exception("Не удалось загрузить страницу '{$url}'");
+            }
+
+            $crawler = new Crawler($html, $url);
+            $image = $crawler->filter('article .attachment-post-thumbnail');
 
             $post = new NewsPost(
                 self::class,
@@ -46,16 +52,19 @@ class NovostimbRuParser implements ParserInterface
                 $item->filter('description')->text() ?: '~',
                 $dt->setTimezone(new DateTimeZone('UTC'))->format('c'),
                 $url,
-                self::getPostImage($url)
+                $image->count() ? Url::encode($image->first()->image()->getUri()) : null
             );
 
-            $items = self::parsePostContent($item->filter('content|encoded'));
+            $node = $crawler->filterXpath('//main/article/div[contains(@class, "entry-content")]/node()[not(contains(@class, "yarpp-related"))]');
+            $items = (new Parser())->parseMany($node, $i);
 
             foreach ($items as $item) {
                 if ($post->description === '~' && $item['type'] == NewsPostItem::TYPE_TEXT) {
                     $post->description = $item['text'];
 
-                    continue;
+                    if (self::SKIP_FIRST) {
+                        continue;
+                    }
                 }
 
                 $post->addItem(new NewsPostItem(...array_values($item)));
@@ -69,59 +78,5 @@ class NovostimbRuParser implements ParserInterface
         });
 
         return self::$posts;
-    }
-
-    protected function parsePostContent($node)
-    {
-        $crawler = new Crawler($node->html());
-
-        return array_filter($crawler->filter('p')->each(function ($node, $i) {
-            $item = [
-                'type'        => NewsPostItem::TYPE_TEXT,
-                'text'        => null,
-                'image'       => null,
-                'link'        => null,
-                'headerLevel' => null,
-                'youtubeId'   => null,
-            ];
-
-            $iframe = $node->filter('iframe');
-            if ($iframe->count()
-                and preg_match(self::YOUTUBE_REGEX, $iframe->attr('src') ?? '', $m)
-            ) {
-                $item['type'] = NewsPostItem::TYPE_VIDEO;
-                $item['youtubeId'] = $m[5];
-            } else {
-                if (self::SKIP_FIRST && $i == 0) {
-                    return;
-                }
-
-                $item['text'] = Text::normalizeWhitespace($node->text(null, false));
-
-                if (!$item['text']) {
-                    return;
-                }
-            }
-
-            return $item;
-        }));
-    }
-
-    protected static function getPostImage($url)
-    {
-        $curl = Helper::getCurl();
-
-        if (!$html = $curl->get($url)) {
-            throw new Exception("Не удалось загрузить страницу '{$url}'");
-        }
-
-        $crawler = new Crawler($html, $url);
-
-        $image = $crawler->filter('article .attachment-post-thumbnail');
-        if (!$image->count()) {
-            return;
-        }
-
-        return Url::encode($image->first()->image()->getUri());
     }
 }
