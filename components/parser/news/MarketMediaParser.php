@@ -126,7 +126,7 @@ class MarketMediaParser implements ParserInterface
         $newsPage = $this->getPageContent($uri);
 
         $newsPageCrawler = new Crawler($newsPage);
-        $newsPostCrawler = $newsPageCrawler->filterXPath('//article[@class="article"]');
+        $newsPostCrawler = $newsPageCrawler->filterXPath('//article');
 
 
         $mainImageCrawler = $newsPageCrawler->filterXPath('//meta[@property="og:image"]')->first();
@@ -146,7 +146,7 @@ class MarketMediaParser implements ParserInterface
             $image
         );
 
-        $contentCrawler = $newsPostCrawler->filterXPath('//div[contains(@class,"articleBody")]');
+        $contentCrawler = $newsPostCrawler->filterXPath('//div[contains(@itemprop,"articleBody")]');
         $this->removeDomNodes($newsPageCrawler, '//a[starts-with(@href, "javascript")]');
         $this->removeDomNodes($newsPageCrawler, '//script | //video');
         $this->removeDomNodes($contentCrawler, '//table');
@@ -167,7 +167,7 @@ class MarketMediaParser implements ParserInterface
                 $newsPost->addItem($newsPostItem);
             }
         }
-
+        dd($newsPost);
         return $newsPost;
     }
 
@@ -203,6 +203,10 @@ class MarketMediaParser implements ParserInterface
             $newsPostItem = $this->searchTextNewsItem($node);
             if ($newsPostItem) {
                 return $newsPostItem;
+            }
+
+            if($node->nodeName === 'br'){
+                $this->removeParentsFromStorage($node->parentNode);
             }
         } catch (RuntimeException $exception) {
             return null;
