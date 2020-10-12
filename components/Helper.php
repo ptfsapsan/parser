@@ -36,6 +36,19 @@ class Helper
     }
 
     /**
+     * Encode international unicode URL
+     * @param $url
+     * @return string
+     */
+    public static function encodeUrl(string $url): string
+    {
+        $url = urlencode(utf8_encode($url));
+        $url = str_replace(['%3A', '%2F', '%3F'], [':', '/', '?'], $url);
+
+        return $url;
+    }
+
+    /**
      * Get curl object
      * @return Curl
      */
