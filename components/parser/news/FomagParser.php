@@ -120,23 +120,22 @@ class FomagParser implements ParserInterface
         $newsPage = $this->getPageContent($uri);
 
         $newsPageCrawler = new Crawler($newsPage);
-        $newsPostCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"bodytext")]');
+        $newsPostCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"article-frame")]');
 
-        dd($newsPostCrawler);
 
-        $mainImageCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"imprint")]/img')->first();
+        $mainImageCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"article-image")]/img')->first();
         if ($this->crawlerHasNodes($mainImageCrawler)) {
             $image = $mainImageCrawler->attr('src');
         }
 
         if ($image !== null) {
             $image = UriResolver::resolve($image, $uri);
-            $image = Helper::encodeUrl($image);
+//            $image = Helper::encodeUrl($image);
         }
 
         $newsPost = new NewsPost(self::class, $title, $description, $publishedAt->format('Y-m-d H:i:s'), $uri, $image);
 
-        $contentCrawler = $newsPostCrawler->filterXPath('//div[contains(@class,"bodytext")]/p');
+        $contentCrawler = $newsPostCrawler->filterXPath('//div[contains(@class,"js-giraff-article")]/p');
 
         $this->removeDomNodes($newsPageCrawler, '//p[contains(@class, "authorpr")]');
 
@@ -160,7 +159,7 @@ class FomagParser implements ParserInterface
                 $newsPost->addItem($newsPostItem);
             }
         }
-
+        dd($newsPost);
         return $newsPost;
     }
 
@@ -231,7 +230,6 @@ class FomagParser implements ParserInterface
 
         $this->nodeStorage->attach($node, $newsPostItem);
         $this->removeParentsFromStorage($node->parentNode);
-
         return $newsPostItem;
     }
 
