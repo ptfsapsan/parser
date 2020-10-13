@@ -20,7 +20,6 @@ class NowCrimeaRuParser implements ParserInterface
     const FEED_ID = 2;
     const SITE_URL = 'http://nowcrimea.ru';
 
-
     public static function run(): array
     {
         $parser = new self();
@@ -130,30 +129,6 @@ class NowCrimeaRuParser implements ParserInterface
         }
 
         return $posts;
-    }
-
-    /**
-     * Получение значения элемента страницы
-     *
-     * @param DOMXPath $xpath
-     * @param string $search
-     * @param string $attribute
-     *
-     * @return string
-     */
-    protected function getBlockValue(DOMXPath $xpath, string $search, string $attribute = ''): string
-    {
-        $value = '';
-        $elements = $xpath->query($search);
-        foreach ($elements as $item) {
-            if ($attribute) {
-                $value = $item->getAttribute($attribute);
-            } else {
-                $value = trim(str_replace(array("\r\n", "\r", "\n", "\t"), '',  $item->nodeValue));
-            }
-        }
-
-        return $value;
     }
 
     /**
