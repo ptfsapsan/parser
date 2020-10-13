@@ -129,8 +129,9 @@ class MoiPortalParser implements ParserInterface
             $image = UriResolver::resolve($image, $uri);
         }
 
-        $this->removeDomNodes($newsPageCrawler, '//a[starts-with(@href, "javascript")]');
-        $this->removeDomNodes($newsPageCrawler, '//script | //video');
+        $this->removeDomNodes($contentCrawler, '//*[contains(@class, "instagram-media")]');
+        $this->removeDomNodes($contentCrawler, '//a[starts-with(@href, "javascript")]');
+        $this->removeDomNodes($contentCrawler, '//script | //video');
         $this->removeDomNodes($contentCrawler, '//table');
 
         $newsPost = new NewsPost(self::class, $title, $description, $publishedAt->format('Y-m-d H:i:s'), $uri, $image);
