@@ -12,7 +12,9 @@
     "lanfix/parser": "*",
     "symfony/dom-crawler": "^5.1",
     "ext-dom": "*",
-    "rowbot/punycode": "^1.0"
+    "league/uri": "^6.3",
+    "rowbot/punycode": "^1.0",
+    "symfony/css-selector": "^5.1"
   },
   "config": {
     "process-timeout": 1800,
