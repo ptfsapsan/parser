@@ -143,6 +143,7 @@ class OgtrkParser implements ParserInterface
 
                 if ($newsPostItem->type === NewsPostItem::TYPE_IMAGE && $newsPost->image === null) {
                     $newsPost->image = $newsPostItem->image;
+                    continue;
                 }
 
                 $newsPost->addItem($newsPostItem);
