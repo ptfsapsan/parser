@@ -9,7 +9,6 @@ use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use RuntimeException;
 use Symfony\Component\DomCrawler\Crawler;
-use Symfony\Component\DomCrawler\UriResolver;
 
 /**
  * Парсер новостей с сайта http://nowcrimea.ru/
@@ -52,7 +51,7 @@ class NowCrimeaRuParser implements ParserInterface
                 $image
             );
 
-            $post->addItem(new NewsPostItem(NewsPostItem::TYPE_HEADER, $title, null, null, 1, null));
+            $this->addItemPost($post, NewsPostItem::TYPE_HEADER, $title, null, null, 1);
 
             $newContentCrawler = (new Crawler($itemCrawler->filterXPath("//*[@class='detail__main-content']")->html()))->filterXPath('//body')->children();
 
@@ -60,67 +59,41 @@ class NowCrimeaRuParser implements ParserInterface
                 foreach ($content->childNodes as $childNode) {
                     $nodeValue = trim($childNode->nodeValue);
                     if (in_array($childNode->nodeName, ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'])) {
-                        $post->addItem(
-                            new NewsPostItem(
-                                NewsPostItem::TYPE_HEADER,
-                                $nodeValue,
-                                null,
-                                null,
-                                (int) substr($childNode->nodeName, 1),
-                                null
-                            ));
+
+                        $this->addItemPost($post, NewsPostItem::TYPE_HEADER, $nodeValue, null, null, (int) substr($childNode->nodeName, 1));
+
                     } if ($childNode->nodeName == 'a' && strpos($childNode->getAttribute('href'), 'http') !== false) {
-                        $post->addItem(
-                            new NewsPostItem(
-                                NewsPostItem::TYPE_LINK,
-                                $nodeValue,
-                                null,
-                                $childNode->getAttribute('href'),
-                                null,
-                                null
-                            ));
+
+                        $this->addItemPost($post, NewsPostItem::TYPE_LINK, $nodeValue, null, $childNode->getAttribute('href'));
+
                     } elseif ($childNode->nodeName == 'iframe') {
                         $src = $childNode->getAttribute('src');
                         if (strpos($src, 'youtube') !== false) {
-                            $post->addItem(
-                                new NewsPostItem(
-                                    NewsPostItem::TYPE_VIDEO,
-                                    $childNode->getAttribute('title'),
-                                    null,
-                                    null,
-                                    null,
-                                    basename(parse_url($src, PHP_URL_PATH))
-                                ));
+
+                            $this->addItemPost($post, NewsPostItem::TYPE_VIDEO, $childNode->getAttribute('title'), null, null, null, basename(parse_url($src, PHP_URL_PATH)));
+
                         }
                     } elseif ($childNode->nodeName == 'ul') {
                         $ulCrawler = (new Crawler($newContentCrawler->filterXPath("//ul")->html()))->filterXPath('//body')->children();
                         foreach ($ulCrawler as $ulNode) {
                             foreach ($ulNode->childNodes as $liChildNode) {
-                                if ($liChildNode->nodeName == 'a') {
-                                    foreach ($liChildNode->childNodes as $imgNode) {
-                                        if ($imgNode->nodeName == 'img') {
-                                            $srcImg = strpos($imgNode->getAttribute('src'), 'http') === false ? self::SITE_URL . $imgNode->getAttribute('src') : $imgNode->getAttribute('src');
-                                            $post->addItem(
-                                                new NewsPostItem(
-                                                    NewsPostItem::TYPE_IMAGE,
-                                                    null,
-                                                    $srcImg,
-                                                ));
-                                        }
+                                if ($liChildNode->nodeName != 'a') {
+                                    continue;
+                                }
+                                foreach ($liChildNode->childNodes as $imgNode) {
+                                    if ($imgNode->nodeName != 'img') {
+                                        continue;
                                     }
+                                    $srcImg = strpos($imgNode->getAttribute('src'), 'http') === false
+                                        ? self::SITE_URL . $imgNode->getAttribute('src')
+                                        : $imgNode->getAttribute('src');
+
+                                    $this->addItemPost($post, NewsPostItem::TYPE_IMAGE, null, $srcImg);
                                 }
                             }
                         }
                     } elseif ($nodeValue) {
-                        $post->addItem(
-                            new NewsPostItem(
-                                NewsPostItem::TYPE_TEXT,
-                                $nodeValue,
-                                null,
-                                null,
-                                null,
-                                null
-                            ));
+                        $this->addItemPost($post, NewsPostItem::TYPE_TEXT, $nodeValue);
                     }
                 }
             }
@@ -129,6 +102,29 @@ class NowCrimeaRuParser implements ParserInterface
         }
 
         return $posts;
+    }
+
+    /**
+     * @param NewsPost $post
+     * @param int $type
+     * @param string|null $text
+     * @param string|null $image
+     * @param string|null $link
+     * @param int|null $headerLevel
+     * @param string|null $youtubeId
+     */
+    protected function addItemPost(NewsPost $post, int $type, string $text = null, string $image = null,
+                                   string $link = null, int $headerLevel = null, string $youtubeId = null): void
+    {
+        $post->addItem(
+            new NewsPostItem(
+                $type,
+                $text,
+                $image,
+                $link,
+                $headerLevel,
+                $youtubeId
+            ));
     }
 
     /**
