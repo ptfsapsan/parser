@@ -264,7 +264,7 @@ class VedomParser implements ParserInterface
         }
 
         $link = $this->encodeUri($node->getAttribute('href'));
-        if (!$link || $link === '' || !filter_var($link, FILTER_VALIDATE_URL)) {
+        if ($link===null) {
             return null;
         }
 
@@ -320,6 +320,9 @@ class VedomParser implements ParserInterface
 
         $imageLink = UriResolver::resolve($imageLink, $previewNewsItem->getUri());
         $imageLink = $this->encodeUri($imageLink);
+        if($imageLink === null){
+            return null;
+        }
 
         $alt = $node->getAttribute('alt');
         $alt = $alt !== '' ? $alt : null;
@@ -421,10 +424,17 @@ class VedomParser implements ParserInterface
     }
 
 
-    private function encodeUri(string $uri): string
+    private function encodeUri(string $uri): ?string
     {
-        $uri = urlencode(utf8_encode($uri));
-        $uri = str_replace(["%3A", "%2F"], [":", "/"], $uri);
+        try{
+            $uri = Helper::encodeUrl($uri);
+        }catch (Throwable $exception){
+            return null;
+        }
+
+        if (!$uri || $uri === '' || !filter_var($uri, FILTER_VALIDATE_URL)) {
+            return null;
+        }
 
         return $uri;
     }
