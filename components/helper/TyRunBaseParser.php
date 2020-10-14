@@ -161,17 +161,29 @@ abstract class TyRunBaseParser
     protected static function getProperImageSrc(Crawler $node): ?string
     {
         $src = $node->attr('src') ?? $node->attr('data-src');
-        if ($src && !filter_var($src, FILTER_VALIDATE_URL)) {
+        $src = self::absoluteUrl($src);
+        return $src ? self::urlEncode($src) : false;
+    }
+
+    /**
+     * Исправляет относительные ссылки на абсолютные для текущего сайта,
+     * указанного в MAIN_PAGE_URI текущего класса
+     * @param string $url
+     * @return string|null
+     */
+    protected static function absoluteUrl(string $url): ?string
+    {
+        if ($url && !filter_var($url, FILTER_VALIDATE_URL)) {
             if (static::MAIN_PAGE_URI) {
-                if (strpos($src, '/') == 0) {
-                    return static::MAIN_PAGE_URI . $src;
+                if (strpos($url, '/') == 0) {
+                    return static::MAIN_PAGE_URI . $url;
                 } else {
-                    return static::MAIN_PAGE_URI . '/' . $src;
+                    return static::MAIN_PAGE_URI . '/' . $url;
                 }
             }
             return false;
         }
-        return self::urlEncode($src);
+        return false;
     }
 
     /**
