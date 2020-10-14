@@ -91,7 +91,7 @@ class Helper
                 if ($item->type == NewsPostItem::TYPE_LINK)
                     echo "\t $item->link" . PHP_EOL;
                 if ($item->type == NewsPostItem::TYPE_IMAGE)
-                    echo '\t' . urldecode($item->image) . PHP_EOL;
+                    echo "\t" . urldecode($item->image) . PHP_EOL;
                 if ($item->type == NewsPostItem::TYPE_VIDEO)
                     echo "\t $item->youtubeId" . PHP_EOL;
             }
