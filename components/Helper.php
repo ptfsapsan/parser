@@ -50,7 +50,7 @@ class Helper
             throw new InvalidArgumentException('Невалидный или сильно искаженный URL: ' . $url);
         }
 
-        if (!empty($uriParts['path']) && preg_match('/[^\x00-\x7F]/S', $uriParts['path'])) {
+        if (!empty($uriParts['path'])) {
             $uriParts['path'] = implode('/', array_map('rawurlencode', explode('/', $uriParts['path'])));
         }
 
