@@ -21,11 +21,11 @@ use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\DomCrawler\UriResolver;
 use Throwable;
 
-class OgtrkParser implements ParserInterface
+class NaZapadeMosParser implements ParserInterface
 {
     public const USER_ID = 2;
     public const FEED_ID = 2;
-    public const SITE_URL = 'https://ogtrk.ru';
+    public const SITE_URL = 'https://na-zapade-mos.ru/';
 
     private int $microsecondsDelay;
     private int $pageCountBetweenDelay;
@@ -74,7 +74,7 @@ class OgtrkParser implements ParserInterface
     {
         $previewList = [];
 
-        $uriPreviewPage = UriResolver::resolve("/rss.xml", $this->getSiteUri());
+        $uriPreviewPage = UriResolver::resolve("/share/rss.xml", $this->getSiteUri());
 
         try {
             $previewNewsContent = $this->getPageContent($uriPreviewPage);
@@ -87,21 +87,23 @@ class OgtrkParser implements ParserInterface
 
         $previewNewsCrawler = $previewNewsCrawler->filterXPath('//item');
 
-        $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$previewList) {
-            $title = $newsPreview->filterXPath('//title')->text();
-            $uri = $newsPreview->filterXPath('//link')->text();
+        $previewNewsCrawler->each(
+            function (Crawler $newsPreview) use (&$previewList) {
+                $title = $newsPreview->filterXPath('//title')->text();
+                $uri = $newsPreview->filterXPath('//link')->text();
+                $publishedAtString = $newsPreview->filterXPath('//pubDate')->text();
+                $publishedAt = DateTimeImmutable::createFromFormat('D, d M Y H:i:s O', $publishedAtString);
+                $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
 
-            $publishedAtString = $newsPreview->filterXPath('//pubDate')->text();
-            $publishedAt = DateTimeImmutable::createFromFormat('D, d M Y H:i:s O', $publishedAtString);
-            $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
+                $preview = trim(strip_tags($newsPreview->filterXPath('//description')->text()));
+                $previewExplode = explode('.',$preview,2);
+                $preview = $previewExplode[0];
 
-            $preview = $newsPreview->filterXPath('//description')->text();
-
-            $previewList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $title, $preview);
-        });
+                $previewList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $title, $preview);
+            }
+        );
 
         $previewList = array_slice($previewList, 0, $maxNewsCount);
-
         return $previewList;
     }
 
@@ -117,19 +119,25 @@ class OgtrkParser implements ParserInterface
         $newsPage = $this->getPageContent($uri);
 
         $newsPageCrawler = new Crawler($newsPage);
-        $newsPostCrawler = $newsPageCrawler->filterXPath('//span[@class="smarttext"]/parent::*');
+        $newsPostCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"main-content-area")]');
 
+
+        $mainImageCrawler = $newsPageCrawler->filterXPath('//p[contains(@class,"fullmimg")]/img')->first();
+        if ($this->crawlerHasNodes($mainImageCrawler)) {
+            $image = $mainImageCrawler->attr('src');
+        }
+
+        if ($image !== null) {
+            $image = UriResolver::resolve($image, $uri);
+        }
 
         $newsPost = new NewsPost(self::class, $title, $description, $publishedAt->format('Y-m-d H:i:s'), $uri, $image);
 
-        $contentCrawler = $newsPostCrawler;
+        $contentCrawler = $newsPostCrawler->filterXPath('//div[contains(@class,"ce_text block")]/p');
 
-        $this->removeDomNodes($contentCrawler, '//*[name()="i" and self::*/a[contains(@href, "t=author")]]');
-        $this->removeDomNodes($contentCrawler,
-            '//span[@class="smarttext"]/preceding-sibling::* | //span[@class="smarttext"]');
-
-        $this->removeDomNodes($contentCrawler, '//a[starts-with(@href, "javascript")]');
-        $this->removeDomNodes($contentCrawler, '//script | //video');
+        $this->removeDomNodes($newsPageCrawler, '//p[contains(@class, "avtory")]');
+        $this->removeDomNodes($newsPageCrawler, '//a[starts-with(@href, "javascript")]');
+        $this->removeDomNodes($newsPageCrawler, '//script | //video');
         $this->removeDomNodes($contentCrawler, '//table');
 
         foreach ($contentCrawler as $item) {
@@ -143,13 +151,11 @@ class OgtrkParser implements ParserInterface
 
                 if ($newsPostItem->type === NewsPostItem::TYPE_IMAGE && $newsPost->image === null) {
                     $newsPost->image = $newsPostItem->image;
-                    continue;
                 }
 
                 $newsPost->addItem($newsPostItem);
             }
         }
-
         return $newsPost;
     }
 
@@ -167,7 +173,7 @@ class OgtrkParser implements ParserInterface
                 return $newsPostItem;
             }
 
-            $newsPostItem = $this->searchLinkNewsItem($node, $previewNewsItem);
+            $newsPostItem = $this->searchLinkNewsItem($node);
             if ($newsPostItem) {
                 return $newsPostItem;
             }
@@ -182,16 +188,13 @@ class OgtrkParser implements ParserInterface
                 return $newsPostItem;
             }
 
-
             $newsPostItem = $this->searchTextNewsItem($node);
             if ($newsPostItem) {
                 return $newsPostItem;
             }
 
-
             if ($node->nodeName === 'br') {
                 $this->removeParentsFromStorage($node->parentNode);
-                return null;
             }
         } catch (RuntimeException $exception) {
             return null;
@@ -202,9 +205,12 @@ class OgtrkParser implements ParserInterface
     private function searchQuoteNewsItem(DOMNode $node): ?NewsPostItem
     {
         if ($node->nodeName === '#text') {
-            $parentNode = $this->getRecursivelyParentNode($node, function (DOMNode $parentNode) {
-                return $this->isQuoteType($parentNode);
-            });
+            $parentNode = $this->getRecursivelyParentNode(
+                $node,
+                function (DOMNode $parentNode) {
+                    return $this->isQuoteType($parentNode);
+                }
+            );
             $node = $parentNode ?: $node;
         }
 
@@ -220,16 +226,18 @@ class OgtrkParser implements ParserInterface
 
         $this->nodeStorage->attach($node, $newsPostItem);
         $this->removeParentsFromStorage($node->parentNode);
-
         return $newsPostItem;
     }
 
     private function searchHeadingNewsItem(DOMNode $node): ?NewsPostItem
     {
         if ($node->nodeName === '#text') {
-            $parentNode = $this->getRecursivelyParentNode($node, function (DOMNode $parentNode) {
-                return $this->getHeadingLevel($parentNode);
-            });
+            $parentNode = $this->getRecursivelyParentNode(
+                $node,
+                function (DOMNode $parentNode) {
+                    return $this->getHeadingLevel($parentNode);
+                }
+            );
             $node = $parentNode ?: $node;
         }
 
@@ -250,23 +258,24 @@ class OgtrkParser implements ParserInterface
         return $newsPostItem;
     }
 
-    private function searchLinkNewsItem(DOMNode $node, PreviewNewsDTO $previewNewsItem): ?NewsPostItem
+    private function searchLinkNewsItem(DOMNode $node): ?NewsPostItem
     {
         if ($node->nodeName === '#text') {
-            $parentNode = $this->getRecursivelyParentNode($node, function (DOMNode $parentNode) {
-                return $this->isLink($parentNode);
-            });
+            $parentNode = $this->getRecursivelyParentNode(
+                $node,
+                function (DOMNode $parentNode) {
+                    return $this->isLink($parentNode);
+                }
+            );
             $node = $parentNode ?: $node;
         }
-
 
         if (!$node instanceof DOMElement || !$this->isLink($node)) {
             return null;
         }
 
-        $link = UriResolver::resolve($node->getAttribute('href'), $previewNewsItem->getUri());
-        $link = $this->encodeUri($link);
-        if ($link === null) {
+        $link = Helper::encodeUrl($node->getAttribute('href'));
+        if (!$link || $link === '' || !filter_var($link, FILTER_VALIDATE_URL)) {
             return null;
         }
 
@@ -285,23 +294,16 @@ class OgtrkParser implements ParserInterface
 
     private function searchYoutubeVideoNewsItem(DOMNode $node): ?NewsPostItem
     {
-        if ($node->nodeName === '#text') {
-            $parentNode = $this->getRecursivelyParentNode($node, function (DOMNode $parentNode) {
-                return $parentNode->nodeName === 'iframe';
-            }, 3);
-            $node = $parentNode ?: $node;
-        }
-
         if (!$node instanceof DOMElement || $node->nodeName !== 'iframe') {
             return null;
         }
 
-        $youtubeVideoId = $this->getYoutubeVideoId($node->getAttribute('src'));
-        if (!$youtubeVideoId) {
+        $iframeLink = $node->getAttribute('src');
+        if (!str_contains($iframeLink, 'youtube')) {
             return null;
         }
 
-        return new NewsPostItem(NewsPostItem::TYPE_VIDEO, null, null, null, null, $youtubeVideoId);
+        return new NewsPostItem(NewsPostItem::TYPE_VIDEO, null, null, null, null, basename($iframeLink));
     }
 
     private function searchImageNewsItem(DOMNode $node, PreviewNewsDTO $previewNewsItem): ?NewsPostItem
@@ -328,10 +330,7 @@ class OgtrkParser implements ParserInterface
         }
 
         $imageLink = UriResolver::resolve($imageLink, $previewNewsItem->getUri());
-        $imageLink = $this->encodeUri($imageLink);
-        if($imageLink === null){
-            return null;
-        }
+        $imageLink = Helper::encodeUrl($imageLink);
 
         $alt = $node->getAttribute('alt');
         $alt = $alt !== '' ? $alt : null;
@@ -356,17 +355,19 @@ class OgtrkParser implements ParserInterface
             'a' => true,
         ];
 
-        $attachNode = $node;
         if ($node->nodeName === '#text') {
-            $parentNode = $this->getRecursivelyParentNode($node, function (DOMNode $parentNode) use ($ignoringTags) {
-                return isset($ignoringTags[$parentNode->nodeName]);
-            }, 3);
-
-            if ($parentNode) {
-                $attachNode = $parentNode;
-            }
+            $parentNode = $this->getRecursivelyParentNode(
+                $node,
+                function (DOMNode $parentNode) use ($ignoringTags) {
+                    return isset($ignoringTags[$parentNode->nodeName]);
+                },
+                3
+            );
+            $node = $parentNode ?: $node;
         }
 
+
+        $attachNode = $node;
         if (isset($ignoringTags[$node->nodeName]) || $node->nodeName === '#text') {
             $attachNode = $node->parentNode;
         }
@@ -387,30 +388,13 @@ class OgtrkParser implements ParserInterface
     }
 
 
-    private function removeParentsFromStorage(
-        DOMNode $node,
-        int $maxLevel = 5,
-        array $exceptNewsPostItemTypes = null
-    ): void {
+    private function removeParentsFromStorage(DOMNode $node, int $maxLevel = 5): void
+    {
         if ($maxLevel <= 0 || !$node->parentNode) {
             return;
         }
 
-        if ($exceptNewsPostItemTypes === null) {
-            $exceptNewsPostItemTypes = [NewsPostItem::TYPE_HEADER, NewsPostItem::TYPE_QUOTE, NewsPostItem::TYPE_LINK];
-        }
-
-        if ($this->nodeStorage->contains($node)) {
-            /** @var NewsPostItem $newsPostItem */
-            $newsPostItem = $this->nodeStorage->offsetGet($node);
-
-            if (in_array($newsPostItem->type, $exceptNewsPostItemTypes, true)) {
-                return;
-            }
-
-            $this->nodeStorage->detach($node);
-            return;
-        }
+        $this->nodeStorage->detach($node);
 
         $maxLevel--;
 
@@ -536,12 +520,14 @@ class OgtrkParser implements ParserInterface
 
     private function removeDomNodes(Crawler $crawler, string $xpath): void
     {
-        $crawler->filterXPath($xpath)->each(function (Crawler $crawler) {
-            $domNode = $crawler->getNode(0);
-            if ($domNode) {
-                $domNode->parentNode->removeChild($domNode);
+        $crawler->filterXPath($xpath)->each(
+            function (Crawler $crawler) {
+                $domNode = $crawler->getNode(0);
+                if ($domNode) {
+                    $domNode->parentNode->removeChild($domNode);
+                }
             }
-        });
+        );
     }
 
     private function crawlerHasNodes(Crawler $crawler): bool
@@ -589,32 +575,8 @@ class OgtrkParser implements ParserInterface
         return $date;
     }
 
-    private function encodeUri(string $uri)
-    {
-        try {
-            $encodedUri = Helper::encodeUrl($uri);
-        } catch (Throwable $exception) {
-            return null;
-        }
-
-        if (!$encodedUri || $encodedUri === '' || !filter_var($encodedUri, FILTER_VALIDATE_URL)) {
-            return null;
-        }
-
-        return $encodedUri;
-    }
-
-    private function getYoutubeVideoId(string $link): ?string
-    {
-        $youtubeRegex = '/(youtu\.be\/|youtube\.com\/(watch\?(.*&)?v=|(embed|v)\/))([\w-]{11})/iu';
-        preg_match($youtubeRegex, $link, $matches);
-
-        return $matches[5] ?? null;
-    }
-
     private function getSiteUri(): string
     {
         return self::SITE_URL;
     }
-
 }
