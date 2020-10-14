@@ -87,6 +87,7 @@ class GroznyParser implements ParserInterface
                 if (count($previewList) < $minNewsCount) {
                     throw new RuntimeException('Не удалось получить достаточное кол-во новостей', null, $exception);
                 }
+                break;
             }
 
             $previewNewsCrawler = $previewNewsCrawler->filterXPath('//div[@class="bl-news-all"]');
