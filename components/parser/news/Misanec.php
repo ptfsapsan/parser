@@ -23,7 +23,7 @@ class Misanec extends Aleks007smolBaseParser implements ParserInterface
     /**
      * Ссылка на главную страницу сайта
      */
-    const MAIN_PAGE_URI = 'https://misanec.ru/';
+    const MAIN_PAGE_URI = null;
 
 
     /**
@@ -110,12 +110,11 @@ class Misanec extends Aleks007smolBaseParser implements ParserInterface
 
                 if ($mainImage->count()) {
                     if ($mainImage->attr('src')) {
-                        $newPost->image = $mainImage->attr('src');
+                        $newPost->image = self::prepareImage($mainImage->attr('src'));
                     }
                 }
 
                 $newsContent = (new Crawler($newsContent))->filter(self::BODY_CONTAINER_CSS_SELECTOR);
-
 
                 /**
                  * Подпись под основным фото (отсутствует)
@@ -290,6 +289,43 @@ class Misanec extends Aleks007smolBaseParser implements ParserInterface
                 )
             );
         }
+    }
+
+    /**
+     * Парсер для тегов <img>
+     * @param Crawler $node
+     * @param NewsPost $newPost
+     */
+    protected static function parseImage(Crawler $node, NewsPost $newPost): void
+    {
+        $src = self::prepareImage($node->attr('src'));
+
+        if ($src && $src != $newPost->image) {
+            $newPost->addItem(
+                new NewsPostItem(
+                    NewsPostItem::TYPE_IMAGE,
+                    null,
+                    $src,
+                    null,
+                    null,
+                    null
+                ));
+        }
+    }
+
+    /**
+     * Кодирование киррилических симоволов в URL
+     * Например из: https://misanec.ru/wp-content/uploads/2020/10/пожар3--840x1050.jpg
+     * в: https://misanec.ru/wp-content/uploads/2020/10/%D0%BF%D0%BE%D0%B6%D0%B0%D1%803-840x1050.jpg
+     *
+     * @param string $imageUrl
+     * @return string
+     */
+    private static function prepareImage(string $imageUrl): string
+    {
+        $imageUrlExploded = explode('//', $imageUrl);
+        $imageUrlExploded[1] = implode('/', array_map('rawurlencode', explode('/', $imageUrlExploded[1])));
+        return  implode('//', $imageUrlExploded);
     }
 
 }
