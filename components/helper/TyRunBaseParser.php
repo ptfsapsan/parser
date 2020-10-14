@@ -175,15 +175,57 @@ abstract class TyRunBaseParser
     }
 
     /**
+     * Парсер для тегов <p> для сайтов у которых описание содержит часть текста статьи.
+     * Дополнительно сверяем содержимое тегов с описанием новости (по предложениям), дубли не добавляем
+     * @param Crawler $node текущий элемент для парсинга
+     * @param NewsPost $newPost объект новости
+     * @param array $descriptionSentences массив предложений описания новости (explode('. ', $description))
+     */
+    protected static function parseDescriptionIntersectParagraph(Crawler $node, NewsPost $newPost, array $descriptionSentences): void
+    {
+        $nodeSentences = array_map(function ($item) {
+            return !empty($item) ? trim($item, '  \t\n\r\0\x0B.') : false;
+        }, explode('.', $node->text()));
+        $intersect = array_intersect($nodeSentences, $descriptionSentences);
+
+        /**
+         * Если в тексте есть хоть одно уникальное предложение ( по сравнению с описанием новости )
+         */
+        if (!empty($node->text()) && count($intersect) < count($nodeSentences)) {
+            /**
+             * Дополнительно проверяем, что оставшийся текст не является подстрокой описания
+             */
+            $text = trim(implode('. ', array_diff($nodeSentences, $intersect)));
+
+            if (empty($text) || stristr($newPost->description, $text)) {
+                return;
+            }
+
+            $type = NewsPostItem::TYPE_TEXT;
+            if ($node->nodeName() == static::QUOTE_TAG) {
+                $type = NewsPostItem::TYPE_QUOTE;
+            }
+
+            $newPost->addItem(
+                new NewsPostItem(
+                    $type,
+                    $text,
+                    null,
+                    null,
+                    null,
+                    null
+                ));
+        }
+    }
+
+    /**
+     * Кодирует кириллицу в ссылках, для прохождения валидации Url (FILTER_VALIDATE_URL)
      * @param string $url
      * @return string
      */
     protected static function urlEncode(string $url): string
     {
-        if (preg_match('/[А-я ]/', $url)) {
-            return str_replace(['%3A', '%2F'], [':', '/'], urlencode($url));
-        }
-        return $url;
+        return str_replace(['%3A', '%2F'], [':', '/'], rawurlencode($url));
     }
 
 }
