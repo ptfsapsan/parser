@@ -220,6 +220,10 @@ class MorvestiParser implements ParserInterface
             $node = $parentNode ?: $node;
         }
 
+        if (!$this->isQuoteType($node) || !$this->hasText($node)) {
+            return null;
+        }
+
         if ($this->nodeStorage->contains($node)) {
             throw new RuntimeException('Тег уже сохранен');
         }
