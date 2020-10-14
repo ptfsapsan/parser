@@ -14,6 +14,9 @@ use Symfony\Component\DomCrawler\Crawler;
 /**
  * Парсер новостей из RSS ленты uralpress.ru
  *
+ * На страницах новостей может быть галерея
+ * Описание может пересекаться с содержимым статьи
+ * (используем дял парсинга тегов <p> метод parseDescriptionIntersectParagraph)
  */
 class UralPress extends TyRunBaseParser implements ParserInterface
 {
