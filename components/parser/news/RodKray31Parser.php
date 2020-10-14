@@ -145,6 +145,7 @@ class RodKray31Parser implements ParserInterface
 
         $title = $entityData["title"];
         $createDate = new DateTime($entityData["created_at"]);
+        $createDate->setTimezone(new \DateTimeZone("UTC"));
         $description = $entityData["lead"];
         $original = $entityData["detail_url"];
         $galleryItem = array_shift($entityData["gallery"]);
