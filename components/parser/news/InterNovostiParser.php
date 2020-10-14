@@ -66,6 +66,7 @@ class InterNovostiParser implements ParserInterface
     {
         $title = $entityData->filter("title")->text();
         $createDate = new DateTime($entityData->filter("pubDate")->text());
+        $createDate->setTimezone(new \DateTimeZone("UTC"));
         $description = $entityData->filter("description")->text();
         $original = $entityData->filter("link")->text();
 
