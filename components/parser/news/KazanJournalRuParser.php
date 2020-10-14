@@ -351,19 +351,18 @@ class KazanJournalRuParser implements ParserInterface
             'a' => true,
         ];
 
+        $attachNode = $node;
         if ($node->nodeName === '#text') {
             $parentNode = $this->getRecursivelyParentNode($node, function (DOMNode $parentNode) use ($ignoringTags) {
                 return isset($ignoringTags[$parentNode->nodeName]);
-            }, 7);
-            $node = $parentNode ?: $node;
+            }, 3);
+
+            $attachNode = $parentNode ?: $node->parentNode;
         }
 
-
-        $attachNode = $node;
-        if (isset($ignoringTags[$node->nodeName]) || $node->nodeName === '#text') {
-            $attachNode = $node->parentNode;
+        if (isset($ignoringTags[$attachNode->nodeName])) {
+            $attachNode = $attachNode->parentNode;
         }
-
 
         if ($this->nodeStorage->contains($attachNode)) {
             /** @var NewsPostItem $parentNewsPostItem */
@@ -373,7 +372,7 @@ class KazanJournalRuParser implements ParserInterface
             throw new RuntimeException('Контент добавлен к существующему объекту NewsPostItem');
         }
 
-        $newsPostItem = new NewsPostItem(NewsPostItem::TYPE_TEXT, $node->textContent);
+        $newsPostItem = new NewsPostItem(NewsPostItem::TYPE_TEXT, $this->normalizeSpaces($node->textContent));
 
         $this->nodeStorage->attach($attachNode, $newsPostItem);
 
