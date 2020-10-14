@@ -167,7 +167,6 @@ class MarketMediaParser implements ParserInterface
                 $newsPost->addItem($newsPostItem);
             }
         }
-        dd($newsPost);
         return $newsPost;
     }
 
