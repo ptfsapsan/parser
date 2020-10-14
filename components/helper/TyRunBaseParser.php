@@ -98,10 +98,11 @@ abstract class TyRunBaseParser
      * Парсер для тегов <img>
      * @param Crawler $node
      * @param NewsPost $newPost
+     * @param string $lazySrcAttr название атрибута в котором лежит ссылка на изображение при lazyLoad
      */
-    protected static function parseImage(Crawler $node, NewsPost $newPost): void
+    protected static function parseImage(Crawler $node, NewsPost $newPost, $lazySrcAttr = 'data-src'): void
     {
-        $src = self::getProperImageSrc($node);
+        $src = self::getProperImageSrc($node, $lazySrcAttr);
         if ($src && $src != $newPost->image) {
             $newPost->addItem(
                 new NewsPostItem(
@@ -156,11 +157,12 @@ abstract class TyRunBaseParser
      * - если итоговый src не пустой и в классе указана константа MAIN_PAGE_UTI,
      * пробуем исправить ссылку, возможно ссылка относительная
      * @param Crawler $node элемент изображения
+     * @param string $lazySrcAttr
      * @return string|null
      */
-    protected static function getProperImageSrc(Crawler $node): ?string
+    protected static function getProperImageSrc(Crawler $node, string $lazySrcAttr): ?string
     {
-        $src = $node->attr('src') ?? $node->attr('data-src');
+        $src = $node->attr('src') ?? $node->attr($lazySrcAttr);
         $src = self::absoluteUrl($src);
         return $src ? self::urlEncode($src) : false;
     }
@@ -183,7 +185,7 @@ abstract class TyRunBaseParser
             }
             return false;
         }
-        return false;
+        return $url;
     }
 
     /**
