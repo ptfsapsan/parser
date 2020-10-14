@@ -347,14 +347,11 @@ class NovayaGazetaRazyanParser implements ParserInterface
 
         $imageLink = UriResolver::resolve($imageLink, $previewNewsItem->getUri());
         $imageLink = Helper::encodeUrl($imageLink);
-        $imageLink = str_replace(' ','%',$imageLink);
+        $imageLink = str_replace(' ','%20',$imageLink);
 
 
         $alt = $node->getAttribute('alt');
         $alt = $alt !== '' ? $alt : null;
-//        if (!$imageLink || $imageLink == '' || !filter_var($imageLink, FILTER_VALIDATE_URL)) {
-//            dd($previewNewsItem,$imageLink);
-//        }
         return new NewsPostItem(NewsPostItem::TYPE_IMAGE, $alt, $imageLink);
     }
 
