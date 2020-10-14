@@ -4,6 +4,7 @@ namespace app\components;
 
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
+use League\Uri\Uri;
 use linslin\yii2\curl\Curl;
 
 class Helper
@@ -33,6 +34,22 @@ class Helper
         $url .= $scheme ? $scheme . '://' : 'https://';
         $url .= $link;
         return $url;
+    }
+
+    /**
+     * Encode international unicode URL
+     * @param $url
+     * @return string
+     */
+    public static function encodeUrl(string $url): string
+    {
+        $uriParts = parse_url($url);
+
+        if (!empty($uriParts['path']) && preg_match('/[^\x00-\x7F]/S', $uriParts['path'])) {
+            $uriParts['path'] = implode('/', array_map('rawurlencode', explode('/', $uriParts['path'])));
+        }
+
+        return (string) Uri::createFromComponents($uriParts);
     }
 
     /**
@@ -78,4 +95,3 @@ class Helper
     }
 
 }
-
