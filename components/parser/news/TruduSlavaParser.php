@@ -18,7 +18,7 @@ class TruduSlavaParser implements ParserInterface
 {
     const USER_ID = 2;
     const FEED_ID = 2;
-    const SITE_URL = 'http://www.trudu-slava.ru/';
+    const SITE_URL = 'http://www.trudu-slava.ru';
 
     public static function run(): array
     {
@@ -39,38 +39,41 @@ class TruduSlavaParser implements ParserInterface
             if (!$contentPage) {
                 continue;
             }
+
             $itemCrawler = new Crawler(null, $url);
             $itemCrawler->addHtmlContent($contentPage, 'UTF-8');
 
             $title = $itemCrawler->filterXPath("//*[@class='contentpagetitle']")->text();
             $date = $this->getDate($itemCrawler->filterXPath("//*[@class='createdate']")->text());
-            $image = $this->getHeadUrl($itemCrawler->filterXPath('//p[3]/img')->attr('src'));
-            $p = 3;
+            $image = null;
+            $imageSrc = $itemCrawler->filterXPath("//*[@id='page']/p/img");
+            if ($imageSrc->getNode(0)) {
+                $image = $this->getHeadUrl($imageSrc->attr('src'));
+            }elseif ($imageSrc = $itemCrawler->filterXPath("//*[@id='page']/p/*/img")){
+                $image = $this->getHeadUrl($imageSrc->attr('src'));
+            }
 
-            $description = $itemCrawler->filterXPath('//p[3]');
-            dd($itemCrawler->filterXPath("//*[@class='blog_more']")->parents());//->previousSibling);//->text();
-            dd($itemCrawler->filterXPath('//p[3]')->text(),$itemCrawler->filterXPath('//p[10]')->text());
-            foreach ($description as $key => $item) {
-                foreach ($item->childNodes as $childNode) {
-                    if($childNode->nodeName == '#text' && !$childNode->nodeValue) {
-                        dd($childNode);
+            $description = '';
+            $p = [];
+
+            $paragraph = $itemCrawler->filterXPath("//*[@id='page']/p");
+            dump($url, $paragraph);
+            foreach ($paragraph as $key => $item) {
+                if ($key >= 2 && $text = $item->nodeValue) {
+                    $text = htmlentities($text);
+                    $text = str_replace("&nbsp;",'',$text);
+                    $text = html_entity_decode($text);
+                    if ($text) {
+                        $description = $description . ' ' . $text;
+                        $p[] = $text;
                     }
-                    dump($childNode->nodeValue);
                 }
-                dd($item->childNodes);
-                dump($item->nodeValue);
-            }//*[@id="page"]/p[11]
-            dd($description);
-            dd($url,$itemCrawler->filterXPath('//*[@id="page"]/p[3]/img'));
-            //
-            dd($image);
-//*[@id="page"]/p[3]
-            $description = $itemCrawler->filterXPath("//*[@class='articletext']")->text();
+            }
 
             $post = new NewsPost(
                 self::class,
                 $title,
-                $description,
+                trim($description),
                 $date,
                 $url,
                 $image
@@ -78,23 +81,8 @@ class TruduSlavaParser implements ParserInterface
 
             $this->addItemPost($post, NewsPostItem::TYPE_HEADER, $title, null, null, 1);
 
-            $newContentCrawler = (new Crawler($itemCrawler->filterXPath("//*[@class='articletext']")->html()))->filterXPath('//body')->children();
-
-            foreach ($newContentCrawler as $content) {
-                foreach ($content->childNodes as $childNode) {
-                    $nodeValue = trim($childNode->nodeValue);
-                    if (in_array($childNode->nodeName, ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'])) {
-
-                        $this->addItemPost($post, NewsPostItem::TYPE_HEADER, $nodeValue, null, null, (int) substr($childNode->nodeName, 1));
-
-                    } if ($childNode->nodeName == 'a' && strpos($childNode->getAttribute('href'), 'http') !== false) {
-
-                        $this->addItemPost($post, NewsPostItem::TYPE_LINK, $nodeValue, null, $childNode->getAttribute('href'));
-
-                    } elseif ($nodeValue) {
-                        $this->addItemPost($post, NewsPostItem::TYPE_TEXT, $nodeValue);
-                    }
-                }
+            foreach ($p as $text) {
+                $this->addItemPost($post, NewsPostItem::TYPE_TEXT, $text);
             }
 
             $posts[] = $post;
