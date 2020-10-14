@@ -382,40 +382,6 @@ class SportmediaNewsParser implements ParserInterface
         return $newsPostItem;
     }
 
-    private function searchPublishedAt(Crawler $crawler): ?DateTimeImmutable
-    {
-        $crawler = $crawler->filter('p.news-itm__date')->first();
-        if (!$this->crawlerHasNodes($crawler)) {
-            return null;
-        }
-
-        $publishedAt = Text::trim($crawler->text());
-
-        $months = [
-            1 => 'янв.',
-            2 => 'февр.',
-            3 => 'марта',
-            4 => 'апр.',
-            5 => 'мая',
-            6 => 'июня',
-            7 => 'июля',
-            8 => 'авг.',
-            9 => 'сент.',
-            10 => 'окт.',
-            11 => 'нояб.',
-            12 => 'дек.',
-        ];
-
-        $publishedAt = str_replace([...$months, ' г., '], [...array_keys($months), ''], $publishedAt);
-        $publishedAt = DateTimeImmutable::createFromFormat('d m Y H:i', $publishedAt, new DateTimeZone('Europe/Moscow'));
-
-        if (!$publishedAt) {
-            return null;
-        }
-
-        return $publishedAt->setTimezone(new DateTimeZone('UTC'));
-    }
-
     private function removeParentsFromStorage(DOMNode $node, int $maxLevel = 5): void
     {
         if ($maxLevel <= 0 || !$node->parentNode) {
