@@ -57,7 +57,6 @@ class TruduSlavaParser implements ParserInterface
             $p = [];
 
             $paragraph = $itemCrawler->filterXPath("//*[@id='page']/p");
-            dump($url, $paragraph);
             foreach ($paragraph as $key => $item) {
                 if ($key >= 2 && $text = $item->nodeValue) {
                     $text = htmlentities($text);
