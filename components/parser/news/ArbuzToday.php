@@ -222,28 +222,6 @@ class ArbuzToday extends TyRunBaseParser implements ParserInterface
 
     }
 
-
-    /**
-     * Парсер для тегов <a>
-     * @param Crawler $node
-     * @param NewsPost $newPost
-     */
-    protected static function parseLink(Crawler $node, NewsPost $newPost): void
-    {
-        if (filter_var($node->attr('href'), FILTER_VALIDATE_URL)
-            && !stristr($node->attr('class'), 'link-more')) {
-            $newPost->addItem(
-                new NewsPostItem(
-                    NewsPostItem::TYPE_LINK,
-                    null,
-                    null,
-                    $node->attr('href'),
-                    null,
-                    null
-                ));
-        }
-    }
-
     /**
      * Парсер для тегов <p>
      * Дополнительно сверяем содержимое тегов с описанием новости (по предложениям), дубли не добавляем

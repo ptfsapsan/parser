@@ -29,6 +29,27 @@ abstract class TyRunBaseParser
     );
 
     /**
+     * Парсер для тегов <a>
+     * @param Crawler $node
+     * @param NewsPost $newPost
+     */
+    protected static function parseLink(Crawler $node, NewsPost $newPost): void
+    {
+        $url = self::urlEncode($node->attr('href'));
+        if (filter_var($url, FILTER_VALIDATE_URL)) {
+            $newPost->addItem(
+                new NewsPostItem(
+                    NewsPostItem::TYPE_LINK,
+                    null,
+                    null,
+                    $node->attr('href'),
+                    null,
+                    null
+                ));
+        }
+    }
+
+    /**
      * Парсер для тегов <ul>, <ol> и т.п.
      * Разбирает списки в текст с переносом строки
      * @param Crawler $node
@@ -150,7 +171,19 @@ abstract class TyRunBaseParser
             }
             return false;
         }
-        return $src;
+        return self::urlEncode($src);
+    }
+
+    /**
+     * @param string $url
+     * @return string
+     */
+    protected static function urlEncode(string $url): string
+    {
+        if (preg_match('/[А-я ]/', $url)) {
+            return str_replace(['%3A', '%2F'], [':', '/'], urlencode($url));
+        }
+        return $url;
     }
 
 }
