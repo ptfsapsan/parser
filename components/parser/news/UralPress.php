@@ -175,19 +175,19 @@ class UralPress extends TyRunBaseParser implements ParserInterface
                  * парсим только изображения из таких блоков
                  */
                 if (stristr($node->attr('class'), 'field-type-image')) {
-                    $images = $node->filter('img');
+                    $images = $node->filter('.gallery-slides img');
                     if ($images->count()) {
                         $images->each(function (Crawler $node) use (&$newPost){
                             self::parseImage($node, $newPost);
                         });
                     }
-                }
-
-                $nodes = $node->children();
-                if ($nodes->count()) {
-                    $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing) {
-                        self::parseNode($node, $newPost, $maxDepth, $stopParsing);
-                    });
+                } else {
+                    $nodes = $node->children();
+                    if ($nodes->count()) {
+                        $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing) {
+                            self::parseNode($node, $newPost, $maxDepth, $stopParsing);
+                        });
+                    }
                 }
                 break;
             case 'p':
