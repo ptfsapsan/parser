@@ -132,7 +132,11 @@ class NovayaGazetaRazyanParser implements ParserInterface
         $this->removeDomNodes($contentCrawler, '//script | //video');
         $this->removeDomNodes($contentCrawler, '//table');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"row")]');
-        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"mt-4")]');
+//        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"mt-4")]');
+//        div[ @class="posts" and div ]
+        $this->removeDomNodes($contentCrawler, '//div[@class="mt-4" and iframe]');
+        $this->removeDomNodes($contentCrawler, '//div[contains(@id,"vk_comments")]');
+        $this->removeDomNodes($contentCrawler, '//iframe[contains(@src,"https://vk.com/")]');
 
         foreach ($contentCrawler as $item) {
             $nodeIterator = new DOMNodeRecursiveIterator($item->childNodes);
@@ -150,6 +154,7 @@ class NovayaGazetaRazyanParser implements ParserInterface
                 $newsPost->addItem($newsPostItem);
             }
         }
+
         return $newsPost;
     }
 
@@ -223,7 +228,6 @@ class NovayaGazetaRazyanParser implements ParserInterface
 
         $this->nodeStorage->attach($node, $newsPostItem);
         $this->removeParentsFromStorage($node->parentNode);
-
         return $newsPostItem;
     }
 
@@ -343,11 +347,14 @@ class NovayaGazetaRazyanParser implements ParserInterface
 
         $imageLink = UriResolver::resolve($imageLink, $previewNewsItem->getUri());
         $imageLink = Helper::encodeUrl($imageLink);
+        $imageLink = str_replace(' ','%',$imageLink);
+
 
         $alt = $node->getAttribute('alt');
         $alt = $alt !== '' ? $alt : null;
-
-
+//        if (!$imageLink || $imageLink == '' || !filter_var($imageLink, FILTER_VALIDATE_URL)) {
+//            dd($previewNewsItem,$imageLink);
+//        }
         return new NewsPostItem(NewsPostItem::TYPE_IMAGE, $alt, $imageLink);
     }
 
@@ -397,7 +404,6 @@ class NovayaGazetaRazyanParser implements ParserInterface
         $newsPostItem = new NewsPostItem(NewsPostItem::TYPE_TEXT, $node->textContent);
 
         $this->nodeStorage->attach($attachNode, $newsPostItem);
-
         return $newsPostItem;
     }
 
