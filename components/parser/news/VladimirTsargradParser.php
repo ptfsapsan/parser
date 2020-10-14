@@ -21,7 +21,7 @@ use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\DomCrawler\UriResolver;
 use Throwable;
 
-class VladimirTsargrad implements ParserInterface
+class VladimirTsargradParser implements ParserInterface
 {
     public const USER_ID = 2;
     public const FEED_ID = 2;
@@ -86,6 +86,7 @@ class VladimirTsargrad implements ParserInterface
                 if (count($previewList) < $minNewsCount) {
                     throw new RuntimeException('Не удалось получить достаточное кол-во новостей', null, $exception);
                 }
+                break;
             }
 
             $previewNewsCrawler = $previewNewsCrawler->filterXPath('//div[contains(@class,"news__item-info")]/parent::*');
