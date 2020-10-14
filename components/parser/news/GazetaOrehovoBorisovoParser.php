@@ -100,7 +100,7 @@ class GazetaOrehovoBorisovoParser implements ParserInterface
         }
 
         $createDate = new DateTime($dateStr);
-
+        $createDate->setTimezone(new \DateTimeZone("UTC"));
         $imageUrl = null;
         return new NewsPost(
             self::class,
