@@ -26,7 +26,7 @@ class VegChelParser implements ParserInterface
 {
     public const USER_ID = 2;
     public const FEED_ID = 2;
-    public const SITE_URL = 'http://vegchel.ru/';
+    private const SITE_URL = 'http://vegchel.ru';
 
     private int $microsecondsDelay;
     private int $pageCountBetweenDelay;
@@ -112,20 +112,21 @@ class VegChelParser implements ParserInterface
         $title = $previewNewsItem->getTitle();
         $publishedAt = $previewNewsItem->getDateTime();
         $description = $previewNewsItem->getPreview();
-        $image = null;
 
         $newsPage = $this->getPageContent($uri);
 
         $newsPageCrawler = new Crawler($newsPage);
         $newsPostCrawler = $newsPageCrawler->filterXPath('//div[@id="posts"]');
-
-
+        $image = self::SITE_URL.$newsPostCrawler->filterXPath('//img[1]')->attr('src');
         $newsPost = new NewsPost(self::class, $title, $description, $publishedAt->format('Y-m-d H:i:s'), $uri, $image);
 
         $contentCrawler = $newsPostCrawler;
 
         $this->removeDomNodes($contentCrawler, '//a[starts-with(@href, "javascript")]');
+        $this->removeDomNodes($contentCrawler, '//h1[contains(@itemprop, "headline")]');
+        $this->removeDomNodes($contentCrawler, '//img[1]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"full-subinfo")]');
+        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"f-page-cat")]');
         $this->removeDomNodes($contentCrawler, '//center');
         $this->removeDomNodes($contentCrawler, '//div[contains(text(), "Загрузка")]');
         $this->removeDomNodes($contentCrawler, '//script | //video');
