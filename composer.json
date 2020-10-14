@@ -2,16 +2,19 @@
   "name": "news/parser",
   "description": "News parser",
   "type": "project",
-  "minimum-stability": "stable",
   "require": {
     "php": ">=7.4",
     "yiisoft/yii2": "~2.0.14",
     "yiisoft/yii2-bootstrap": "~2.0.0",
     "yiisoft/yii2-swiftmailer": "~2.0.0 || ~2.1.0",
     "linslin/yii2-curl": "^1.4",
-    "electrolinux/phpquery": "^0.9.6",
-    "symfony/css-selector": "^5.1",
-    "symfony/dom-crawler": "^5.1"
+    "cagartner/phpquery": "^0.9.12",
+    "lanfix/parser": "*",
+    "symfony/dom-crawler": "^5.1",
+    "ext-dom": "*",
+    "league/uri": "^6.3",
+    "rowbot/punycode": "^1.0",
+    "symfony/css-selector": "^5.1"
   },
   "config": {
     "process-timeout": 1800,
@@ -44,5 +47,8 @@
       "type": "composer",
       "url": "https://asset-packagist.org"
     }
-  ]
+  ],
+  "require-dev": {
+    "symfony/var-dumper": "^5.1"
+  }
 }
