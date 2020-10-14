@@ -13,6 +13,7 @@ use DateTimeImmutable;
 use DateTimeInterface;
 use DateTimeZone;
 use DOMElement;
+use League\Uri\Uri;
 use DOMNode;
 use linslin\yii2\curl\Curl;
 use RuntimeException;
@@ -123,23 +124,14 @@ class FomagParser implements ParserInterface
         $newsPostCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"article-frame")]');
 
 
-        $mainImageCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"article-image")]/img')->first();
-        if ($this->crawlerHasNodes($mainImageCrawler)) {
-            $image = $mainImageCrawler->attr('src');
-        }
-
-        if ($image !== null) {
-            $image = UriResolver::resolve($image, $uri);
-        }
-
         $newsPost = new NewsPost(self::class, $title, $description, $publishedAt->format('Y-m-d H:i:s'), $uri, $image);
 
-        $contentCrawler = $newsPostCrawler->filterXPath('//div[contains(@class,"js-giraff-article")]/p');
+        $contentCrawler = $newsPostCrawler;
 
-        $this->removeDomNodes($newsPageCrawler, '//p[contains(@class, "authorpr")]');
-
-        $this->removeDomNodes($newsPageCrawler, '//a[starts-with(@href, "javascript")]');
-        $this->removeDomNodes($newsPageCrawler, '//script | //video');
+        $this->removeDomNodes($contentCrawler, '//a[starts-with(@href, "javascript")]');
+        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"panel-block")]');
+        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"soc-frame")]');
+        $this->removeDomNodes($contentCrawler, '//script | //video');
         $this->removeDomNodes($contentCrawler, '//table');
 
         foreach ($contentCrawler as $item) {
@@ -158,6 +150,7 @@ class FomagParser implements ParserInterface
                 $newsPost->addItem($newsPostItem);
             }
         }
+
         return $newsPost;
     }
 
@@ -175,7 +168,7 @@ class FomagParser implements ParserInterface
                 return $newsPostItem;
             }
 
-            $newsPostItem = $this->searchLinkNewsItem($node);
+            $newsPostItem = $this->searchLinkNewsItem($node, $previewNewsItem);
             if ($newsPostItem) {
                 return $newsPostItem;
             }
@@ -190,13 +183,16 @@ class FomagParser implements ParserInterface
                 return $newsPostItem;
             }
 
+
             $newsPostItem = $this->searchTextNewsItem($node);
             if ($newsPostItem) {
                 return $newsPostItem;
             }
 
+
             if ($node->nodeName === 'br') {
                 $this->removeParentsFromStorage($node->parentNode);
+                return null;
             }
         } catch (RuntimeException $exception) {
             return null;
@@ -228,6 +224,7 @@ class FomagParser implements ParserInterface
 
         $this->nodeStorage->attach($node, $newsPostItem);
         $this->removeParentsFromStorage($node->parentNode);
+
         return $newsPostItem;
     }
 
@@ -260,7 +257,7 @@ class FomagParser implements ParserInterface
         return $newsPostItem;
     }
 
-    private function searchLinkNewsItem(DOMNode $node): ?NewsPostItem
+    private function searchLinkNewsItem(DOMNode $node, PreviewNewsDTO $previewNewsItem): ?NewsPostItem
     {
         if ($node->nodeName === '#text') {
             $parentNode = $this->getRecursivelyParentNode(
@@ -272,11 +269,14 @@ class FomagParser implements ParserInterface
             $node = $parentNode ?: $node;
         }
 
+
         if (!$node instanceof DOMElement || !$this->isLink($node)) {
             return null;
         }
 
-        $link = Helper::encodeUrl($node->getAttribute('href'));
+        $link = UriResolver::resolve($node->getAttribute('href'), $previewNewsItem->getUri());
+        $link = Helper::encodeUrl($link);
+
         if (!$link || $link === '' || !filter_var($link, FILTER_VALIDATE_URL)) {
             return null;
         }
@@ -296,16 +296,27 @@ class FomagParser implements ParserInterface
 
     private function searchYoutubeVideoNewsItem(DOMNode $node): ?NewsPostItem
     {
+        if ($node->nodeName === '#text') {
+            $parentNode = $this->getRecursivelyParentNode(
+                $node,
+                function (DOMNode $parentNode) {
+                    return $parentNode->nodeName === 'iframe';
+                },
+                3
+            );
+            $node = $parentNode ?: $node;
+        }
+
         if (!$node instanceof DOMElement || $node->nodeName !== 'iframe') {
             return null;
         }
 
-        $iframeLink = $node->getAttribute('src');
-        if (!str_contains($iframeLink, 'youtube')) {
+        $youtubeVideoId = $this->getYoutubeVideoId($node->getAttribute('src'));
+        if (!$youtubeVideoId) {
             return null;
         }
 
-        return new NewsPostItem(NewsPostItem::TYPE_VIDEO, null, null, null, null, basename($iframeLink));
+        return new NewsPostItem(NewsPostItem::TYPE_VIDEO, null, null, null, null, $youtubeVideoId);
     }
 
     private function searchImageNewsItem(DOMNode $node, PreviewNewsDTO $previewNewsItem): ?NewsPostItem
@@ -357,6 +368,7 @@ class FomagParser implements ParserInterface
             'a' => true,
         ];
 
+        $attachNode = $node;
         if ($node->nodeName === '#text') {
             $parentNode = $this->getRecursivelyParentNode(
                 $node,
@@ -365,11 +377,12 @@ class FomagParser implements ParserInterface
                 },
                 3
             );
-            $node = $parentNode ?: $node;
+
+            if ($parentNode) {
+                $attachNode = $parentNode;
+            }
         }
 
-
-        $attachNode = $node;
         if (isset($ignoringTags[$node->nodeName]) || $node->nodeName === '#text') {
             $attachNode = $node->parentNode;
         }
@@ -390,13 +403,30 @@ class FomagParser implements ParserInterface
     }
 
 
-    private function removeParentsFromStorage(DOMNode $node, int $maxLevel = 5): void
-    {
+    private function removeParentsFromStorage(
+        DOMNode $node,
+        int $maxLevel = 5,
+        array $exceptNewsPostItemTypes = null
+    ): void {
         if ($maxLevel <= 0 || !$node->parentNode) {
             return;
         }
 
-        $this->nodeStorage->detach($node);
+        if ($exceptNewsPostItemTypes === null) {
+            $exceptNewsPostItemTypes = [NewsPostItem::TYPE_HEADER, NewsPostItem::TYPE_QUOTE, NewsPostItem::TYPE_LINK];
+        }
+
+        if ($this->nodeStorage->contains($node)) {
+            /** @var NewsPostItem $newsPostItem */
+            $newsPostItem = $this->nodeStorage->offsetGet($node);
+
+            if (in_array($newsPostItem->type, $exceptNewsPostItemTypes, true)) {
+                return;
+            }
+
+            $this->nodeStorage->detach($node);
+            return;
+        }
 
         $maxLevel--;
 
@@ -577,8 +607,17 @@ class FomagParser implements ParserInterface
         return $date;
     }
 
+    private function getYoutubeVideoId(string $link): ?string
+    {
+        $youtubeRegex = '/(youtu\.be\/|youtube\.com\/(watch\?(.*&)?v=|(embed|v)\/))([\w-]{11})/iu';
+        preg_match($youtubeRegex, $link, $matches);
+
+        return $matches[5] ?? null;
+    }
+
     private function getSiteUri(): string
     {
         return self::SITE_URL;
     }
+
 }
