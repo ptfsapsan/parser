@@ -78,23 +78,23 @@ class InzaraiskRuParser implements ParserInterface
 
     protected static function parseDate($string)
     {
-        $re = '/^(?<day>\d+) (?<month>[^ ]+) (?<year>\d{4}) г\., (?<hours>\d{2}):(?<minutes>\d{2})$/';
+        $re = '/^(?<day>\d{1,2}) (?<month>[^ ]+) (?<year>\d{4}) г\., (?<hours>\d{1,2}):(?<minutes>\d{1,2})$/';
 
         if (!preg_match($re, trim($string), $m)) {
-            throw new Exception('Не удалось разобрать дату');
+            throw new Exception("Не удалось разобрать дату '{$string}'");
         }
 
         $months = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 
         foreach ($months as $key => $name) {
             if (strpos($m['month'], $name) === 0) {
-                $month = sprintf('%02d', $key + 1);
+                $month = $key + 1;
 
                 break;
             }
         }
 
-        return sprintf('%d-%d-%d %s:%s:00',
+        return sprintf('%d-%02d-%02d %02d:%02d:00',
             $m['year'], $month, $m['day'], $m['hours'], $m['minutes']
         );
     }
