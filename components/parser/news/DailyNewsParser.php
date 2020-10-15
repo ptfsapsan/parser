@@ -111,19 +111,21 @@ class DailyNewsParser implements ParserInterface
         $title = $previewNewsItem->getTitle();
         $publishedAt = $previewNewsItem->getDateTime();
         $description = $previewNewsItem->getPreview();
-        $image = null;
 
         $newsPage = $this->getPageContent($uri);
 
         $newsPageCrawler = new Crawler($newsPage);
         $newsPostCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"full-news-text")]');
-
+        $image = $newsPostCrawler->filterXPath('//img[1]')->attr('src');
+        $image = UriResolver::resolve($image, $previewNewsItem->getUri());
+        $image = Helper::encodeUrl($image);
 
         $newsPost = new NewsPost(self::class, $title, $description, $publishedAt->format('Y-m-d H:i:s'), $uri, $image);
 
         $contentCrawler = $newsPostCrawler;
 
         $this->removeDomNodes($contentCrawler, '//a[starts-with(@href, "javascript")]');
+        $this->removeDomNodes($contentCrawler, '//div[contains(@style,"text-align:center;")]/a');
         $this->removeDomNodes($contentCrawler, '//script | //video');
         $this->removeDomNodes($contentCrawler, '//table');
 
