@@ -64,7 +64,7 @@ class LegitimistParser implements ParserInterface
             if ($image->count() !== 0) {
                 $imgUrl = $image->attr("src");
                 self::addImage($post, $imgUrl);
-                $post->image = self::ROOT_SRC . $imgUrl;
+                $post->image = self::normalizeUrl(self::ROOT_SRC . $imgUrl);
             }
 
             $header = $content->filter("div.outro h1");
@@ -171,15 +171,14 @@ class LegitimistParser implements ParserInterface
             ));
     }
 
+
     /**
      * @param NewsPost $post
      * @param string   $content
      */
     protected static function addImage(NewsPost $post, string $content): void
     {
-        $url = preg_replace_callback('/[^\x20-\x7f]/', function ($match) {
-            return urlencode($match[0]);
-        }, $content);
+        $url = self::normalizeUrl($content);
         $post->addItem(
             new NewsPostItem(
                 NewsPostItem::TYPE_IMAGE,
@@ -224,5 +223,17 @@ class LegitimistParser implements ParserInterface
                 null
             ));
     }
+
+    /**
+     * @param string $content
+     *
+     * @return string
+     */
+    protected static function normalizeUrl(string $content)
+    {
+        return preg_replace_callback('/[^\x20-\x7f]/', function ($match) {
+            return urlencode($match[0]);
+        }, $content);
+}
 }
 
