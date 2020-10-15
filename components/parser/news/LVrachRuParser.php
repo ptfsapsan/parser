@@ -342,7 +342,7 @@ class LVrachRuParser implements ParserInterface
             }
         }
 
-        if ($imageLink === '') {
+        if ($imageLink === '' || preg_match('/\.webp/m', $imageLink)) {
             return null;
         }
 
