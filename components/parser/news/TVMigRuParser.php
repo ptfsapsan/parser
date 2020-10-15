@@ -125,6 +125,10 @@ class TVMigRuParser implements ParserInterface
         
         $newsPostCrawler = $newsPageCrawler->filterXPath('//div[@class="news_detail"]');
 
+        foreach ($newsPostCrawler->filterXPath("//*[contains(concat(' ',normalize-space(@class),' '),' ffull ')]") as $domElement) {
+            $domElement->removeAttribute('href');
+        }
+
         $this->removeDomNodes($newsPostCrawler, '//*[@class="news-date-time"]
         | //*[@itemprop="headline"]
         | //*[@itemprop="author"]
@@ -280,6 +284,12 @@ class TVMigRuParser implements ParserInterface
 
 
         if (!$node instanceof DOMElement || !$this->isLink($node)) {
+            return null;
+        }
+
+        $href = trim($node->getAttribute('href'));
+
+        if (!$href || $href === '') {
             return null;
         }
 
