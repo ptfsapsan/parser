@@ -110,17 +110,39 @@ class PanoramaProParser implements ParserInterface
         $title = $previewNewsItem->getTitle();
         $publishedAt = $previewNewsItem->getDateTime();
         $description = $previewNewsItem->getPreview();
-        $description = html_entity_decode($description);
-
         $image = null;
         $newsPage = $this->getPageContent($uri);
 
         $newsPageCrawler = new Crawler($newsPage);
+
+        $this->removeDomNodes($newsPageCrawler, '//div[@id="preloader"]');
+        $this->removeDomNodes($newsPageCrawler, '//img[contains(@src, "base64")]');
+
         $newsPostCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"entry-content")]');
+        $mainImageCrawler = $newsPostCrawler->filterXPath('//img[contains(@class,"size-full")][1]');
+
+        if ($this->crawlerHasNodes($mainImageCrawler)) {
+            $image = $mainImageCrawler->attr('src');
+            $this->removeDomNodes($newsPostCrawler, '//img[contains(@class,"size-full")][1]');
+        }
+
+        if ($image !== null) {
+            $image = UriResolver::resolve($image,$uri);
+            $image = Helper::encodeUrl($image);
+        }
+
+
+
         //У некоторых новостей в rss description пустой, поэтому при проверке description беру с детальной страницы.
         if (empty($description)) {
-            $description = $newsPageCrawler->filterXPath('//meta[@property="og:description"]')->attr('content');
+            $description = explode('.',$newsPageCrawler->filterXPath('//meta[@property="og:description"]')->attr('content'));
+            $description = $description[0];
+        } else {
+            $description = explode('.', $description);
+            $description = $description[0];
         }
+
+//        $this->removeDomNodes($newsPostCrawler, "//p[contains(text(),$description)]");
 
         $newsPost = new NewsPost(self::class, $title, $description, $publishedAt->format('Y-m-d H:i:s'), $uri, $image);
         $contentCrawler = $newsPostCrawler;
@@ -142,6 +164,13 @@ class PanoramaProParser implements ParserInterface
                     $newsPost->image = $newsPostItem->image;
                 }
 
+
+                $sim = similar_text($description, $newsPostItem->text, $percent);
+
+                if ($sim > 80) {
+                    continue;
+                }
+//                if ($newsPostItem->text() == $description)
                 $newsPost->addItem($newsPostItem);
             }
         }
