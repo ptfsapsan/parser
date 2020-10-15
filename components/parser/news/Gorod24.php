@@ -49,7 +49,7 @@ class Gorod24 extends TyRunBaseParser implements ParserInterface
     /**
      *  Максимальная глубина для парсинга <div> тегов
      */
-    const MAX_PARSE_DEPTH = 3;
+    const MAX_PARSE_DEPTH = 10;
 
     /**
      * Префикс для элементов списков (ul, ol и т.п.)
