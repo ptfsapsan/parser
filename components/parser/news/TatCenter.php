@@ -11,10 +11,6 @@ use app\components\parser\ParserInterface;
 use Exception;
 use Symfony\Component\DomCrawler\Crawler;
 
-/**
- * Парсер новостей из RSS ленты ug.ru
- *
- */
 class TatCenter extends Aleks007smolBaseParser implements ParserInterface
 {
     const USER_ID = 2;
