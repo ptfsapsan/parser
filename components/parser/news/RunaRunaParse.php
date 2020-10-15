@@ -123,6 +123,10 @@ class RunaRunaParse implements ParserInterface
         $contentCrawler = $newsPostCrawler;
 
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"social_block")]');
+        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"social_block")]');
+        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"article-content")]/p[1]');
+        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"imgwrap")][1]');
+        $this->removeDomNodes($contentCrawler, '//article/h1[1]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"anonce_info")]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"load-more-block")]');
         $this->removeDomNodes($contentCrawler, '//h2[contains(text(),"Расскажите друзьям!")]');
