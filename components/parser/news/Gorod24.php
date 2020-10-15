@@ -28,7 +28,7 @@ class Gorod24 extends TyRunBaseParser implements ParserInterface
     /**
      * CSS  класс для параграфов - цитат
      */
-    const QUOTE_CSS_CLASS = 'marker-quote1';
+    const QUOTE_TAG = 'blockquote';
 
     /**
      * Классы эоементов, которые не нужно парсить, например блоки с рекламой и т.п.
@@ -74,14 +74,14 @@ class Gorod24 extends TyRunBaseParser implements ParserInterface
         $rss = $curl->get(self::FEED_URL);
 
         $crawler = new Crawler($rss);
-        $crawler->filter('rss channel item')->slice(0, self::MAX_NEWS_COUNT)->each(function ($node) use (&$curl, &$posts) {
+        $crawler->filter('rss channel item')->slice(0, self::MAX_NEWS_COUNT)->each(function (Crawler $node) use (&$curl, &$posts) {
             $newPost = new NewsPost(
                 self::class,
                 $node->filter('title')->text(),
-                $node->filter('description')->text() ? $node->filter('description')->text() : $node->filter('title')->text(),
+                $node->filter('description')->text() ? $node->filter('description')->text() : '-',
                 self::stringToDateTime($node->filter('pubDate')->text()),
                 $node->filter('link')->text(),
-                $node->filter('enclosure')->attr('url')
+                $node->filterXPath('//media:thumbnail')->attr('url')
             );
 
             /**
@@ -91,11 +91,25 @@ class Gorod24 extends TyRunBaseParser implements ParserInterface
             if (!empty($newsContent)) {
                 $newsContent = (new Crawler($newsContent))->filter(self::BODY_CONTAINER_CSS_SELECTOR);
                 /**
-                 * Попали на другой тип страницы, не новость
+                 * Если в rss нет описания то берем первый абзац из новости
                  */
-                if (!$newsContent->count()) {
-                    return;
+                if ($newPost->description === '-') {
+                    foreach ($newsContent->filter('p') as $content) {
+                        $node = new Crawler($content);
+                        if ($node->text()) {
+                            $newPost->description = $node->text();
+                            break;
+                        }
+                    }
                 }
+
+                /**
+                 * Предложения содержащиеся в описании (для последующей проверки при парсинга тела новости)
+                 */
+                $descriptionSentences = explode(
+                    '. ',
+                    html_entity_decode(trim($newPost->description, '  \t\n\r\0\x0B.'))
+                );
 
                 /**
                  * Текст статьи, может содержать цитаты ( все полезное содержимое в тегах <p> )
@@ -103,11 +117,11 @@ class Gorod24 extends TyRunBaseParser implements ParserInterface
                 $articleContent = $newsContent->children();
                 $stopParsing = false;
                 if ($articleContent->count()) {
-                    $articleContent->each(function ($node) use ($newPost, &$stopParsing) {
+                    $articleContent->each(function ($node) use ($newPost, &$stopParsing, $descriptionSentences) {
                         if ($stopParsing) {
                             return;
                         }
-                        self::parseNode($node, $newPost, self::MAX_PARSE_DEPTH, $stopParsing);
+                        self::parseNode($node, $newPost, self::MAX_PARSE_DEPTH, $stopParsing, $descriptionSentences);
                     });
                 }
             }
@@ -118,7 +132,7 @@ class Gorod24 extends TyRunBaseParser implements ParserInterface
         return $posts;
     }
 
-    protected static function parseNode(Crawler $node, NewsPost $newPost, int $maxDepth, bool &$stopParsing): void
+    protected static function parseNode(Crawler $node, NewsPost $newPost, int $maxDepth, bool &$stopParsing, $descriptionSentences = []): void
     {
         /**
          * Пропускаем элемент, если элемент имеет определенный класс
@@ -150,7 +164,7 @@ class Gorod24 extends TyRunBaseParser implements ParserInterface
         $maxDepth--;
 
         switch ($node->nodeName()) {
-            case 'div': //запускаем рекурсивно на дочерние ноды, если есть, если нет то там обычно ненужный шлак
+            case 'div':
                 $nodes = $node->children();
                 if ($nodes->count()) {
                     $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing) {
@@ -159,8 +173,15 @@ class Gorod24 extends TyRunBaseParser implements ParserInterface
                 }
                 break;
             case 'p':
-            case 'blockquote':
-                self::parseParagraph($node, $newPost);
+                self::parseDescriptionIntersectParagraph($node, $newPost, $descriptionSentences);
+                if ($nodes = $node->children()) {
+                    $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing) {
+                        self::parseNode($node, $newPost, $maxDepth, $stopParsing);
+                    });
+                }
+                break;
+            case self::QUOTE_TAG:
+                self::parseQuote($node, $newPost);
                 break;
             case 'img':
                 self::parseImage($node, $newPost);
@@ -184,53 +205,17 @@ class Gorod24 extends TyRunBaseParser implements ParserInterface
 
     }
 
-    /**
-     * Парсер для тегов <p>
-     * @param Crawler $node
-     * @param NewsPost $newPost
-     */
-    private static function parseParagraph(Crawler $node, NewsPost $newPost): void
+    protected static function parseQuote(Crawler $node, NewsPost $newPost): void
     {
-        if (!empty($node->text())) {
-            $type = NewsPostItem::TYPE_TEXT;
-            $text = $node->text();
-            $quoteText = '';
-            if (stristr($node->attr('class'), self::QUOTE_CSS_CLASS)) {
-                $type = NewsPostItem::TYPE_QUOTE;
-            /**
-             * Абзац оформленный как
-             * <p><b>цитирующий</b>:<i>цитата</i></p>
-             * преобразуем в 2 элемента: TEXT и QUOTE
-             */
-            } else if ($node->filter('b')->count() === 1 && $node->filter('i')->count() === 1) {
-                $quoteText = $node->filter('i')->text();
-                if ($quoteText) {
-                    $text = $node->filter('b')->text();
-                }
-            }
-
-            $newPost->addItem(
-                new NewsPostItem(
-                    $type,
-                    $text,
-                    null,
-                    null,
-                    null,
-                    null
-                ));
-
-            if ($quoteText) {
-                $newPost->addItem(
-                    new NewsPostItem(
-                        NewsPostItem::TYPE_QUOTE,
-                        $quoteText,
-                        null,
-                        null,
-                        null,
-                        null
-                    ));
-            }
-        }
+        $newPost->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_QUOTE,
+                $node->text(),
+                null,
+                null,
+                null,
+                null
+            ));
     }
 
     protected static function parseLink(Crawler $node, NewsPost $newPost): void
