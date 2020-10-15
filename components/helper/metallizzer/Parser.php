@@ -20,6 +20,16 @@ class Parser
     protected $glued     = [];
     protected $callbacks = [];
     protected $subNode   = './*/node()';
+    protected $ignore    = [
+        'script',
+        'noscript',
+        'style',
+        'video',
+        'embed',
+        'form',
+        'table',
+    ];
+    protected $joinText = true;
 
     public static function flatten(array $blocks)
     {
@@ -32,6 +42,28 @@ class Parser
         }
 
         return array_filter($result);
+    }
+
+    public function addIgnore($selector, $merge = true)
+    {
+        if (!is_array($selector)) {
+            $selector = [$selector];
+        }
+
+        if ($merge) {
+            $this->ignore = array_merge($this->ignore, $selector);
+        } else {
+            $this->ignore = $selector;
+        }
+
+        return $this;
+    }
+
+    public function setJoinText($joinText)
+    {
+        $this->joinText = (bool) $joinText;
+
+        return $this;
     }
 
     public function setDeep(int $deep)
@@ -59,6 +91,16 @@ class Parser
 
     public function parse(Crawler $node, int $i)
     {
+        if (count($this->ignore)) {
+            $node->filterXPath('//'.implode('|//', $this->ignore))->each(function (Crawler $crawler) {
+                $domNode = $crawler->getNode(0);
+
+                if ($domNode && $domNode->parentNode) {
+                    $domNode->parentNode->removeChild($domNode);
+                }
+            });
+        }
+
         $this->glued = array_map(function ($v) {
             return implode(',', $v);
         }, $this->selectors);
@@ -71,19 +113,19 @@ class Parser
             $method = 'parse'.ucfirst($type);
 
             if (false !== $item = $this->{$method}($node, $i)) {
-                return [$item];
+                return $this->filterItems([$item]);
             }
         }
 
         if ($items = $this->parseSubnodes($node, $i)) {
-            return $items;
+            return $this->filterItems($items);
         }
 
         $text = $node->nodeName() == 'br'
             ? PHP_EOL
             : Text::normalizeWhitespace($node->text(null, false));
 
-        return array_filter([$this->textNode($text)]);
+        return $this->filterItems([$this->textNode($text)]);
     }
 
     public function addCallback(string $type, callable $callback)
@@ -110,6 +152,21 @@ class Parser
         return $this;
     }
 
+    protected function filterItems(array $items)
+    {
+        return array_filter($items, function ($item) {
+            if (empty($item)) {
+                return false;
+            }
+
+            if (NewsPostItem::TYPE_TEXT != $item['type']) {
+                return true;
+            }
+
+            return strlen(Text::trim($item['text'])) > 0;
+        });
+    }
+
     protected function parseSubnodes(Crawler $node, int $i)
     {
         $items = array_filter($node->filterXpath($this->subNode)->each(function ($node, $i) {
@@ -127,6 +184,10 @@ class Parser
 
             return $this->textNode($text);
         }));
+
+        if (!$this->joinText) {
+            return $items;
+        }
 
         $lastItem = false;
         $lastKey  = null;
