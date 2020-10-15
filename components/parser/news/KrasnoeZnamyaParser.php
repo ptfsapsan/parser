@@ -8,7 +8,6 @@ use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use DateTime;
 use DateTimeZone;
-use DOMElement;
 use DOMNode;
 use Exception;
 use lanfix\parser\Parser;
