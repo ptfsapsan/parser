@@ -95,7 +95,7 @@ class ChupraleOnlineRuParser implements ParserInterface
             $uri = $newsPreview->filterXPath('//pdalink')->text();
 
             $publishedAtString = $newsPreview->filterXPath('//pubDate | //pubdate')->text();
-            $publishedAt = DateTimeImmutable::createFromFormat('D, d M Y H:i:s O', $publishedAtString);
+            $publishedAt = DateTimeImmutable::createFromFormat('D, d M y H:i:s O', $publishedAtString);
             $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
 
             $preview = $newsPreview->filterXPath('//description')->text();
