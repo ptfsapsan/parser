@@ -293,4 +293,48 @@ class Ul1 extends Aleks007smolBaseParser implements ParserInterface
         }
     }
 
+    /**
+     * Парсер для тегов <img>
+     * @param Crawler $node
+     * @param NewsPost $newPost
+     */
+    protected static function parseImage(Crawler $node, NewsPost $newPost): void
+    {
+        $src = self::prepareImage($node->attr('src'));
+
+        if (empty($newPost->image)) {
+            $newPost->image = $src;
+            return;
+        }
+
+        if ($src && $src != $newPost->image) {
+            $newPost->addItem(
+                new NewsPostItem(
+                    NewsPostItem::TYPE_IMAGE,
+                    null,
+                    $src,
+                    null,
+                    null,
+                    null
+                ));
+        }
+    }
+
+    /**
+     * Кодирование киррилических симоволов в URL
+     * Например из: https://misanec.ru/wp-content/uploads/2020/10/пожар3--840x1050.jpg
+     * в: https://misanec.ru/wp-content/uploads/2020/10/%D0%BF%D0%BE%D0%B6%D0%B0%D1%803-840x1050.jpg
+     *
+     * @param string $imageUrl
+     * @return string
+     */
+    private static function prepareImage(string $imageUrl): string
+    {
+        if (strpos($imageUrl, self::MAIN_PAGE_URI) === false) {
+            $imageUrl = self::MAIN_PAGE_URI . $imageUrl;
+        }
+
+        return str_replace(['%3A', '%2F'], [':', '/'], rawurlencode($imageUrl));
+    }
+
 }
