@@ -177,11 +177,14 @@ class LegitimistParser implements ParserInterface
      */
     protected static function addImage(NewsPost $post, string $content): void
     {
+        $url = preg_replace_callback('/[^\x20-\x7f]/', function ($match) {
+            return urlencode($match[0]);
+        }, $content);
         $post->addItem(
             new NewsPostItem(
                 NewsPostItem::TYPE_IMAGE,
                 null,
-                self::ROOT_SRC . $content,
+                self::ROOT_SRC . $url,
                 null,
                 1,
                 null
@@ -221,6 +224,5 @@ class LegitimistParser implements ParserInterface
                 null
             ));
     }
-
-
 }
+
