@@ -234,6 +234,6 @@ class LegitimistParser implements ParserInterface
         return preg_replace_callback('/[^\x20-\x7f]/', function ($match) {
             return urlencode($match[0]);
         }, $content);
-}
+    }
 }
 
