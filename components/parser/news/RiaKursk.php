@@ -251,7 +251,7 @@ class RiaKursk extends Aleks007smolBaseParser implements ParserInterface
     {
         $nodeSentences = array_map(function ($item) {
             return !empty($item) ? trim($item, "  \t\n\r\0\x0B") : false;
-        }, explode('. ', $node->text()));
+        }, explode('. ', str_replace(' ', '', Helper::prepareString($node->text()))));
 
         if ($newPost->description == 'description') {
             $newPost->description = implode('. ', $nodeSentences);
