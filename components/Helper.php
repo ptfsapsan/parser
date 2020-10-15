@@ -4,6 +4,8 @@ namespace app\components;
 
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
+use InvalidArgumentException;
+use League\Uri\Uri;
 use linslin\yii2\curl\Curl;
 
 class Helper
@@ -36,6 +38,25 @@ class Helper
     }
 
     /**
+     * Encode international unicode URL
+     * @param $url
+     * @return string
+     */
+    public static function encodeUrl(string $url): string
+    {
+        $uriParts = parse_url($url);
+        if ($uriParts === false) {
+            throw new InvalidArgumentException('Невалидный или сильно искаженный URL: ' . $url);
+        }
+
+        if (!empty($uriParts['path'])) {
+            $uriParts['path'] = implode('/', array_map('rawurlencode', explode('/', $uriParts['path'])));
+        }
+
+        return (string) Uri::createFromComponents($uriParts);
+    }
+
+    /**
      * Get curl object
      * @return Curl
      */
@@ -51,8 +72,8 @@ class Helper
         /** @var NewsPost $post */
         foreach ($posts as $post) {
             echo PHP_EOL . "---------------------" . PHP_EOL;
-            echo $post->title . PHP_EOL;
-            echo $post->description . PHP_EOL;
+            echo 'title: ' . $post->title . PHP_EOL;
+            echo 'description: ' . $post->description . PHP_EOL;
             echo $post->image . PHP_EOL;
             echo $post->original . PHP_EOL;
             echo $post->createDate->format('Y-m-d H:i:s') . PHP_EOL;
@@ -77,6 +98,4 @@ class Helper
         }
     }
 
-
 }
-
