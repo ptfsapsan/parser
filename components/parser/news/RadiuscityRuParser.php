@@ -103,15 +103,18 @@ class RadiuscityRuParser implements ParserInterface
     private function parseNewsPage(PreviewNewsDTO $previewNewsItem): NewsPost
     {
         $uri = $previewNewsItem->getUri();
-        $publishedAt = $previewNewsItem->getDateTime();
+        $publishedAt = $previewNewsItem->getDateTime() ?: new DateTimeImmutable('now', new DateTimeZone('UTC'));
+        $description = $previewNewsItem->getPreview();
         $title = $previewNewsItem->getTitle();
         $image = null;
 
         $newsPage = $this->getPageContent($uri);
-
+        $newsPage = str_replace('</br>', '<br>', $newsPage);
         $newsPageCrawler = new Crawler($newsPage);
 
+
         $mainImageCrawler = $newsPageCrawler->filterXPath('//div[contains(@id,"ArticleImagesFull")]//img[1]');
+        $this->removeDomNodes($newsPageCrawler, '//div[contains(@id,"ArticleThumbsContainer")]');
 
         if ($this->crawlerHasNodes($mainImageCrawler)) {
             $image = $mainImageCrawler->attr('src');
@@ -125,8 +128,10 @@ class RadiuscityRuParser implements ParserInterface
 
         $contentCrawler = $newsPageCrawler->filterXPath('//div[contains(@id,"articleImages")] || //div[contains(@id,"articleText")]');
 
-        $description = Text::trim($contentCrawler->filterXPath('//p[1]/strong')->text());
-        $this->removeDomNodes($contentCrawler, '//p[1]/strong');
+        if (!$description) {
+            $description = Text::trim($this->normalizeSpaces($contentCrawler->filterXPath('//b[1]')->text()));
+            $this->removeDomNodes($contentCrawler, '//b[1]');
+        }
 
         $this->removeDomNodes($contentCrawler, '//script | //video | //style | //form | //table');
 
