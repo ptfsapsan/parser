@@ -47,7 +47,7 @@ class AtkarskGazetaParser implements ParserInterface
     {
         $parser = new self(200000, 10);
 
-        return $parser->parse(1, 4);
+        return $parser->parse(10, 50);
     }
 
 
@@ -98,6 +98,7 @@ class AtkarskGazetaParser implements ParserInterface
                 $title = $newsPreview->filterXPath('//h1[contains(@class,"tape__news__content-title")]')->text();
                 $uri = $newsPreview->filterXPath('//a[contains(@class,"link-covers")]')->attr('href');
                 $uri = UriResolver::resolve($uri, "{$this->getSiteUri()}/novosti");
+                $uri = $this->encodeUri($uri);
 
                 $timezone = new DateTimeZone('Europe/Saratov');
                 $publishedAtString = $newsPreview->filterXPath('//span[contains(@class,"today__content-time")]')->text();
@@ -160,6 +161,7 @@ class AtkarskGazetaParser implements ParserInterface
                 }
 
                 $imageLink = UriResolver::resolve($matches[1], $uri);
+                $imageLink = $this->encodeUri($imageLink);
                 if($imageLink === $newsPost->image){
                     return;
                 }
