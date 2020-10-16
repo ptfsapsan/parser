@@ -141,6 +141,12 @@ class MediasferaNewsParser
                 static::$post->itemImage = static::getNodeImage('src', $node);
                 break;
 
+            case 'picture' :
+                if($node->filter('img')->count()) {
+                    static::$post->itemImage = static::getNodeImage('src', $node->filter('img'));
+                }
+                break;
+
             case 'a' :
                 if($node->text()) {
                     static::$post->itemLink = [
@@ -163,6 +169,7 @@ class MediasferaNewsParser
                 break;
 
             case 'div' :
+            case 'article' :
                 $nodes = $node->children();
                 if ($nodes->count()) {
                     static::parseNodes($node);
@@ -189,10 +196,16 @@ class MediasferaNewsParser
                 static::parseList($node);
                 break;
             default :
+                $nodes = $node->children();
+                if ($nodes->count()) {
+                    static::parseSection($node);
+                } else {
+                    static::$post->itemText = $node->text();
+                }
                 if(self::DEBUG) {
                     throw new \Exception('Unknown tag ' . $nodeName);
                 } else {
-                    trigger_error('Unknown tag ' . $nodeName, E_USER_WARNING);
+                    trigger_error('Unknown tag ' . $nodeName, E_USER_NOTICE);
                 }
         }
     }
