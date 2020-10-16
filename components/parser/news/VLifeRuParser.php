@@ -193,7 +193,7 @@ class VLifeRuParser implements ParserInterface
         $httpCode = $responseInfo['http_code'] ?? null;
 
         if ($httpCode >= 200 && $httpCode < 400) {
-            return iconv('windows-1251', 'utf-8', $result);//mb_convert_encoding($result, 'utf-8', 'windows-1251'); //$result;//iconv('windows-1251', 'utf-8', $result);
+            return iconv('windows-1251', 'utf-8', $result);
         }
 
         throw new RuntimeException("Не удалось скачать страницу {$uri}, код ответа {$httpCode}");
