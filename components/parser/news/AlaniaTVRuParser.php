@@ -136,15 +136,6 @@ class AlaniaTVRuParser implements ParserInterface
             $description = $title;
         }
 
-        $imageNode = $newsPostCrawler->filterXPath('//*[@class="article__main-photo-img"]');
-        if ($imageNode->count()) {
-            $style = $imageNode->attr('style') ?? '';
-            preg_match('/http.*(?=\')/m', $style, $matches);
-            if (isset($matches[0])) {
-                $image = $matches[0];
-            }
-        }
-
         $newsPost = new NewsPost(self::class, $title, $description, $publishedAt->format('Y-m-d H:i:s'), $uri, $image);
 
         $contentCrawler = $newsPostCrawler;
@@ -358,10 +349,6 @@ class AlaniaTVRuParser implements ParserInterface
         $alt = $node->getAttribute('alt');
  
         $alt = $alt !== '' ? $alt : null;
-        
-        if(!$alt) {
-            return null;
-        }
 
         return new NewsPostItem(NewsPostItem::TYPE_IMAGE, $alt, $imageLink);
     }
