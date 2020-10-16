@@ -103,7 +103,6 @@ class Info34374Parser implements ParserInterface
         });
 
         $previewList = array_slice($previewList, 0, $maxNewsCount);
-            dd($previewList);
         return $previewList;
     }
 
