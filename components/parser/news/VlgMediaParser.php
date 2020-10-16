@@ -405,7 +405,7 @@ class VlgMediaParser implements ParserInterface
             $attachNode = $parentNode ?: $node->parentNode;
         }
 
-        if (isset($ignoringTags[$attachNode->nodeName])) {
+        if ($this->isFormattingTag($attachNode)) {
             $attachNode = $attachNode->parentNode;
         }
 
