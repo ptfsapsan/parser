@@ -42,9 +42,10 @@ class MediasferaNewsParser
             'noscript' => false,
             'table' => false,
         ],
-        'text' => [],
-        'id' => [],
-        'class' => [],
+//        'text' => [],
+//        'class' => [],
+//        'id' => [],
+//        'src' => [],
     ];
 
 
@@ -77,7 +78,7 @@ class MediasferaNewsParser
             return;
         }
 
-        $node = self::filterNode($node, $filter);
+        $node = static::filterNode($node, $filter);
 
         foreach (static::getBreakpoints() as $key => $array) {
 
@@ -90,11 +91,14 @@ class MediasferaNewsParser
                 case 'text' :
                     $values[] = $node->text();
                     break;
-                case 'id' :
                 case 'class' :
-                case 'src' :
                     $values = explode(' ', $node->attr($key));
+                    break;
+                default :
+                    $values[] = $node->attr($key);
             }
+
+            $values = array_filter($values);
 
             if(!$values) {
                 continue;
@@ -111,6 +115,8 @@ class MediasferaNewsParser
                 }
             }
         }
+
+        $node = static::clearNode($node, false);
 
         $nodeName = $node->nodeName();
 
@@ -141,6 +147,12 @@ class MediasferaNewsParser
                 static::$post->itemImage = static::getNodeImage('src', $node);
                 break;
 
+            case 'picture' :
+                if($node->filter('img')->count()) {
+                    static::$post->itemImage = static::getNodeImage('src', $node->filter('img'));
+                }
+                break;
+
             case 'a' :
                 if($node->text()) {
                     static::$post->itemLink = [
@@ -163,6 +175,7 @@ class MediasferaNewsParser
                 break;
 
             case 'div' :
+            case 'article' :
                 $nodes = $node->children();
                 if ($nodes->count()) {
                     static::parseNodes($node);
@@ -189,10 +202,16 @@ class MediasferaNewsParser
                 static::parseList($node);
                 break;
             default :
-                if(self::DEBUG) {
+                $nodes = $node->children();
+                if ($nodes->count()) {
+                    static::parseSection($node);
+                } else {
+                    static::$post->itemText = $node->text();
+                }
+                if(static::DEBUG) {
                     throw new \Exception('Unknown tag ' . $nodeName);
                 } else {
-                    trigger_error('Unknown tag ' . $nodeName, E_USER_WARNING);
+                    trigger_error('Unknown tag ' . $nodeName, E_USER_NOTICE);
                 }
         }
     }
@@ -200,7 +219,10 @@ class MediasferaNewsParser
 
     protected static function parseSection(Crawler $node) : void
     {
+        $node = static::clearNode($node);
+
         $allow_tags = [
+            'br',
             'p',
             'a',
             'img',
@@ -227,7 +249,7 @@ class MediasferaNewsParser
             $item = trim(array_shift($chunks));
 
             if($item) {
-                static::$post->itemText = $html;
+                static::$post->itemText = $item;
             }
 
             static::parseNode($node);
@@ -235,11 +257,40 @@ class MediasferaNewsParser
             $html = array_shift($chunks);
         });
 
-        $html = trim($html);
-
-        if(strlen($html) > 1) {
-            static::$post->itemText = $html;
+        if(strlen(trim(str_replace(["\x2e", "\xc2", "\xa0"],'',$html))) > 1) {
+            static::$post->itemText = trim($html);
         }
+    }
+
+    protected static function clearNode(Crawler $crawler, bool $recursive = true, $filter = null) : Crawler
+    {
+        $crawler = static::filterNode($crawler, $filter);
+
+        $crawler->children()->each(function (Crawler $node) use (&$recursive) {
+
+            $remove = false;
+
+            $names = [
+                'script',
+                'noscript',
+                'style',
+                'table',
+            ];
+
+            if(in_array($node->nodeName(), $names)) {
+                $remove = true;
+            }
+
+            if($remove) {
+                $self = $node->getNode(0);
+                $self->parentNode->removeChild($self);
+            }
+            else if($recursive && $node->children()->count()) {
+                static::clearNode($node, $recursive);
+            }
+        });
+
+        return $crawler;
     }
 
 
