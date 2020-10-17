@@ -26,6 +26,7 @@ class ProvinceRostovParser implements ParserInterface
     public const USER_ID = 2;
     public const FEED_ID = 2;
     private const SITE_URL = 'https://www.province.ru';
+    private const EMPTY_DESCRIPTION_KEY = 'EmptyDescription';
 
     private int $microsecondsDelay;
     private int $pageCountBetweenDelay;
@@ -46,7 +47,7 @@ class ProvinceRostovParser implements ParserInterface
     {
         $parser = new self(200000, 10);
 
-        return $parser->parse(1, 4);
+        return $parser->parse(10, 50);
     }
 
 
@@ -109,12 +110,11 @@ class ProvinceRostovParser implements ParserInterface
     {
         $uri = $previewNewsItem->getUri();
         $title = $previewNewsItem->getTitle();
-        $publishedAt = $previewNewsItem->getDateTime();
+        $publishedAtUTC = $previewNewsItem->getDateTime();
         $description = $previewNewsItem->getPreview();
         $image = null;
 
         $newsPage = $this->getPageContent($uri);
-        dd($newsPage,$uri);
 
         $newsPageCrawler = new Crawler($newsPage);
         $newsPostCrawler = $newsPageCrawler->filterXPath('//div[@id="k2Container"]');
@@ -129,13 +129,15 @@ class ProvinceRostovParser implements ParserInterface
             $image = $this->encodeUri($image);
         }
 
-        $description = $newsPostCrawler->filterXPath('//div[@id="itemIntroText"]')->text();
+        $description = $newsPostCrawler->filterXPath('//div[@id="itemIntroText"]')->text() ?: self::EMPTY_DESCRIPTION_KEY;
 
         $contentCrawler = $newsPostCrawler->filterXPath('//div[@id="itemFullText"]');
-        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"code-block code-block-1")]/following-sibling::*');
+        $this->removeDomNodes($contentCrawler,
+            '//div[contains(@class,"code-block code-block-1")]/following-sibling::*');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"code-block code-block-1")]');
 
-        $newsPost = new NewsPost(self::class, $title, $description, $publishedAt->format('Y-m-d H:i:s'), $uri, $image);
+        $publishedAtFormatted = $publishedAtUTC->format('Y-m-d H:i:s');
+        $newsPost = new NewsPost(self::class, $title, $description, $publishedAtFormatted, $uri, $image);
 
 
         $this->removeDomNodes($contentCrawler, '//a[starts-with(@href, "javascript")]');
@@ -152,6 +154,12 @@ class ProvinceRostovParser implements ParserInterface
                 }
 
                 $isImage = $newsPostItem->type === NewsPostItem::TYPE_IMAGE;
+                $isText = $newsPostItem->type === NewsPostItem::TYPE_TEXT;
+
+                if ($isText && $newsPost->description === self::EMPTY_DESCRIPTION_KEY) {
+                    $newsPost->description = $newsPostItem->text;
+                    continue;
+                }
 
                 if ($isImage && $newsPost->image === null) {
                     $newsPost->image = $newsPostItem->image;
@@ -299,7 +307,7 @@ class ProvinceRostovParser implements ParserInterface
             throw new RuntimeException('Тег уже сохранен');
         }
 
-        $linkText = $this->hasText($node) ? $node->textContent : null;
+        $linkText = $this->hasText($node) ? $this->normalizeSpaces($node->textContent) : null;
         $newsPostItem = new NewsPostItem(NewsPostItem::TYPE_LINK, $linkText, null, $link);
 
         $this->nodeStorage->attach($node, $newsPostItem);
@@ -390,20 +398,23 @@ class ProvinceRostovParser implements ParserInterface
         $attachNode = $node;
         if ($node->nodeName === '#text') {
             $parentNode = $this->getRecursivelyParentNode($node, function (DOMNode $parentNode) {
-                return $this->isFormattingTag($parentNode) && !$this->isFormattingTag($parentNode->parentNode);
+                if ($parentNode->parentNode && $this->isFormattingTag($parentNode->parentNode)) {
+                    return false;
+                }
+                return $this->isFormattingTag($parentNode);
             }, 6);
 
             $attachNode = $parentNode ?: $node->parentNode;
         }
 
-        if (isset($ignoringTags[$attachNode->nodeName])) {
+        if ($this->isFormattingTag($attachNode)) {
             $attachNode = $attachNode->parentNode;
         }
 
         if ($this->nodeStorage->contains($attachNode)) {
             /** @var NewsPostItem $parentNewsPostItem */
             $parentNewsPostItem = $this->nodeStorage->offsetGet($attachNode);
-            $parentNewsPostItem->text .= $node->textContent;
+            $parentNewsPostItem->text .= $this->normalizeSpaces($node->textContent);
 
             throw new RuntimeException('Контент добавлен к существующему объекту NewsPostItem');
         }
@@ -503,10 +514,19 @@ class ProvinceRostovParser implements ParserInterface
     private function getPageContent(string $uri): string
     {
         $encodedUri = Helper::encodeUrl($uri);
-        $result = $this->curl->get($encodedUri);
+        $content = $this->curl->get($encodedUri);
         $this->checkResponseCode($this->curl);
 
-        return $result;
+        return $this->decodeGZip($content);
+    }
+
+    private function decodeGZip(string $string)
+    {
+        if (0 !== mb_strpos($string, "\x1f\x8b\x08")) {
+            return $string;
+        }
+
+        return gzdecode($string);
     }
 
 
@@ -537,19 +557,23 @@ class ProvinceRostovParser implements ParserInterface
 
     private function isLink(DOMNode $node): bool
     {
-        return $node->nodeName === 'a';
+        if (!$node instanceof DOMElement || $node->nodeName !== 'a') {
+            return false;
+        }
+
+        $link = $node->getAttribute('href');
+        $scheme = parse_url($link, PHP_URL_SCHEME);
+
+        if ($scheme && !in_array($scheme, ['http', 'https'])) {
+            return false;
+        }
+
+        return $link !== '';
     }
 
     private function isFormattingTag(DOMNode $node): bool
     {
-        $formattingTags = [
-            'strong' => true,
-            'b' => true,
-            'span' => true,
-            's' => true,
-            'i' => true,
-            'a' => true,
-        ];
+        $formattingTags = ['strong' => true, 'b' => true, 'span' => true, 's' => true, 'i' => true, 'a' => true];
 
         return isset($formattingTags[$node->nodeName]);
     }
@@ -562,10 +586,7 @@ class ProvinceRostovParser implements ParserInterface
 
     private function isQuoteType(DOMNode $node): bool
     {
-        $quoteTags = [
-            'q' => true,
-            'blockquote' => true
-        ];
+        $quoteTags = ['q' => true, 'blockquote' => true];
 
         if ($node instanceof DOMElement && str_contains($node->getAttribute('class'), 'line')) {
             return true;
@@ -600,40 +621,23 @@ class ProvinceRostovParser implements ParserInterface
     private function translateDateToEng(string $date)
     {
         $date = mb_strtolower($date);
-
-        $ruMonth = [
-            'январь',
-            'февраль',
-            'март',
-            'апрель',
-            'май',
-            'июнь',
-            'июль',
-            'август',
-            'сентябрь',
-            'октябрь',
-            'ноябрь',
-            'декабрь'
+        $monthRegex = [
+            '/янв[\S.]*/iu' => 'January',
+            '/фев[\S.]*/iu' => 'February',
+            '/мар[\S.]*/iu' => 'March',
+            '/апр[\S.]*/iu' => 'April',
+            '/май[\S.]*/iu' => 'May',
+            '/июн[\S.]*/iu' => 'June',
+            '/июл[\S.]*/iu' => 'July',
+            '/авг[\S.]*/iu' => 'August',
+            '/сен[\S.]*/iu' => 'September',
+            '/окт[\S.]*/iu' => 'October',
+            '/ноя[\S.]*/iu' => 'November',
+            '/дек[\S.]*/iu' => 'December'
         ];
-        $ruMonthShort = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
-        $enMonth = [
-            'January',
-            'February',
-            'March',
-            'April',
-            'May',
-            'June',
-            'July',
-            'August',
-            'September',
-            'October',
-            'November',
-            'December'
-        ];
-
-        $date = str_replace($ruMonth, $enMonth, $date);
-        $date = str_replace($ruMonthShort, $enMonth, $date);
-
+        foreach ($monthRegex as $regex => $enMonth) {
+            $date = preg_replace($regex, $enMonth, $date);
+        }
         return $date;
     }
 
