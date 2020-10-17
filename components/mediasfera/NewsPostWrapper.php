@@ -49,11 +49,18 @@ class NewsPostWrapper
 
     private array $items = [];
 
+
+    private string $TRIM_CHARS;
+
     public function __construct()
     {
         [$self, $caller] = debug_backtrace(0, 2);
 
-        $this->parser = $caller['class'];
+        $parser = $caller['class'];
+
+        $this->parser = $parser;
+
+        $this->TRIM_CHARS = $parser::TRIM_CHARS;
     }
 
     public function __set($name, $value)
@@ -150,7 +157,9 @@ class NewsPostWrapper
 
     private function addItemText(?string $value) : void
     {
-        if(!$value) {
+        $check = trim($value, $this->TRIM_CHARS);
+
+        if(!$check) {
             return;
         }
 

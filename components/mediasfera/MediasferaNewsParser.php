@@ -18,7 +18,7 @@ use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\DomCrawler\UriResolver;
 
 /**
- * @version 1.0.1
+ * @version 1.0.2
  *
  * @property NewsPostWrapper $post
  *
@@ -47,6 +47,9 @@ class MediasferaNewsParser
 //        'id' => [],
 //        'src' => [],
     ];
+
+
+    public const TRIM_CHARS = " \t\n\r\0\x0B\xa0";
 
 
     public static function getBreakpoints() : array
@@ -257,7 +260,7 @@ class MediasferaNewsParser
             $html = array_shift($chunks);
         });
 
-        if(strlen(trim(str_replace(["\x2e", "\xc2", "\xa0"],'',$html))) > 1) {
+        if(strlen(trim($html, static::TRIM_CHARS)) > 1) {
             static::$post->itemText = trim($html);
         }
     }
