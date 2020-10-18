@@ -105,17 +105,20 @@ abstract class TyRunBaseParser
     {
         $src = self::getProperImageSrc($node, $lazySrcAttr);
         if ($src && $src != $newPost->image) {
-            $newPost->addItem(
-                new NewsPostItem(
-                    NewsPostItem::TYPE_IMAGE,
-                    null,
-                    $src,
-                    null,
-                    null,
-                    null
-                ));
+            if (empty($newPost->image)) {
+                $newPost->image = $src;
+            } else {
+                $newPost->addItem(
+                    new NewsPostItem(
+                        NewsPostItem::TYPE_IMAGE,
+                        null,
+                        $src,
+                        null,
+                        null,
+                        null
+                    ));
+            }
         }
-
     }
 
     /**
@@ -291,7 +294,7 @@ abstract class TyRunBaseParser
         if ($pattern) {
             preg_match($pattern, $description, $matches);
         }
-        return !empty($matches[1]) ? $matches[1] : $description;
+        return !empty($matches[1]) ? html_entity_decode($matches[1]) : $description;
     }
 
     /**
