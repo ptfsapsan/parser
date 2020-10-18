@@ -46,7 +46,7 @@ abstract class AbstractBaseParser implements ParserInterface
 
         $newsList = [];
 
-        /** @var NewsPostDTO $newsPostDTO */
+        /** @var PreviewNewsDTO $newsPostDTO */
         foreach ($previewList as $key => $newsPostDTO) {
             $newsList[] = $this->parseNewsPage($newsPostDTO);
             $this->nodeStorage->removeAll($this->nodeStorage);
@@ -73,10 +73,10 @@ abstract class AbstractBaseParser implements ParserInterface
     abstract protected function getNewsPostDTOList(int $minNewsCount = 10, int $maxNewsCount = 100): array;
 
     /**
-     * @param NewsPostDTO $newsPostDTO
+     * @param PreviewNewsDTO $newsPostDTO
      * @return NewsPost
      */
-    abstract protected function parseNewsPage(NewsPostDTO $newsPostDTO): NewsPost;
+    abstract protected function parseNewsPage(PreviewNewsDTO $newsPostDTO): NewsPost;
 
 
     protected function purifyNewsPostContent(Crawler $contentCrawler): void
@@ -86,7 +86,7 @@ abstract class AbstractBaseParser implements ParserInterface
         $this->removeDomNodes($contentCrawler, '//table');
     }
 
-    protected function parseNewsPostContent(Crawler $contentCrawler, NewsPostDTO $newsPostDTO): array
+    protected function parseNewsPostContent(Crawler $contentCrawler, PreviewNewsDTO $newsPostDTO): array
     {
         $newsPostItemDTOList = [];
 
@@ -107,12 +107,12 @@ abstract class AbstractBaseParser implements ParserInterface
     }
 
     /**
-     * @param NewsPostDTO $newsPostDTO
+     * @param PreviewNewsDTO $newsPostDTO
      * @param NewsPostItemDTO[] $newsPostItems
      * @param int $descLength
      * @return NewsPost
      */
-    protected function factoryNewsPost(NewsPostDTO $newsPostDTO, array $newsPostItems, int $descLength = 200): NewsPost
+    protected function factoryNewsPost(PreviewNewsDTO $newsPostDTO, array $newsPostItems, int $descLength = 200): NewsPost
     {
         $uri = $newsPostDTO->getUri();
         $image = $newsPostDTO->getImage();
@@ -165,7 +165,7 @@ abstract class AbstractBaseParser implements ParserInterface
     }
 
 
-    protected function parseDOMNode(DOMNode $node, NewsPostDTO $newsPostDTO): ?NewsPostItemDTO
+    protected function parseDOMNode(DOMNode $node, PreviewNewsDTO $newsPostDTO): ?NewsPostItemDTO
     {
         try {
             $newsPostItem = $this->searchQuoteNewsItem($node);
@@ -261,7 +261,7 @@ abstract class AbstractBaseParser implements ParserInterface
         return $newsPostItem;
     }
 
-    protected function searchLinkNewsItem(DOMNode $node, NewsPostDTO $newsPostDTO): ?NewsPostItemDTO
+    protected function searchLinkNewsItem(DOMNode $node, PreviewNewsDTO $newsPostDTO): ?NewsPostItemDTO
     {
         if ($this->isImageType($node)) {
             return null;
@@ -325,7 +325,7 @@ abstract class AbstractBaseParser implements ParserInterface
         return $newsPostItem;
     }
 
-    protected function searchImageNewsItem(DOMNode $node, NewsPostDTO $newsPostDTO): ?NewsPostItemDTO
+    protected function searchImageNewsItem(DOMNode $node, PreviewNewsDTO $newsPostDTO): ?NewsPostItemDTO
     {
         $isPicture = $this->isPictureType($node);
 

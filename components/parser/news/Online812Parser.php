@@ -4,7 +4,7 @@ namespace app\components\parser\news;
 
 use app\components\Helper;
 use app\components\helper\nai4rus\DOMNodeRecursiveIterator;
-use app\components\helper\nai4rus\NewsPostDTO;
+use app\components\helper\nai4rus\PreviewNewsDTO;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
@@ -87,7 +87,7 @@ class Online812Parser implements ParserInterface
             $publishedAt = DateTimeImmutable::createFromFormat('D, d M Y H:i:s O', $publishedAtString);
             $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
 
-            $previewList[] = new NewsPostDTO($uri, $publishedAtUTC, $title, $preview);
+            $previewList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $title, $preview);
         });
 
         $previewList = array_slice($previewList, 0, $maxNewsCount);
@@ -95,7 +95,7 @@ class Online812Parser implements ParserInterface
         return $previewList;
     }
 
-    private function parseNewsPage(NewsPostDTO $previewNewsItem): NewsPost
+    private function parseNewsPage(PreviewNewsDTO $previewNewsItem): NewsPost
     {
         $uri = $previewNewsItem->getUri();
         $title = $previewNewsItem->getTitle();
@@ -149,7 +149,7 @@ class Online812Parser implements ParserInterface
         return $newsPost;
     }
 
-    private function parseDOMNode(DOMNode $node, NewsPostDTO $previewNewsItem): ?NewsPostItem
+    private function parseDOMNode(DOMNode $node, PreviewNewsDTO $previewNewsItem): ?NewsPostItem
     {
         if ($this->isQuoteType($node) && $this->hasText($node)) {
             return new NewsPostItem(NewsPostItem::TYPE_QUOTE, $node->textContent);

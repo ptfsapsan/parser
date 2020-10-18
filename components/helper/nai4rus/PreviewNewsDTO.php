@@ -5,7 +5,7 @@ namespace app\components\helper\nai4rus;
 use DateTimeInterface;
 use InvalidArgumentException;
 
-class NewsPostDTO
+class PreviewNewsDTO
 {
     private string $uri;
     private ?DateTimeInterface $publishedAt;
@@ -41,6 +41,11 @@ class NewsPostDTO
         return $this->publishedAt;
     }
 
+    public function getDateTime(): ?DateTimeInterface
+    {
+        return $this->getPublishedAt();
+    }
+
     public function setPublishedAt(?DateTimeInterface $publishedAt): void
     {
         $this->publishedAt = $publishedAt;
@@ -54,6 +59,11 @@ class NewsPostDTO
     public function setTitle(?string $title): void
     {
         $this->title = $title;
+    }
+
+    public function getPreview(): ?string
+    {
+        return $this->getDescription();
     }
 
     public function getDescription(): ?string

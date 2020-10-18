@@ -4,7 +4,7 @@ namespace app\components\parser\news;
 
 use app\components\Helper;
 use app\components\helper\nai4rus\DOMNodeRecursiveIterator;
-use app\components\helper\nai4rus\NewsPostDTO;
+use app\components\helper\nai4rus\PreviewNewsDTO;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
@@ -117,7 +117,7 @@ class VestiKamazaParser implements ParserInterface
 
                 $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
 
-                $previewList[] = new NewsPostDTO($uri, $publishedAtUTC, $titleCrawler->text());
+                $previewList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $titleCrawler->text());
             });
 
             $pageNumber++;
@@ -125,7 +125,7 @@ class VestiKamazaParser implements ParserInterface
 
         $previewList = array_slice($previewList, 0, $maxNewsCount);
 
-        usort($previewList, function (NewsPostDTO $firstNews, NewsPostDTO $secondNews) {
+        usort($previewList, function (PreviewNewsDTO $firstNews, PreviewNewsDTO $secondNews) {
             $firstNewsTimestamp = $firstNews->getDateTime()->getTimestamp();
             $secondNewsTimestamp = $secondNews->getDateTime()->getTimestamp();
 
@@ -139,7 +139,7 @@ class VestiKamazaParser implements ParserInterface
         return $previewList;
     }
 
-    private function parseNewsPage(NewsPostDTO $previewNewsItem): NewsPost
+    private function parseNewsPage(PreviewNewsDTO $previewNewsItem): NewsPost
     {
         $uri = $previewNewsItem->getUri();
         $title = $previewNewsItem->getTitle();
@@ -187,7 +187,7 @@ class VestiKamazaParser implements ParserInterface
         return $newsPost;
     }
 
-    private function parseDOMNode(DOMNode $node, NewsPostDTO $previewNewsItem): ?NewsPostItem
+    private function parseDOMNode(DOMNode $node, PreviewNewsDTO $previewNewsItem): ?NewsPostItem
     {
         if ($this->isQuoteType($node) && $this->hasText($node)) {
             return new NewsPostItem(NewsPostItem::TYPE_QUOTE, $node->textContent);
