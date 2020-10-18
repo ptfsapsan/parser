@@ -42,7 +42,7 @@ abstract class AbstractBaseParser implements ParserInterface
 
     public function parse(int $minNewsCount = 10, int $maxNewsCount = 100): array
     {
-        $previewList = $this->getNewsPostDTOList($minNewsCount, $maxNewsCount);
+        $previewList = $this->getPreviewNewsDTOList($minNewsCount, $maxNewsCount);
 
         $newsList = [];
 
