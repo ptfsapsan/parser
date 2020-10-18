@@ -96,7 +96,7 @@ class ChechenInfoParser implements ParserInterface
             $publishedAt = DateTimeImmutable::createFromFormat('D, d M Y H:i:s O', $publishedAtString);
             $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
 
-            $preview = trim(str_replace('&nbsp;', ' ', strip_tags($newsPreview->filterXPath('//description')->text())));
+            $preview = trim($this->normalizeSpaces(str_replace('&nbsp;', ' ', strip_tags($newsPreview->filterXPath('//description')->text()))));
 
             $previewList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $title, $preview);
         });
@@ -118,9 +118,10 @@ class ChechenInfoParser implements ParserInterface
 
         $newsPageCrawler = new Crawler($newsPage);
 
-        $mainImageCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"news-page__text")]/img')->first();
+        $mainImageCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"news-page__text")]//img[1]')->first();
         if ($this->crawlerHasNodes($mainImageCrawler)) {
             $image = $mainImageCrawler->attr('src');
+            $this->removeDomNodes($newsPageCrawler, '//div[contains(@class,"news-page__text")]//img[1]');
         }
 
         if ($image !== null) {
@@ -130,10 +131,13 @@ class ChechenInfoParser implements ParserInterface
 
         $contentCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"news-page__text")]');
 
-        $this->removeDomNodes($contentCrawler, '//img[1]');
         $this->removeDomNodes($contentCrawler, '//p[last()]');
         $this->removeDomNodes($contentCrawler, '//a[starts-with(@href,"javascript")]');
         $this->removeDomNodes($contentCrawler, '//script | //video | //style | //form | //table');
+
+        if (!$description) {
+            $description = $this->getDescriptionFromText($contentCrawler);
+        }
 
         $newsPost = new NewsPost(self::class, $title, $description, $publishedAt->format('Y-m-d H:i:s'), $uri, $image);
 
@@ -151,6 +155,15 @@ class ChechenInfoParser implements ParserInterface
                 }
 
                 $newsPost->addItem($newsPostItem);
+            }
+        }
+
+        /** @var NewsPostItem $item */
+        foreach ($newsPost->items as $key => $item) {
+            if ($item->type === NewsPostItem::TYPE_TEXT && $item->text) {
+                $newsPost->description = $this->normalizeSpaces($item->text);
+                unset($newsPost->items[$key]);
+                break;
             }
         }
 
@@ -511,4 +524,37 @@ class ChechenInfoParser implements ParserInterface
 
         return (string)Uri::createFromComponents($uriParts);
     }
+
+    private function getDescriptionFromText(Crawler $crawler): string
+    {
+        $description = '';
+
+        $deepForFilter = 1;
+        for ($deep = 1; $deep <= 10; $deep++) {
+            if ($description && str_contains($description, '.')) {
+                break;
+            }
+
+            $descriptionCrawler = $crawler->filterXPath("//p[$deepForFilter]");
+            if ($this->crawlerHasNodes($descriptionCrawler)) {
+                $descriptionText = $descriptionCrawler->text();
+                if ($descriptionText) {
+                    $description .= " $descriptionText";
+                    $this->removeDomNodes($crawler, "//p[$deepForFilter]");
+                } else {
+                    $deepForFilter++;
+                }
+
+                $description = $this->normalizeSpaces($description);
+            }
+        }
+
+        return $description;
+    }
+
+    private function normalizeSpaces(string $string): string
+    {
+        return preg_replace('/\s+/u', ' ', $string);
+    }
+
 }
