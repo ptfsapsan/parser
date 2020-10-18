@@ -119,6 +119,29 @@ abstract class TyRunBaseParser
     }
 
     /**
+     * Парсим заголовки
+     * @param Crawler $node
+     * @param NewsPost $newPost
+     */
+    protected static function parseHeader(Crawler $node, NewsPost $newPost): void
+    {
+        $content = $node->text();
+        $lvl = preg_match('/d/', $node->nodeName(), $matches);
+        if ($lvl && $lvl <= 6 && $content) {
+            $newPost->addItem(
+                new NewsPostItem(
+                    NewsPostItem::TYPE_HEADER,
+                    $content,
+                    null,
+                    null,
+                    $lvl,
+                    null
+                ));
+        }
+
+    }
+
+    /**
      * Возвращает id видео на youtube из url, если он есть
      * @param string $str
      * @return string|null
@@ -139,15 +162,16 @@ abstract class TyRunBaseParser
      * Приводим дату к UTC +0
      * @param string $date
      * @param string $format
-     * @return string
+     * @param bool $asDateTimeObject
+     * @return string|DateTime
      */
-    protected static function stringToDateTime(string $date, string $format = 'D, d M Y H:i:s O'): string
+    protected static function stringToDateTime(string $date, string $format = 'D, d M Y H:i:s O', $asDateTimeObject = false)
     {
         $dateTime = DateTime::createFromFormat($format, $date);
         if (is_a($dateTime, DateTime::class)) {
             $tz = new DateTimeZone('UTC');
             $dateTime->setTimezone($tz);
-            return $dateTime->format('d-m-Y H:i:s');
+            return $asDateTimeObject ? $dateTime : $dateTime->format('d-m-Y H:i:s');
         }
         return $date;
     }
@@ -277,7 +301,20 @@ abstract class TyRunBaseParser
      */
     protected static function sanitizeHtmlEntities(string $str): string
     {
-       return preg_replace("/&#?[a-z0-9]{2,8};/i","", htmlentities($str));
+        return preg_replace("/&#?[a-z0-9]{2,8};/i", "", htmlentities($str));
+    }
+
+    /**
+     * Заменяет название русских месяце в на их порядковый номер месяца без ведущего нуля
+     * @param string $str
+     * @return string
+     */
+    protected static function rusMonthToIndex(string $str): string
+    {
+        $months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+        $indexes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+        return str_replace($months, $indexes, $str);
     }
 
 }
