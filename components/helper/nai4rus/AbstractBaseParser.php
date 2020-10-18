@@ -60,10 +60,22 @@ abstract class AbstractBaseParser implements ParserInterface
         return $newsList;
     }
 
+    /**
+     * @return string
+     */
     abstract protected function getSiteUrl(): string;
 
+    /**
+     * @param int $minNewsCount
+     * @param int $maxNewsCount
+     * @return NewsPostItemDTO[]
+     */
     abstract protected function getNewsPostDTOList(int $minNewsCount = 10, int $maxNewsCount = 100): array;
 
+    /**
+     * @param NewsPostDTO $newsPostDTO
+     * @return NewsPost
+     */
     abstract protected function parseNewsPage(NewsPostDTO $newsPostDTO): NewsPost;
 
 
