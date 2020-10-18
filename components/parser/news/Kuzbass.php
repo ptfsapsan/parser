@@ -162,8 +162,6 @@ class Kuzbass extends TyRunBaseParser implements ParserInterface
 
         switch ($node->nodeName()) {
             case 'div': //запускаем рекурсивно на дочерние ноды, если есть, если нет то там обычно ненужный шлак
-            case 'span':
-                self::parseDescriptionIntersectParagraph($node, $newPost, $descriptionSentences);
                 $nodes = $node->children();
                 if ($nodes->count()) {
                     $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing) {
@@ -179,6 +177,11 @@ class Kuzbass extends TyRunBaseParser implements ParserInterface
             case 'blockquote':
             case 'p':
                 self::parseDescriptionIntersectParagraph($node, $newPost, $descriptionSentences);
+                if ($nodes = $node->children()) {
+                    $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing) {
+                        self::parseNode($node, $newPost, $maxDepth, $stopParsing);
+                    });
+                }
                 break;
             case 'img':
                 self::parseImage($node, $newPost);
