@@ -70,7 +70,7 @@ abstract class AbstractBaseParser implements ParserInterface
      * @param int $maxNewsCount
      * @return NewsPostItemDTO[]
      */
-    abstract protected function getNewsPostDTOList(int $minNewsCount = 10, int $maxNewsCount = 100): array;
+    abstract protected function getPreviewNewsDTOList(int $minNewsCount = 10, int $maxNewsCount = 100): array;
 
     /**
      * @param PreviewNewsDTO $newsPostDTO
