@@ -91,7 +91,8 @@ class KavTodayParser extends AbstractBaseParser
             $previewNewsDTO->setDescription($description);
         }
 
-        $contentCrawler = $newsPostCrawler->filterXPath('//div[contains(@class,"inner-wrap")]');
+        $contentCrawler = $newsPostCrawler->filterXPath('//div[contains(@class,"inner-wrap")]')->first();
+        $this->removeDomNodes($contentCrawler,'//div[contains(@class,"mobile-slider")]');
 
         $this->purifyNewsPostContent($contentCrawler);
 
