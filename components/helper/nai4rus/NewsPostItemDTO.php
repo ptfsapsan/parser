@@ -52,7 +52,7 @@ class NewsPostItemDTO
         return new self(NewsPostItem::TYPE_TEXT, $text);
     }
 
-    public static function createImageItem(string $text, string $image): self
+    public static function createImageItem(string $image, ?string $text = null): self
     {
         return new self(NewsPostItem::TYPE_IMAGE, $text, $image);
     }
@@ -62,7 +62,7 @@ class NewsPostItemDTO
         return new self(NewsPostItem::TYPE_QUOTE, $text);
     }
 
-    public static function createLinkItem(string $text, string $link): self
+    public static function createLinkItem(string $link, ?string $text = null): self
     {
         return new self(NewsPostItem::TYPE_LINK, $text, null, $link);
     }
