@@ -242,10 +242,11 @@ abstract class TyRunBaseParser
          */
         if (!empty($node->text()) && count($intersect) < count($nodeSentences)) {
             /**
-             * Дополнительно проверяем, что оставшийся текст не является подстрокой описания
+             * Дополнительно проверяем, что оставшийся текст не является подстрокой описания и содержит что еще,
+             * кроме html символов
              */
             $text = trim(implode('. ', array_diff($nodeSentences, $intersect)));
-            if (empty($text) || stristr($newPost->description, $text)) {
+            if (empty(self::sanitizeHtmlEntities($text)) || stristr($newPost->description, $text)) {
                 return;
             }
 

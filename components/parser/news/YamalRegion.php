@@ -12,26 +12,25 @@ use Exception;
 use Symfony\Component\DomCrawler\Crawler;
 
 /**
- * Парсер новостей из RSS ленты kuzbass85.ru
+ * Парсер новостей из RSS ленты yamal-region.tv
  *
- *  В RSS отсутствует дата публикации
  */
-class Kuzbass extends TyRunBaseParser implements ParserInterface
+class YamalRegion extends TyRunBaseParser implements ParserInterface
 {
     const USER_ID = 2;
     const FEED_ID = 2;
 
-    const MAIN_PAGE_URI = 'http://kuzbass85.ru';
+    const MAIN_PAGE_URI = 'https://yamal-region.tv';
 
     /**
      * CSS класс, где хранится содержимое новости
      */
-    const BODY_CONTAINER_CSS_SELECTOR = '.inner_article';
+    const BODY_CONTAINER_CSS_SELECTOR = '.page_content';
 
     /**
      * CSS  класс для параграфов - цитат
      */
-    const QUOTE_TAG = 'blockquote';
+    const QUOTE_TAG = 'em';
 
     /**
      * Классы эоементов, которые не нужно парсить, например блоки с рекламой и т.п.
@@ -48,7 +47,7 @@ class Kuzbass extends TyRunBaseParser implements ParserInterface
     /**
      * Ссылка на RSS фид (XML)
      */
-    const FEED_URL = 'http://kuzbass85.ru/rss';
+    const FEED_URL = 'https://yamal-region.tv/xml/news_rss.xml';
 
     /**
      *  Максимальная глубина для парсинга <div> тегов
@@ -78,42 +77,39 @@ class Kuzbass extends TyRunBaseParser implements ParserInterface
         $rss = $curl->get(self::FEED_URL);
 
         $crawler = new Crawler($rss);
-        $crawler->filter('rss channel item')->slice(0, self::MAX_NEWS_COUNT)->each(function (Crawler $node) use (&$pubTimeArray, &$curl, &$posts) {
+        $crawler->filter('rss channel item')->slice(0, self::MAX_NEWS_COUNT)->each(function (Crawler $node) use (&$curl, &$posts) {
 
             $newPost = new NewsPost(
                 self::class,
                 $node->filter('title')->text(),
-                self::prepareDescription($node->filter('description')->text(),
-                    '/(.*)\.(.*)(&#8230;)(.*)/'),
-                date('Y-m-d H:i:s'),
+                $node->filter('description')->text(),
+                self::stringToDateTime($node->filter('pubDate')->text()),
                 $node->filter('link')->text(),
-                self::urlEncode($node->filter('enclosure')->attr('url'))
+                null
             );
 
             /**
              * Предложения содержащиеся в описании (для последующей проверки при парсинга тела новости)
              */
             $descriptionSentences = explode('. ', html_entity_decode($newPost->description));
+            if (count($descriptionSentences) > 4) {
+                $descriptionSentences = array_slice($descriptionSentences, 0, 4);
+                $newPost->description = implode('. ', $descriptionSentences);
+            }
 
             /**
              * Получаем полный html новости
              */
             $newsContent = $curl->get($newPost->original);
 
-
             if (!empty($newsContent)) {
                 $newsContent = (new Crawler($newsContent))->filter(self::BODY_CONTAINER_CSS_SELECTOR);
-
-                $authorString = $newsContent->filter('.author_info')->text();
-                $pubDate = self::rusMonthToIndex(explode(' | ', $authorString)[0]);
-                $dateString = $pubDate . ' ' . date('H:i:s O');
-                $newPost->createDate = self::stringToDateTime($dateString, 'd n Y H:i:s O', true);;
 
                 /**
                  * Текст статьи, может содержать цитаты ( все полезное содержимое в тегах <p> )
                  * Не знаю нужно или нет, но сделал более универсально, с рекурсией
                  */
-                $articleContent = $newsContent->filter('.font_size_options')->children();
+                $articleContent = $newsContent->filter('.news_content .text')->children();
                 $stopParsing = false;
                 if ($articleContent->count()) {
                     $articleContent->each(function ($node) use ($newPost, &$stopParsing, $descriptionSentences) {
@@ -163,19 +159,16 @@ class Kuzbass extends TyRunBaseParser implements ParserInterface
 
         switch ($node->nodeName()) {
             case 'div': //запускаем рекурсивно на дочерние ноды, если есть, если нет то там обычно ненужный шлак
+            case 'span':
                 $nodes = $node->children();
                 if ($nodes->count()) {
                     $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing) {
                         self::parseNode($node, $newPost, $maxDepth, $stopParsing);
                     });
+                } else {
+                    self::parseDescriptionIntersectParagraph($node, $newPost, $descriptionSentences);
                 }
                 break;
-            case 'h3':
-            case 'h4':
-            case 'h5':
-                self::parseHeader($node, $newPost);
-                break;
-            case 'blockquote':
             case 'p':
                 self::parseDescriptionIntersectParagraph($node, $newPost, $descriptionSentences);
                 if ($nodes = $node->children()) {
