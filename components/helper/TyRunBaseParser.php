@@ -2,6 +2,7 @@
 
 namespace app\components\helper;
 
+use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use DateTime;
@@ -197,6 +198,8 @@ abstract class TyRunBaseParser
      */
     protected static function parseDescriptionIntersectParagraph(Crawler $node, NewsPost $newPost, array $descriptionSentences): void
     {
+        if (empty($node->text())) return;
+
         $nodeSentences = array_map(function ($item) {
             return !empty($item) ? trim($item, '  \t\n\r\0\x0B.') : false;
         }, explode('.', $node->text()));
@@ -210,7 +213,6 @@ abstract class TyRunBaseParser
              * Дополнительно проверяем, что оставшийся текст не является подстрокой описания
              */
             $text = trim(implode('. ', array_diff($nodeSentences, $intersect)));
-
             if (empty($text) || stristr($newPost->description, $text)) {
                 return;
             }
@@ -240,6 +242,27 @@ abstract class TyRunBaseParser
     protected static function urlEncode(string $url): string
     {
         return str_replace(['%3A', '%2F'], [':', '/'], rawurlencode($url));
+    }
+
+    /**
+     * @param string $description
+     * @param string $pattern
+     * @return string
+     *
+     * Если В RSS битый дескрипшн:
+     *  - например в конце идет коприайт, в виде ссылки на сайт:
+     * [&#8230;] The post В Тверской области лишили прав водителя, ездившего " под кайфом" first appeared on TVTver.ru.
+     * - Либо есть незаконченное предложение
+     *
+     * То обрезаем описание до последнего законченного предложения
+     */
+    protected static function prepareDescription(string $description, $pattern = ''): string
+    {
+        $description = Helper::prepareString($description);
+        if ($pattern) {
+            preg_match($pattern, $description, $matches);
+        }
+        return !empty($matches[1]) ? $matches[1] : $description;
     }
 
 }
