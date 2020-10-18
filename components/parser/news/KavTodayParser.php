@@ -72,7 +72,6 @@ class KavTodayParser extends AbstractBaseParser
         $uri = $previewNewsDTO->getUri();
         $image = null;
 
-
         $newsPage = $this->getPageContent($uri);
 
         $newsPageCrawler = new Crawler($newsPage);
