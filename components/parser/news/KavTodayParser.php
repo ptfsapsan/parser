@@ -26,11 +26,12 @@ class KavTodayParser extends AbstractBaseParser
     {
         $previewNewsDTOList = [];
         $pageNumber = 1;
-        $urn = "/site/articles?catids[0]=1&catids[1]=2&catids[2]=3&catids[3]=4&title=В22&page={$pageNumber}&showImages=0";
-
-        $uriPreviewPage = UriResolver::resolve($urn, $this->getSiteUrl());
 
         while (count($previewNewsDTOList) < $maxNewsCount) {
+            $urn = "/site/articles?catids[0]=1&catids[1]=2&catids[2]=3&catids[3]=4&title=В22&page={$pageNumber}&showImages=0";
+            $uriPreviewPage = UriResolver::resolve($urn, $this->getSiteUrl());
+            $pageNumber++;
+
             try {
                 $previewNewsContent = $this->getPageContent($uriPreviewPage);
                 $previewNewsCrawler = new Crawler($previewNewsContent);
@@ -71,6 +72,7 @@ class KavTodayParser extends AbstractBaseParser
         $uri = $previewNewsDTO->getUri();
         $image = null;
 
+
         $newsPage = $this->getPageContent($uri);
 
         $newsPageCrawler = new Crawler($newsPage);
@@ -80,7 +82,7 @@ class KavTodayParser extends AbstractBaseParser
         if ($this->crawlerHasNodes($mainImageCrawler)) {
             $image = $mainImageCrawler->attr('content');
         }
-        if ($image !== null) {
+        if ($image !== null && $image !== '') {
             $image = UriResolver::resolve($image, $uri);
             $previewNewsDTO->setImage($this->encodeUri($image));
         }
