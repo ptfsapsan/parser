@@ -4,7 +4,7 @@ namespace app\components\parser\news;
 
 use app\components\Helper;
 use app\components\helper\nai4rus\DOMNodeRecursiveIterator;
-use app\components\helper\nai4rus\PreviewNewsDTO;
+use app\components\helper\nai4rus\NewsPostDTO;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
@@ -56,7 +56,7 @@ class NaZapadeMosParser implements ParserInterface
 
         $newsList = [];
 
-        /** @var PreviewNewsDTO $previewNewsItem */
+        /** @var NewsPostDTO $previewNewsItem */
         foreach ($previewList as $key => $previewNewsItem) {
             $newsList[] = $this->parseNewsPage($previewNewsItem);
             $this->nodeStorage = new SplObjectStorage();
@@ -99,7 +99,7 @@ class NaZapadeMosParser implements ParserInterface
                 $previewExplode = explode('.',$preview,2);
                 $preview = $previewExplode[0];
 
-                $previewList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $title, $preview);
+                $previewList[] = new NewsPostDTO($uri, $publishedAtUTC, $title, $preview);
             }
         );
 
@@ -108,7 +108,7 @@ class NaZapadeMosParser implements ParserInterface
     }
 
 
-    private function parseNewsPage(PreviewNewsDTO $previewNewsItem): NewsPost
+    private function parseNewsPage(NewsPostDTO $previewNewsItem): NewsPost
     {
         $uri = $previewNewsItem->getUri();
         $title = $previewNewsItem->getTitle();
@@ -160,7 +160,7 @@ class NaZapadeMosParser implements ParserInterface
     }
 
 
-    private function parseDOMNode(DOMNode $node, PreviewNewsDTO $previewNewsItem): ?NewsPostItem
+    private function parseDOMNode(DOMNode $node, NewsPostDTO $previewNewsItem): ?NewsPostItem
     {
         try {
             $newsPostItem = $this->searchQuoteNewsItem($node);
@@ -306,7 +306,7 @@ class NaZapadeMosParser implements ParserInterface
         return new NewsPostItem(NewsPostItem::TYPE_VIDEO, null, null, null, null, basename($iframeLink));
     }
 
-    private function searchImageNewsItem(DOMNode $node, PreviewNewsDTO $previewNewsItem): ?NewsPostItem
+    private function searchImageNewsItem(DOMNode $node, NewsPostDTO $previewNewsItem): ?NewsPostItem
     {
         $isPicture = $this->isPictureType($node);
 

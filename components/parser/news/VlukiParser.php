@@ -4,7 +4,7 @@ namespace app\components\parser\news;
 
 use app\components\Helper;
 use app\components\helper\nai4rus\DOMNodeRecursiveIterator;
-use app\components\helper\nai4rus\PreviewNewsDTO;
+use app\components\helper\nai4rus\NewsPostDTO;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
@@ -87,7 +87,7 @@ class VlukiParser implements ParserInterface
                 $previewCrawler = $newsPreview->filterXPath('//div[contains(@class, "news-obj__desc")]');
                 $preview = $previewCrawler->count() >= 1 ? $previewCrawler->text() : null;
 
-                $previewList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $titleCrawler->text(), $preview);
+                $previewList[] = new NewsPostDTO($uri, $publishedAtUTC, $titleCrawler->text(), $preview);
             });
 
             $pageNumber++;
@@ -97,7 +97,7 @@ class VlukiParser implements ParserInterface
     }
 
 
-    private function parseNewsPage(PreviewNewsDTO $previewNewsItem): NewsPost
+    private function parseNewsPage(NewsPostDTO $previewNewsItem): NewsPost
     {
         $uri = $previewNewsItem->getUri();
         $title = $previewNewsItem->getTitle();
@@ -159,7 +159,7 @@ class VlukiParser implements ParserInterface
         throw new RuntimeException("Не удалось скачать страницу {$uri}, код ответа {$httpCode}");
     }
 
-    private function parseDOMNode(DOMNode $node, PreviewNewsDTO $previewNewsItem): ?NewsPostItem
+    private function parseDOMNode(DOMNode $node, NewsPostDTO $previewNewsItem): ?NewsPostItem
     {
         if (!empty($node->textContent) && $this->isQuoteType($node->parentNode)) {
             return new NewsPostItem(NewsPostItem::TYPE_QUOTE, $node->textContent);

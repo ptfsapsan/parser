@@ -4,7 +4,7 @@ namespace app\components\parser\news;
 
 use app\components\Helper;
 use app\components\helper\nai4rus\DOMNodeRecursiveIterator;
-use app\components\helper\nai4rus\PreviewNewsDTO;
+use app\components\helper\nai4rus\NewsPostDTO;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
@@ -53,7 +53,7 @@ class GtrkPskovParser implements ParserInterface
 
         $newsList = [];
 
-        /** @var PreviewNewsDTO $previewNewsItem */
+        /** @var NewsPostDTO $previewNewsItem */
         foreach ($previewList as $key => $previewNewsItem) {
             $newsList[] = $this->parseNewsPage($previewNewsItem);
             $this->nodeStorage = new SplObjectStorage();
@@ -98,7 +98,7 @@ class GtrkPskovParser implements ParserInterface
 
             $preview = trim(html_entity_decode(strip_tags($newsPreview->filterXPath('//description')->text())));
 
-            $previewList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $title, $preview);
+            $previewList[] = new NewsPostDTO($uri, $publishedAtUTC, $title, $preview);
         });
 
         $previewList = array_slice($previewList, 0, $maxNewsCount);
@@ -106,7 +106,7 @@ class GtrkPskovParser implements ParserInterface
         return $previewList;
     }
 
-    private function parseNewsPage(PreviewNewsDTO $previewNewsItem): NewsPost
+    private function parseNewsPage(NewsPostDTO $previewNewsItem): NewsPost
     {
         $uri = $previewNewsItem->getUri();
         $title = $previewNewsItem->getTitle();
@@ -158,7 +158,7 @@ class GtrkPskovParser implements ParserInterface
         return $newsPost;
     }
 
-    private function parseDOMNode(DOMNode $node, PreviewNewsDTO $previewNewsItem): ?NewsPostItem
+    private function parseDOMNode(DOMNode $node, NewsPostDTO $previewNewsItem): ?NewsPostItem
     {
         try {
             $newsPostItem = $this->searchQuoteNewsItem($node);
@@ -251,7 +251,7 @@ class GtrkPskovParser implements ParserInterface
         return $newsPostItem;
     }
 
-    private function searchLinkNewsItem(DOMNode $node, PreviewNewsDTO $previewNewsItem): ?NewsPostItem
+    private function searchLinkNewsItem(DOMNode $node, NewsPostDTO $previewNewsItem): ?NewsPostItem
     {
         if ($node->nodeName === '#text') {
             $parentNode = $this->getRecursivelyParentNode($node, function (DOMNode $parentNode) {
@@ -306,7 +306,7 @@ class GtrkPskovParser implements ParserInterface
         return new NewsPostItem(NewsPostItem::TYPE_VIDEO, null, null, null, null, $youtubeVideoId);
     }
 
-    private function searchImageNewsItem(DOMNode $node, PreviewNewsDTO $previewNewsItem): ?NewsPostItem
+    private function searchImageNewsItem(DOMNode $node, NewsPostDTO $previewNewsItem): ?NewsPostItem
     {
         $isPicture = $this->isPictureType($node);
 
