@@ -3,7 +3,7 @@
 namespace app\components\parser\news;
 
 use app\components\helper\nai4rus\AbstractBaseParser;
-use app\components\helper\nai4rus\NewsPostDTO;
+use app\components\helper\nai4rus\PreviewNewsDTO;
 use app\components\parser\NewsPost;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -22,20 +22,20 @@ class KavTodayParser extends AbstractBaseParser
         return 'https://kavtoday.ru';
     }
 
-    protected function getNewsPostDTOList(int $minNewsCount = 10, int $maxNewsCount = 100): array
+    protected function getPreviewNewsDTOList(int $minNewsCount = 10, int $maxNewsCount = 100): array
     {
-        $newsPostDTOList = [];
+        $previewNewsDTOList = [];
         $pageNumber = 1;
         $urn = "/site/articles?catids[0]=1&catids[1]=2&catids[2]=3&catids[3]=4&title=В22&page={$pageNumber}&showImages=0";
 
         $uriPreviewPage = UriResolver::resolve($urn, $this->getSiteUrl());
 
-        while (count($newsPostDTOList) < $maxNewsCount) {
+        while (count($previewNewsDTOList) < $maxNewsCount) {
             try {
                 $previewNewsContent = $this->getPageContent($uriPreviewPage);
                 $previewNewsCrawler = new Crawler($previewNewsContent);
             } catch (Throwable $exception) {
-                if (count($newsPostDTOList) < $minNewsCount) {
+                if (count($previewNewsDTOList) < $minNewsCount) {
                     throw new RuntimeException('Не удалось получить достаточное кол-во новостей', null, $exception);
                 }
                 break;
@@ -44,7 +44,7 @@ class KavTodayParser extends AbstractBaseParser
             $previewNewsXPath = '//div[contains(@class,"item-wrap")]/div[contains(@class,"row-wrap")]';
             $previewNewsCrawler = $previewNewsCrawler->filterXPath($previewNewsXPath);
 
-            $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$newsPostDTOList) {
+            $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$previewNewsDTOList) {
                 $titleCrawler = $newsPreview->filterXPath('//a[contains(@class,"title-wrap")]');
                 $title = $titleCrawler->text();
                 $uri = UriResolver::resolve($titleCrawler->attr('href'), $this->getSiteUrl());
@@ -58,17 +58,17 @@ class KavTodayParser extends AbstractBaseParser
                 $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
 
                 $description = null;
-                $newsPostDTOList[] = new NewsPostDTO($this->encodeUri($uri), $publishedAtUTC, $title, $description);
+                $previewNewsDTOList[] = new PreviewNewsDTO($this->encodeUri($uri), $publishedAtUTC, $title, $description);
             });
         }
 
-        $newsPostDTOList = array_slice($newsPostDTOList, 0, $maxNewsCount);
-        return $newsPostDTOList;
+        $previewNewsDTOList = array_slice($previewNewsDTOList, 0, $maxNewsCount);
+        return $previewNewsDTOList;
     }
 
-    protected function parseNewsPage(NewsPostDTO $newsPostDTO): NewsPost
+    protected function parseNewsPage(PreviewNewsDTO $previewNewsDTO): NewsPost
     {
-        $uri = $newsPostDTO->getUri();
+        $uri = $previewNewsDTO->getUri();
         $image = null;
 
         $newsPage = $this->getPageContent($uri);
@@ -82,20 +82,20 @@ class KavTodayParser extends AbstractBaseParser
         }
         if ($image !== null) {
             $image = UriResolver::resolve($image, $uri);
-            $newsPostDTO->setImage($this->encodeUri($image));
+            $previewNewsDTO->setImage($this->encodeUri($image));
         }
 
         $description = $newsPostCrawler->filterXPath('//h2[contains(@class,"subtitle-wrap")]')->text();
         if($description && $description !== ''){
-            $newsPostDTO->setDescription($description);
+            $previewNewsDTO->setDescription($description);
         }
 
         $contentCrawler = $newsPostCrawler->filterXPath('//div[contains(@class,"inner-wrap")]');
 
         $this->purifyNewsPostContent($contentCrawler);
 
-        $newsPostItemDTOList = $this->parseNewsPostContent($contentCrawler, $newsPostDTO);
+        $newsPostItemDTOList = $this->parseNewsPostContent($contentCrawler, $previewNewsDTO);
 
-        return $this->factoryNewsPost($newsPostDTO, $newsPostItemDTOList);
+        return $this->factoryNewsPost($previewNewsDTO, $newsPostItemDTOList);
     }
 }
