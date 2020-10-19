@@ -46,6 +46,9 @@ class IskraLysvaParser implements ParserInterface
      */
     public static function getNewsData(): array
     {
+        /** Вырубаем нотисы */
+        error_reporting(E_ALL & ~E_NOTICE);
+
         $posts = [];
 
         /** Get page */
@@ -266,7 +269,7 @@ class IskraLysvaParser implements ParserInterface
      */
     protected static function isParagraphType(DOMNode $node): bool
     {
-        return $node->tagName === 'p';
+        return isset($node->tagName) === true && $node->tagName === 'p';
     }
 
     /**
@@ -278,7 +281,7 @@ class IskraLysvaParser implements ParserInterface
      */
     protected static function isQuoteType(DOMNode $node): bool
     {
-        return in_array($node->tagName, ['blockquote']);
+        return isset($node->tagName) === true && in_array($node->tagName, ['blockquote']);
     }
 
     /**
@@ -290,7 +293,7 @@ class IskraLysvaParser implements ParserInterface
      */
     protected static function isLinkType(DOMNode $node): bool
     {
-        return $node->tagName === 'a';
+        return isset($node->tagName) === true && $node->tagName === 'a';
     }
 
     /**
@@ -302,7 +305,7 @@ class IskraLysvaParser implements ParserInterface
      */
     protected static function isImageType(DOMNode $node): bool
     {
-        return $node->tagName === 'img';
+        return isset($node->tagName) === true && $node->tagName === 'img';
     }
 
     /**
