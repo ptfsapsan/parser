@@ -94,8 +94,7 @@ class VirtualnyKamenskParser implements ParserInterface
             $publishedAtString = $newsPreview->filterXPath('//pubDate')->text();
             $publishedAt = DateTimeImmutable::createFromFormat('D, d M Y H:i:s O', $publishedAtString);
             $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
-
-            $preview = strip_tags($newsPreview->filterXPath('//description')->text());
+            $preview = null;
 
             $previewList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $title, $preview);
         });
@@ -110,7 +109,6 @@ class VirtualnyKamenskParser implements ParserInterface
         $uri = $previewNewsItem->getUri();
         $title = $previewNewsItem->getTitle();
         $publishedAt = $previewNewsItem->getDateTime();
-        $description = $previewNewsItem->getPreview();
         $image = null;
 
         $newsPage = $this->getPageContent($uri);
@@ -118,11 +116,27 @@ class VirtualnyKamenskParser implements ParserInterface
         $newsPageCrawler = new Crawler($newsPage);
         $newsPostCrawler = $newsPageCrawler->filterXPath('//div[@itemprop="articleBody"]');
 
+        $mainImageCrawler = $newsPostCrawler->filterXPath('//img')->first();
+        if ($this->crawlerHasNodes($mainImageCrawler)) {
+            $image = $mainImageCrawler->attr('src');
+        }
+
+        if ($image !== null) {
+            $image = UriResolver::resolve($image, $uri);
+        }
+        $description = $newsPostCrawler->filterXPath('//p[1]')->text();
+        $this->removeDomNodes($newsPostCrawler, '//p[1]');
+
+        if ($description === '' || empty($description)) {
+            $description = $newsPostCrawler->filterXPath('//p[2]')->text();
+            $this->removeDomNodes($newsPostCrawler, '//p[2]');
+        }
         $newsPost = new NewsPost(self::class, $title, $description, $publishedAt->format('Y-m-d H:i:s'), $uri, $image);
 
         $contentCrawler = $newsPostCrawler;
 
         $this->removeDomNodes($contentCrawler, '//a[starts-with(@href, "javascript")]');
+        $this->removeDomNodes($contentCrawler, '//img[1]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class, "jllikeproSharesContayner")]');
         $this->removeDomNodes($contentCrawler, '//script | //video');
         $this->removeDomNodes($contentCrawler, '//table');
