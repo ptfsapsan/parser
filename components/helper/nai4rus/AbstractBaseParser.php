@@ -626,4 +626,9 @@ abstract class AbstractBaseParser implements ParserInterface
 
         return $curl;
     }
+
+    protected function getCurl(): Curl
+    {
+        return $this->curl;
+    }
 }
