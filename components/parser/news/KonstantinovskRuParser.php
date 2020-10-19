@@ -58,8 +58,6 @@ class KonstantinovskRuParser implements ParserInterface
                 $image
             );
 
-            $this->addItemPost($post, NewsPostItem::TYPE_HEADER, $title, null, null, 1);
-
             $newContentCrawler = $content->filterXPath("//div[@class='node']/table/*/td");
             $description = '';
             foreach ($newContentCrawler as $content) {
@@ -134,7 +132,10 @@ class KonstantinovskRuParser implements ParserInterface
         $yesterday = $now->sub(new \DateInterval('P1D'))->format('Y-m-d');
         $ruMonths = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря', 'сегодня', 'вчера'];
         $enMonths = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december', $today, $yesterday];
-        return $date ? str_ireplace($ruMonths, $enMonths, $date) : '';
+        $newDate = $date ? str_ireplace($ruMonths, $enMonths, $date) : '';
+        $newDate = new \DateTime($newDate);
+        $newDate->setTimezone(new \DateTimeZone("UTC"));
+        return $newDate->format("Y-m-d H:i:s");
     }
 
     /**
