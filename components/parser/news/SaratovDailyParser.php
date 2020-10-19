@@ -53,6 +53,9 @@ class SaratovDailyParser implements ParserInterface
      */
     public static function getNewsData(int $limit = 100): array
     {
+        /** Вырубаем нотисы */
+        error_reporting(E_ALL & ~E_NOTICE);
+
         $page = 1;
         $posts = [];
         while (self::$parsedCount < $limit) {
@@ -89,7 +92,7 @@ class SaratovDailyParser implements ParserInterface
         $titleBlock = $item->findOne('.content_text_item_title');
 
         /** Get item detail link */
-        $link = UriResolver::resolve($titleBlock->findOne('a')->getAttribute('href'), static::SITE_URL);
+        $link = UriResolver::resolve(self::cleanUrl($titleBlock->findOne('a')->getAttribute('href')), static::SITE_URL);
 
         /** Get title */
         $title = self::cleanText($titleBlock->asText());
@@ -329,7 +332,7 @@ class SaratovDailyParser implements ParserInterface
      */
     protected static function isParagraphType(DOMNode $node): bool
     {
-        return $node->tagName === 'p';
+        return isset($node->tagName) === true && $node->tagName === 'p';
     }
 
     /**
@@ -341,7 +344,7 @@ class SaratovDailyParser implements ParserInterface
      */
     protected static function isQuoteType(DOMNode $node): bool
     {
-        return in_array($node->tagName, ['blockquote']);
+        return isset($node->tagName) === true && in_array($node->tagName, ['blockquote']);
     }
 
     /**
@@ -353,7 +356,7 @@ class SaratovDailyParser implements ParserInterface
      */
     protected static function isLinkType(DOMNode $node): bool
     {
-        return $node->tagName === 'a';
+        return isset($node->tagName) === true && $node->tagName === 'a';
     }
 
     /**
@@ -365,7 +368,7 @@ class SaratovDailyParser implements ParserInterface
      */
     protected static function isImageType(DOMNode $node): bool
     {
-        return $node->tagName === 'img';
+        return isset($node->tagName) === true && $node->tagName === 'img';
     }
 
     /**
