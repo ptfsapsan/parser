@@ -13,6 +13,7 @@ namespace app\components\parser\news;
 
 use app\components\mediasfera\MediasferaNewsParser;
 use app\components\mediasfera\NewsPostWrapper;
+use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
@@ -36,7 +37,20 @@ class Tvchannel31tvParser extends MediasferaNewsParser implements ParserInterfac
     public const NEWSLIST_DESC = '//description';
     public const NEWSLIST_CONTENT = '//content:encoded';
 
-    public const ARTICLE_BREAKPOINTS = [];
+    public const ARTICLE_BREAKPOINTS = [
+        'class' => [
+            'hideme' => false,
+            'clear' => false,
+            'read-more' => false,
+        ],
+        'id' => [
+            'read-more' => false,
+        ],
+        'href' => [
+            'https://goo.gl/oIqt5t' => false,
+            'https://goo.gl/CN7xkq' => false
+        ]
+    ];
 
     protected static NewsPostWrapper $post;
 
@@ -61,9 +75,27 @@ class Tvchannel31tvParser extends MediasferaNewsParser implements ParserInterfac
 
             $articleCrawler = new Crawler('<body><div>'.$html.'</div></body>');
 
-            static::parseSection($articleCrawler);
+            static::parse($articleCrawler);
 
-            $posts[] = self::$post->getNewsPost();
+            $newsPost = self::$post->getNewsPost();
+
+            $removeNext = false;
+
+            foreach ($newsPost->items as $key => $item) {
+                if($removeNext) {
+                    unset($newsPost->items[$key]);
+                    continue;
+                }
+
+                $text = trim($item->text);
+
+                if(strpos($text, 'Следите за главными новостями региона на нашей странице в') !== false) {
+                    unset($newsPost->items[$key]);
+                    $removeNext = true;
+                }
+            }
+
+            $posts[] = $newsPost;
         });
 
         return $posts;
