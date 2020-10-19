@@ -3,6 +3,7 @@
 
 namespace app\components\parser\news;
 
+use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
@@ -36,7 +37,7 @@ class RyazanNewsRuParser implements ParserInterface
         foreach ($newsList as $newsItem) {
             $itemCrawler = new Crawler($newsItem);
             $title = $itemCrawler->filterXPath('//title')->text();
-            $date = $itemCrawler->filterXPath('//pubDate')->text();
+            $date = $this->getDate($itemCrawler->filterXPath('//pubDate')->text());
             $description = $itemCrawler->filterXPath('//description')->text();
             $url = $itemCrawler->filterXPath('//link')->text();
 
@@ -63,7 +64,7 @@ class RyazanNewsRuParser implements ParserInterface
             }
             $img = $newsCrawler->filterXPath('//img[@class="img-responsive post-image"]');
             if ($img->getNode(0)) {
-                $this->addItemPost($post, NewsPostItem::TYPE_IMAGE, null, $img->attr('src'));
+                $post->image = $img->attr('src');
             }
 
             $newContentCrawler = (new Crawler($newsCrawler->filterXPath("//div[@class='post-content']")->html()))->filterXPath('//body')->children();
@@ -73,7 +74,11 @@ class RyazanNewsRuParser implements ParserInterface
                      $nodeValue = $this->clearText($childNode->nodeValue);
                      if ($childNode->nodeName == 'a' && strpos($childNode->getAttribute('href'), 'http') !== false) {
 
-                        $this->addItemPost($post, NewsPostItem::TYPE_LINK, $nodeValue, null, $childNode->getAttribute('href'));
+                         $this->addItemPost($post, NewsPostItem::TYPE_LINK, $nodeValue, null, $childNode->getAttribute('href'));
+
+                     } elseif ($childNode->nodeName == 'img' && $post->image != $childNode->getAttribute('src')) {
+
+                         $this->addItemPost($post, NewsPostItem::TYPE_IMAGE, null, $childNode->getAttribute('src'));
 
                     } elseif ($nodeValue) {
                         $this->addItemPost($post, NewsPostItem::TYPE_TEXT, $nodeValue);
@@ -119,8 +124,7 @@ class RyazanNewsRuParser implements ParserInterface
      */
     private function getPageContent(string $uri): string
     {
-        $curl = new Curl();
-        $curl->setOption(CURLOPT_FOLLOWLOCATION, true);
+        $curl = Helper::getCurl();
         $curl->setOption(CURLOPT_SSL_VERIFYPEER, 0);
 
         $result = $curl->get($uri);
@@ -148,5 +152,18 @@ class RyazanNewsRuParser implements ParserInterface
         $text = str_replace("&nbsp;",'',$text);
         $text = html_entity_decode($text);
         return $text;
+    }
+
+    /**
+     *
+     * @param string $date
+     *
+     * @return string
+     */
+    protected function getDate(string $date): string
+    {
+        $date = new \DateTime($date);
+        $date->setTimezone(new \DateTimeZone("UTC"));
+        return $date->format("Y-m-d H:i:s");
     }
 }
