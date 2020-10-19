@@ -3,7 +3,6 @@
 namespace app\components\parser\news;
 
 use app\components\Helper;
-use app\components\helper\secreate\DOMNodeParse;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
@@ -21,8 +20,6 @@ use Symfony\Component\DomCrawler\UriResolver;
  */
 class SredneuralskVolnaParser implements ParserInterface
 {
-    use DOMNodeParse;
-
     public const USER_ID = 2;
 
     public const FEED_ID = 2;
