@@ -46,7 +46,7 @@ class NovayaGazetaRazyanParser implements ParserInterface
     {
         $parser = new self(200000, 10);
 
-        return $parser->parse(10, 100);
+        return $parser->parse(5, 10);
     }
 
 
@@ -119,11 +119,23 @@ class NovayaGazetaRazyanParser implements ParserInterface
         $description = $previewNewsItem->getPreview();
         $image = null;
 
+
         $newsPage = $this->getPageContent($uri);
 
         $newsPageCrawler = new Crawler($newsPage);
         $newsPostCrawler = $newsPageCrawler->filterXPath('//div[@class="show_item"]');
 
+        $mainImageCrawler = $newsPageCrawler->filterXPath('//div[@class="show_item"]//img[1]');
+        if ($this->crawlerHasNodes($mainImageCrawler)) {
+            $image = $mainImageCrawler->attr('src');
+            $this->removeDomNodes($newsPostCrawler, '//img[1]');
+        }
+
+        if ($image !== null) {
+            $image = UriResolver::resolve($image, $uri);
+            $image = Helper::encodeUrl($image);
+            if ($uri === 'https://novgaz-rzn.ru/novosti/14353.html') $image = str_replace(' ','%20',$image);
+        }
 
         $newsPost = new NewsPost(self::class, $title, $description, $publishedAt->format('Y-m-d H:i:s'), $uri, $image);
         $contentCrawler = $newsPostCrawler;
@@ -131,9 +143,9 @@ class NovayaGazetaRazyanParser implements ParserInterface
         $this->removeDomNodes($contentCrawler, '//a[starts-with(@href, "javascript")]');
         $this->removeDomNodes($contentCrawler, '//script | //video');
         $this->removeDomNodes($contentCrawler, '//table');
+        $this->removeDomNodes($contentCrawler, '//div[contains(@class, "p-2 header")]');
+        $this->removeDomNodes($contentCrawler, '//span[1]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"row")]');
-//        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"mt-4")]');
-//        div[ @class="posts" and div ]
         $this->removeDomNodes($contentCrawler, '//div[@class="mt-4" and iframe]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@id,"vk_comments")]');
         $this->removeDomNodes($contentCrawler, '//iframe[contains(@src,"https://vk.com/")]');
@@ -615,6 +627,21 @@ class NovayaGazetaRazyanParser implements ParserInterface
         preg_match($youtubeRegex, $link, $matches);
 
         return $matches[5] ?? null;
+    }
+
+    private function encodeUri(string $uri)
+    {
+        try {
+            $encodedUri = Helper::encodeUrl($uri);
+        } catch (Throwable $exception) {
+            return null;
+        }
+
+        if (!$encodedUri || $encodedUri === '' || !filter_var($encodedUri, FILTER_VALIDATE_URL)) {
+            return null;
+        }
+
+        return $encodedUri;
     }
 
     private function getSiteUri(): string
