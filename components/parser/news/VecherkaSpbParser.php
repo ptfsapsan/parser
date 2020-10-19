@@ -123,9 +123,10 @@ class VecherkaSpbParser implements ParserInterface
         $image = $newsPostCrawler->filterXPath('//div[contains(@class,"post-image-content")]//img')->attr('src');
         $image = Helper::encodeUrl($image);
 
+        $contentCrawler = $newsPostCrawler->filterXPath('//div[@class="entry-content"]');
+        $description = $contentCrawler->filterXPath('//p[1]')->text();
+        $this->removeDomNodes($contentCrawler,'//p[1]');
         $newsPost = new NewsPost(self::class, $title, $description, $publishedAt->format('Y-m-d H:i:s'), $uri, $image);
-
-        $contentCrawler = $newsPostCrawler;
 
         $this->removeDomNodes($contentCrawler, '//a[starts-with(@href, "javascript")]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class, "post-image-content")]');
