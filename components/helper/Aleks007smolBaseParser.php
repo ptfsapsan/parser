@@ -29,6 +29,27 @@ abstract class Aleks007smolBaseParser
     );
 
     /**
+     * Парсер для тегов <h*>
+     *
+     * @param Crawler $node
+     * @param NewsPost $newPost
+     * @param int $headerLevel
+     */
+    protected static function parseH(Crawler $node, NewsPost $newPost, int $headerLevel): void
+    {
+        $newPost->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_HEADER,
+                $node->text(),
+                null,
+                null,
+                $headerLevel,
+                null
+            )
+        );
+    }
+
+    /**
      * Парсер для тегов <ul>, <ol> и т.п.
      * Разбирает списки в текст с переносом строки
      * @param Crawler $node
