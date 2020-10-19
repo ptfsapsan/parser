@@ -95,7 +95,7 @@ class KazanJournalRuParser implements ParserInterface
             $publishedAt = DateTimeImmutable::createFromFormat(DATE_ATOM, $publishedAtString);
             $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
 
-            $preview = Text::trim(strip_tags(html_entity_decode($newsPreview->filterXPath('//summary')->text())));
+            $preview = Text::trim($this->normalizeSpaces(strip_tags(html_entity_decode($newsPreview->filterXPath('//summary')->text()))));
 
             $previewList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $title, $preview);
         });
@@ -113,6 +113,7 @@ class KazanJournalRuParser implements ParserInterface
         $image = null;
 
         $newsPage = $this->getPageContent($uri);
+        $newsPage = str_replace(['<b>','</b>'], ['', ''], $newsPage);
 
         $newsPageCrawler = new Crawler($newsPage);
 
@@ -148,6 +149,12 @@ class KazanJournalRuParser implements ParserInterface
                 }
 
                 $newsPost->addItem($newsPostItem);
+            }
+        }
+
+        foreach ($newsPost->items as $key => $item) {
+            if ($item->text === $description) {
+                unset($newsPost->items[$key]);
             }
         }
 
@@ -274,6 +281,10 @@ class KazanJournalRuParser implements ParserInterface
         }
 
         $linkText = $this->hasText($node) ? $node->textContent : null;
+        if ($link !== '' && $linkText === $link) {
+            $linkText = null;
+        }
+
         $newsPostItem = new NewsPostItem(NewsPostItem::TYPE_LINK, $linkText, null, $link);
 
         $this->nodeStorage->attach($node, $newsPostItem);
