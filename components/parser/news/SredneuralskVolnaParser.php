@@ -11,9 +11,7 @@ use DateTime;
 use DateTimeZone;
 use DOMElement;
 use DOMNode;
-use DOMText;
 use Exception;
-use lanfix\parser\Parser;
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\DomCrawler\UriResolver;
 
@@ -30,6 +28,9 @@ class SredneuralskVolnaParser implements ParserInterface
     public const FEED_ID = 2;
 
     public const SITE_URL = 'http://www.sredneuralsk.info/';
+
+    /** @var array */
+    protected static $parsedEntities = ['a', 'img', 'blockquote'];
 
     /**
      * @inheritDoc
@@ -87,10 +88,10 @@ class SredneuralskVolnaParser implements ParserInterface
         $itemCrawler = new Crawler($item);
 
         /** Get item detail link */
-        $link = $itemCrawler->filterXPath('//link')->text();
+        $link = self::cleanUrl($itemCrawler->filterXPath('//link')->text());
 
         /** Get title */
-        $title = $itemCrawler->filterXPath('//title')->text();
+        $title = self::cleanText($itemCrawler->filterXPath('//title')->text());
 
         /** Get item datetime */
         $createdAt = new DateTime($itemCrawler->filterXPath('//pubDate')->text());
@@ -99,77 +100,35 @@ class SredneuralskVolnaParser implements ParserInterface
 
         /** Get preview picture */
         $picture = $itemCrawler->filterXPath('//enclosure')->attr('url');
-        $lastUrlPart = basename($picture);
-        $encodedLastUrlPart = urlencode($lastUrlPart);
-        $finalLink = str_replace($lastUrlPart, $encodedLastUrlPart, $picture);
+        $finalLink = self::cleanUrl($picture);
 
         /** Detail page parser creation */
         $curl = Helper::getCurl();
         $curlResult = $curl->get($link);
-        $detailPageParser = new Parser($curlResult, true);
-        $head = $detailPageParser->document->getHead();
+        $crawler = new Crawler($curlResult);
+        
+        self::removeNodes($crawler, '//script');
+        self::removeNodes($crawler, '//style');
+
+        /** Detail info crawler creation */
+        $detailInfo = $itemCrawler->filterXPath('//description')->html();
+        $detailCrawler = new Crawler($detailInfo);
 
         /** Get description */
-        $description = '';
-        foreach ($head->find('meta') ?? [] as $meta) {
-            if ($meta->getAttribute('name') === 'description') {
-                $description = $meta->getAttribute('content') ?: '';
-                break;
-            }
-        }
-        if (empty($description) === true) {
-            throw new Exception('Empty post description');
-        }
+        $descriptionBlock = $detailCrawler->filterXPath('//div[contains(@class, "K2FeedIntroText")]//p')->first();
+        $description = self::cleanText($descriptionBlock->getNode(0)->textContent);
 
         /** @var NewsPost */
         $post = new NewsPost(static::class, $title, htmlspecialchars_decode($description), $createdAt, $link, $finalLink);
 
-        $post->addItem(new NewsPostItem(NewsPostItem::TYPE_HEADER, $title,
-            null, null, 1));
+        $fullText = $detailCrawler->filterXPath('//div[contains(@class, "K2FeedFullText")]')->getNode(0);
 
-        /** Detail info crawler creation */
-        $detailInfo = $itemCrawler->filterXPath('//description')->html();
-
-        /** Skip if no content */
-        if (!empty($detailInfo) === true) {
-            self::appendPostAdditionalData($post, $detailInfo);
+        //Parsing each child node of full text block
+        foreach ($fullText->childNodes as $node) {
+            self::parseNode($post, $node);
         }
 
         return $post;
-    }
-
-    /**
-     * Function appends NewsPostItem objects to NewsPost with additional post data
-     * 
-     * @param NewsPost $post
-     * @param string $content
-     * 
-     * @return void
-     */
-    public static function appendPostAdditionalData(NewsPost $post, string $content): void
-    {
-        $crawler = new Crawler($content);
-
-        // Get item detail image
-        $image = $crawler->filterXPath('//div[contains(@class, "K2FeedImage")]//img')->first();
-        if ($image->count() === 1) {
-            $detailImage = trim($image->attr('src') ?: '');
-            $post->addItem(new NewsPostItem(NewsPostItem::TYPE_IMAGE, null, $detailImage));
-        }
-
-        // Get item h2
-        $h2 = $crawler->filterXPath('//div[contains(@class, "K2FeedIntroText")]//p')->first();
-        if ($h2->count() === 1 && ! empty($h2->text()) === true) {
-            $post->addItem(new NewsPostItem(NewsPostItem::TYPE_HEADER, $h2->text(),
-                null, null, 2));
-        }
-
-        $fullText = $crawler->filterXPath('//div[contains(@class, "K2FeedFullText")]')->getNode(0);
-
-        //Parsing each child node of full text block
-        foreach ($fullText->childNodes as $key => $node) {
-            self::parseNode($post, $node);
-        }
     }
 
     /**
@@ -177,10 +136,11 @@ class SredneuralskVolnaParser implements ParserInterface
      * 
      * @param NewsPost $post
      * @param DOMNode $node
+     * @param bool $skipText
      * 
      * @return void
      */
-    public static function parseNode(NewsPost $post, DOMNode $node): void
+    public static function parseNode(NewsPost $post, DOMNode $node, bool $skipText = false): void
     {
         //Get non-empty quotes from nodes
         if (self::isQuoteType($node) && self::hasText($node)) {
@@ -188,19 +148,9 @@ class SredneuralskVolnaParser implements ParserInterface
             return;
         }
 
-        //Get non-empty links from nodes
-        if (self::isLinkType($node) && self::hasText($node)) {
-            $link = $node->getAttribute('href');
-            if ($link && $link !== '' && filter_var($link, FILTER_VALIDATE_URL)) {
-                $linkText = self::hasText($node) ? $node->textContent : null;
-                $post->addItem(new NewsPostItem(NewsPostItem::TYPE_LINK, $linkText, null, $link));
-            }
-            return;
-        }
-
         //Get non-empty images from nodes
         if (self::isImageType($node)) {
-            $imageLink = $node->getAttribute('src');
+            $imageLink = self::cleanUrl($node->getAttribute('src'));
 
             if ($imageLink === '') {
                 return;
@@ -212,40 +162,185 @@ class SredneuralskVolnaParser implements ParserInterface
             return;
         }
 
-        //Get non-empty text from nodes
-        if (self::isParagraphType($node) && self::hasText($node)) {
-            $pText = '';
-            foreach($node->childNodes as $child) {
-                if (! $child instanceof DOMText && self::notRegularTextFormat($child)) {
-                    if (! empty($pText) === true) {
-                        $post->addItem(new NewsPostItem(NewsPostItem::TYPE_TEXT, $pText));
-                        $pText = '';
-                    }
-                    self::parseNode($post, $child);
-                } else {
-                    $pText .= $child->textContent;
-                }
+        //Get non-empty links from nodes
+        if (self::isLinkType($node) && self::hasText($node)) {
+            $link = self::cleanUrl($node->getAttribute('href'));
+            if (! preg_match('/https/', $link)) {
+                $link = UriResolver::resolve($link, static::SITE_URL);
             }
-            $pText = trim(html_entity_decode($pText), " \t\n\r\0\x0B\xC2\xA0");
-            if (empty($pText) === true) {
+            if ($link && $link !== '' && filter_var($link, FILTER_VALIDATE_URL)) {
+                $linkText = self::hasText($node) ? $node->textContent : null;
+                $post->addItem(new NewsPostItem(NewsPostItem::TYPE_LINK, $linkText, null, $link));
+            }
+            return;
+        }
+
+        //Get direct text nodes
+        if (self::isText($node)) {
+            if ($skipText === false && self::hasText($node)) {
+                $textContent = self::cleanText($node->textContent);
+                if (empty(trim($textContent)) === true) {
+                    return;
+                }
+                $post->addItem(new NewsPostItem(NewsPostItem::TYPE_TEXT, $textContent));
+            }
+            return;
+        }
+
+        //Check if some required to parse entities exists inside node
+        $needRecursive = false;
+        foreach (self::$parsedEntities as $entity) {
+            if ($node->getElementsByTagName("$entity")->length > 0) {
+                $needRecursive = true;
+                break;
+            }
+        }
+
+        //Get entire node text if we not need to parse any special entities, go recursive otherwise
+        if ($skipText === false && $needRecursive === false) {
+            $textContent = self::cleanText($node->textContent);
+            if (empty(trim($textContent)) === true) {
                 return;
             }
-            $post->addItem(new NewsPostItem(NewsPostItem::TYPE_TEXT, $pText));
+            $post->addItem(new NewsPostItem(NewsPostItem::TYPE_TEXT, $textContent));
+        } else {
+            foreach($node->childNodes as $child) {
+                self::parseNode($post, $child, $skipText);
+            }
         }
     }
 
     /**
-     * Function check if node has non-regular text format
+     * Function cleans text from bad symbols
+     * 
+     * @param string $text
+     * 
+     * @return string|null
+     */
+    protected static function cleanText(string $text): ?string
+    {
+        $transformedText = preg_replace('/\r\n/', '', $text);
+        $transformedText = preg_replace('/\<script.*\<\/script>/', '', $transformedText);
+        $transformedText = html_entity_decode($transformedText);
+        return preg_replace('/^\p{Z}+|\p{Z}+$/u', '', htmlspecialchars_decode($transformedText));
+    }
+
+    /**
+     * Function clean dangerous urls
+     * 
+     * @param string $url
+     * 
+     * @return string
+     */
+    protected static function cleanUrl(string $url): string
+    {
+        return filter_var($url, FILTER_SANITIZE_ENCODED|FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    }
+
+    /**
+     * Function check if node text content not empty
+     * 
+     * @param DOMNode $node
+     * 
+     * @return bool
+     */
+    protected static function hasActualText(DOMNode $node): bool
+    {
+        return trim($node->textContent) !== '';
+    }
+
+    /**
+     * Function check if node text content not empty
+     * 
+     * @param DOMNode $node
+     * 
+     * @return bool
+     */
+    protected static function hasText(DOMNode $node): bool
+    {
+        return trim($node->textContent) !== '';
+    }
+
+    /**
+     * Function check if node is <p></p>
      * 
      * @param DOMNode
      * 
      * @return bool
      */
-    protected static function notRegularTextFormat(DOMNode $node)
+    protected static function isParagraphType(DOMNode $node): bool
     {
-        return self::isQuoteType($node) === true
-            || self::isLinkType($node) === true
-            || self::isImageType($node) === true;
+        return isset($node->tagName) === true && $node->tagName === 'p';
+    }
+
+    /**
+     * Function check if node is quote
+     * 
+     * @param DOMNode
+     * 
+     * @return bool
+     */
+    protected static function isQuoteType(DOMNode $node): bool
+    {
+        return isset($node->tagName) === true && in_array($node->tagName, ['blockquote']);
+    }
+
+    /**
+     * Function check if node is <a></a>
+     * 
+     * @param DOMNode
+     * 
+     * @return bool
+     */
+    protected static function isLinkType(DOMNode $node): bool
+    {
+        return isset($node->tagName) === true && $node->tagName === 'a';
+    }
+
+    /**
+     * Function check if node is image
+     * 
+     * @param DOMNode
+     * 
+     * @return bool
+     */
+    protected static function isImageType(DOMNode $node): bool
+    {
+        return isset($node->tagName) === true && $node->tagName === 'img';
+    }
+
+    /**
+     * Function check if node is #text
+     * 
+     * @param DOMNode
+     * 
+     * @return bool
+     */
+    protected static function isText(DOMNode $node): bool
+    {
+        return $node->nodeName === '#text';
+    }
+
+    /**
+     * Function remove useless specified nodes
+     * 
+     * @param Crawler $crawler
+     * @param string $xpath
+     * @param int|null $count
+     * 
+     * @return void
+     */
+    protected static function removeNodes(Crawler $crawler, string $xpath, ?int $count = null): void
+    {
+        $crawler->filterXPath($xpath)->each(function (Crawler $crawler, int $key) use ($count) {
+            if ($count !== null && $key === $count) {
+                return;
+            }
+            $domNode = $crawler->getNode(0);
+            if ($domNode) {
+                $domNode->parentNode->removeChild($domNode);
+            }
+        });
     }
 
     
