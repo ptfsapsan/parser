@@ -126,18 +126,17 @@ class VestiKalmykiaParser implements ParserInterface
         $image = $newsPostCrawler->filterXPath('//div[contains(@class,"item-image")]/img[1]')->attr('src');
         if (empty($description)) $description = $title;
 
-        if ($image && !filter_var($image, FILTER_VALIDATE_URL)) {
-            dd($uri, $title, $image);
-        }
-
         $newsPost = new NewsPost(self::class, $title, $description, $publishedAt->format('Y-m-d H:i:s'), $uri, $image);
 
         $contentCrawler = $newsPostCrawler;
 
         $this->removeDomNodes($contentCrawler, '//a[starts-with(@href, "javascript")]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class, "item-related")] | //hr');
+        $this->removeDomNodes($contentCrawler, '//h1[1] | //img[1]');
+        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"item-text")]//p[1]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class, "items-pagination")]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class, "ias-trigger")]');
+        $this->removeDomNodes($contentCrawler, '//div[contains(@class, "uk-flex uk-flex-middle uk-flex-between")][1]');
         $this->removeDomNodes($contentCrawler, '//*[contains(name(),"img.youtube.com")]');
         $this->removeDomNodes(
             $contentCrawler,
