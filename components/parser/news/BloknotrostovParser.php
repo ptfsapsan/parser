@@ -38,7 +38,6 @@ class BloknotrostovParser extends MediasferaNewsParser implements ParserInterfac
     public const NEWSLIST_IMG = '//enclosure';
 
     public const ARTICLE_HEADER = '#news-detail article h1';
-    public const ARTICLE_IMAGE = '#news-detail article .news-picture img.detail_picture';
     public const ARTICLE_TEXT = '#news-detail article .news-text';
 
     public const ARTICLE_BREAKPOINTS = [
@@ -55,7 +54,11 @@ class BloknotrostovParser extends MediasferaNewsParser implements ParserInterfac
             'https://www.facebook.com/bloknot.rostov/' => false,
             'https://vk.com/club87184916' => false,
             'https://t.me/bloknot_rostov' => false,
-        ]
+        ],
+        'id' => [
+            'read-more' => false,
+            'pollFrame' => true,
+        ],
     ];
 
     protected static NewsPostWrapper $post;
@@ -85,9 +88,7 @@ class BloknotrostovParser extends MediasferaNewsParser implements ParserInterfac
                 $articleCrawler = new Crawler($articleContent);
 
                 self::$post->itemHeader = [self::getNodeData('text', $articleCrawler, self::ARTICLE_HEADER), 1];
-                self::$post->itemImage = self::getNodeImage('src', $articleCrawler, self::ARTICLE_IMAGE);
-
-                self::parseArticle($articleCrawler->filter(self::ARTICLE_TEXT));
+                self::parse($articleCrawler->filter(self::ARTICLE_TEXT));
             }
 
             $newsPost = self::$post->getNewsPost();
@@ -100,7 +101,7 @@ class BloknotrostovParser extends MediasferaNewsParser implements ParserInterfac
                     continue;
                 }
 
-                $text = ltrim($item->text, " \t\n\r\0\x0B\x2e\xc2\xa0");
+                $text = ltrim($item->text, static::CHECK_CHARS);
 
                 if(strpos($text, '—') === 0 && $item->type == NewsPostItem::TYPE_TEXT) {
                     $newsPost->items[$key]->type = NewsPostItem::TYPE_QUOTE;
@@ -119,45 +120,5 @@ class BloknotrostovParser extends MediasferaNewsParser implements ParserInterfac
         });
 
         return $posts;
-    }
-
-    protected static function parseArticle(Crawler $crawler) : void
-    {
-        $removeNext = false;
-
-        $crawler->children()->each(function (Crawler $node) use (&$removeNext) {
-
-            $removeSelf = false;
-
-            $nodeName = $node->nodeName();
-
-            $names = [
-                'script',
-                'noscript',
-                'style',
-                'meta',
-                'link',
-            ];
-
-            if(in_array($nodeName, $names)) {
-                $removeSelf = true;
-            }
-
-            if($node->attr('id') == 'pollFrame') {
-                $removeNext = true;
-                $removeSelf = true;
-            }
-
-            if($node->attr('class') == 'hideme') {
-                $removeSelf = true;
-            }
-
-            if($removeNext || $removeSelf) {
-                $self = $node->getNode(0);
-                $self->parentNode->removeChild($self);
-            }
-        });
-
-        self::parseSection($crawler);
     }
 }
