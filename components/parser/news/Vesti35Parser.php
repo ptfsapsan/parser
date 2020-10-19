@@ -130,7 +130,7 @@ class Vesti35Parser implements ParserInterface
             $contentCrawler = $vestiCrawler->filterXPath('//div[contains(@class,"video_wrapper")]');
         } elseif ($this->crawlerHasNodes($tvProgramCrawler)) {
             $titleCrawler = $tvProgramCrawler->filterXPath('//*[contains(@class,"tvprogram_video_header")]//h1')->first();
-            $descriptionCrawler = $tvProgramCrawler->filterXPath('//*[contains(@class,"tvprogram_page_header_text")]')->first();
+            $descriptionCrawler = $tvProgramCrawler->filter('meta[property="og:description"]')->first();
             if ($this->crawlerHasNodes($titleCrawler)) {
                 $title = $titleCrawler->text();
             }
@@ -138,7 +138,8 @@ class Vesti35Parser implements ParserInterface
                 $description = $descriptionCrawler->text();
             }
 
-            $contentCrawler = $tvProgramCrawler->filterXPath('//*[contains(@class,"tvprogram_item_description_block")]');
+            $contentCrawler = $tvProgramCrawler->filterXPath('//*[contains(@class,"tvprogram_item_description_block")] | //div[contains(@class,"video_wrapper")]');
+            $this->removeDomNodes($contentCrawler, '//*[contains(@class,"tvprogram_item_description_block")]/article');
         } else {
             $newsCrawler = $newsPageCrawler->filterXPath('//*[contains(@class,"news_main_block")]');
             $mainImageCrawler = $newsCrawler->filterXPath('//div[contains(@class,"news_media")]//img')->first();
@@ -150,7 +151,7 @@ class Vesti35Parser implements ParserInterface
                 $image = UriResolver::resolve($image, $uri);
             }
 
-            $contentCrawler = $newsCrawler->filterXPath('//*[contains(@class,"news_text")]');
+            $contentCrawler = $newsCrawler->filterXPath('//*[contains(@class,"news_text")] | //div[contains(@class,"video_wrapper")]');
         }
 
         $this->removeDomNodes($contentCrawler, '//a[starts-with(@href,"javascript")]');
@@ -168,7 +169,7 @@ class Vesti35Parser implements ParserInterface
 
             foreach ($nodeIterator->getRecursiveIterator() as $k => $node) {
                 $newsPostItem = $this->parseDOMNode($node, $previewNewsItem);
-                if (!$newsPostItem) {
+                if (!$newsPostItem || (!count($newsPost->items ?? []) && $newsPostItem->text === $description)) {
                     continue;
                 }
 
