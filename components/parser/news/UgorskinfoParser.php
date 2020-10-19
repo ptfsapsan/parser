@@ -46,6 +46,9 @@ class UgorskinfoParser implements ParserInterface
      */
     public static function getNewsData(): array
     {
+        /** Вырубаем нотисы */
+        error_reporting(E_ALL & ~E_NOTICE);
+
         /** Get RSS news list */
         $curl = Helper::getCurl();
         $newsList = $curl->get(static::SITE_URL . "/index.php/novosti?format=feed&type=rss");
@@ -83,10 +86,10 @@ class UgorskinfoParser implements ParserInterface
         $itemCrawler = new Crawler($item);
 
         /** Get item detail link */
-        $link = $itemCrawler->filterXPath('//link')->text();
+        $link = self::cleanUrl($itemCrawler->filterXPath('//link')->text());
 
         /** Get title */
-        $title = $itemCrawler->filterXPath('//title')->text();
+        $title = self::cleanText($itemCrawler->filterXPath('//title')->text());
 
         /** Get item datetime */
         $createdAt = new DateTime($itemCrawler->filterXPath('//pubDate')->text());
@@ -110,9 +113,10 @@ class UgorskinfoParser implements ParserInterface
         if (empty($description) === true) {
             $description = $title;
         }
+        $description = self::cleanText($description);
 
         /** @var NewsPost */
-        $post = new NewsPost(static::class, $title, htmlspecialchars_decode($description), $createdAt, $link, null);
+        $post = new NewsPost(static::class, $title, $description, $createdAt, $link, null);
 
         /** Detail info crawler creation */
         $detailInfo = $itemCrawler->filterXPath('//description')->html();
@@ -245,16 +249,42 @@ class UgorskinfoParser implements ParserInterface
     }
 
     /**
+     * Function cleans text from bad symbols
+     * 
+     * @param string $text
+     * 
+     * @return string|null
+     */
+    protected static function cleanText(string $text): ?string
+    {
+        $transformedText = preg_replace('/\r\n/', '', $text);
+        $transformedText = preg_replace('/\<script.*\<\/script>/', '', $transformedText);
+        $transformedText = html_entity_decode($transformedText);
+        return preg_replace('/^\p{Z}+|\p{Z}+$/u', '', htmlspecialchars_decode($transformedText));
+    }
+
+    /**
      * Function clean dangerous urls
      * 
      * @param string $url
      * 
      * @return string
      */
-    public static function cleanUrl(string $url): string
+    protected static function cleanUrl(string $url): string
     {
-        $url = urlencode($url);
-        return str_replace(array('%3A', '%2F'), array(':', '/'), $url);
+        return filter_var($url, FILTER_SANITIZE_ENCODED|FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    }
+
+    /**
+     * Function check if node text content not empty
+     * 
+     * @param DOMNode $node
+     * 
+     * @return bool
+     */
+    protected static function hasActualText(DOMNode $node): bool
+    {
+        return trim($node->textContent) !== '';
     }
 
     /**
@@ -278,7 +308,7 @@ class UgorskinfoParser implements ParserInterface
      */
     protected static function isParagraphType(DOMNode $node): bool
     {
-        return $node->tagName === 'p';
+        return isset($node->tagName) === true && $node->tagName === 'p';
     }
 
     /**
@@ -290,7 +320,7 @@ class UgorskinfoParser implements ParserInterface
      */
     protected static function isQuoteType(DOMNode $node): bool
     {
-        return in_array($node->tagName, ['blockquote', 'em']);
+        return isset($node->tagName) === true && in_array($node->tagName, ['blockquote']);
     }
 
     /**
@@ -302,7 +332,7 @@ class UgorskinfoParser implements ParserInterface
      */
     protected static function isLinkType(DOMNode $node): bool
     {
-        return $node->tagName === 'a';
+        return isset($node->tagName) === true && $node->tagName === 'a';
     }
 
     /**
@@ -314,7 +344,7 @@ class UgorskinfoParser implements ParserInterface
      */
     protected static function isImageType(DOMNode $node): bool
     {
-        return $node->tagName === 'img';
+        return isset($node->tagName) === true && $node->tagName === 'img';
     }
 
     /**
