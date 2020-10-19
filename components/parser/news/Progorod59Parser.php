@@ -14,6 +14,7 @@ namespace app\components\parser\news;
 
 use app\components\mediasfera\MediasferaNewsParser;
 use app\components\mediasfera\NewsPostWrapper;
+use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
@@ -36,6 +37,41 @@ class Progorod59Parser extends MediasferaNewsParser implements ParserInterface
     public const NEWSLIST_DATE = '//pubDate';
     public const NEWSLIST_DESC = '//description';
     public const NEWSLIST_IMG = '//enclosure';
+
+    public const ARTICLE_BREAKPOINTS = [
+        'name' => [
+            'Ext24smiWidget' => false,
+            'menu' => false,
+        ],
+        'href' => [
+            '/news' => false,
+            '/auto' => false,
+            '/afisha' => false,
+            '/cityfaces' => false,
+            '/peoplecontrol' => false,
+            '/sendnews' => false,
+            'http://progorod59.ru/news' => false,
+            'http://progorod59.ru/auto' => false,
+            'http://progorod59.ru/afisha' => false,
+            'http://progorod59.ru/cityfaces' => false,
+            'http://progorod59.ru/peoplecontrol' => false,
+            'http://progorod59.ru/sendnews' => false,
+        ],
+        'class' => [
+            'article__insert' => true,
+            'adsbygoogle' => false,
+        ],
+        'id' => [
+            'adv' => false,
+        ],
+        'data-turbo-ad-id' => [
+            'ad_place' => false,
+            'ad_place_context' => false,
+        ],
+        'data-block' => [
+            'share' => true,
+        ],
+    ];
 
     protected static NewsPostWrapper $post;
 
@@ -60,16 +96,73 @@ class Progorod59Parser extends MediasferaNewsParser implements ParserInterface
 
             $contentNode = ($node->attr('turbo') == 'true') ? '//turbo:content' : '//yandex:full-text';
 
-
             $html = html_entity_decode(static::filterNode($node, $contentNode)->html());
 
             $articleCrawler = new Crawler('<body><div>'.$html.'</div></body>');
 
-            static::parseSection($articleCrawler);
+            static::parse($articleCrawler);
 
-            $posts[] = self::$post->getNewsPost();
+            $newsPost = self::$post->getNewsPost();
+
+            $removeNext = false;
+
+            foreach ($newsPost->items as $key => $item) {
+                if($removeNext) {
+                    unset($newsPost->items[$key]);
+                    continue;
+                }
+
+                $text = ltrim($item->text, static::CHECK_CHARS);
+
+                if($item->type == NewsPostItem::TYPE_TEXT) {
+                    if(!$text) {
+                        unset($newsPost->items[$key]);
+                        continue;
+                    }
+                    elseif(strpos($text, 'Сообщите об этом в редакцию') !== false) {
+                        unset($newsPost->items[$key]);
+                        $removeNext = true;
+                    }
+                    elseif(strpos($text, 'Стали свидетелем необычного') !== false) {
+                        unset($newsPost->items[$key]);
+                        $removeNext = true;
+                    }
+                    elseif(strpos($text, 'Стали свидетелем происшествия') !== false) {
+                        unset($newsPost->items[$key]);
+                        $removeNext = true;
+                    }
+                    elseif(strpos($text, 'Сделали в помощь вам подборку') !== false) {
+                        unset($newsPost->items[$key]);
+                        $removeNext = true;
+                    }
+                    elseif(strpos($text, 'Подписывайтесь на нас') !== false) {
+                        unset($newsPost->items[$key]);
+                        $removeNext = true;
+                    }
+
+                }
+            }
+
+            $posts[] = $newsPost;
         });
 
         return $posts;
+    }
+
+    public static function getNodeLink(string $data, Crawler $node, ?string $filter = null) : ?string
+    {
+        $node = self::filterNode($node, $filter);
+
+        $href = static::getNodeData($data, $node);
+
+        if(
+            substr_count($href, 'http') > 1
+            && strpos($href, '%') !== false
+            && $node->attr('rel') == 'nofollow'
+        ) {
+            return '';
+        }
+
+        return static::resolveUrl($href);
     }
 }
