@@ -14,7 +14,7 @@ use Exception;
 use Symfony\Component\DomCrawler\Crawler;
 
 /**
- * Парсер новостей из RSS ленты ug.ru
+ * Парсер новостей из RSS ленты
  *
  */
 class Sgpress extends Aleks007smolBaseParser implements ParserInterface
