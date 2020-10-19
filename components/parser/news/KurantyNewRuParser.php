@@ -59,8 +59,6 @@ class KurantyNewRuParser implements ParserInterface
                 $image
             );
 
-            $this->addItemPost($post, NewsPostItem::TYPE_HEADER, $title, null, null, 1);
-
             $newContentCrawler = (new Crawler($itemCrawler->filterXPath("//div[@class='entry-inner']")->html()))->filterXPath('//body')->children();
             $descriptionNew = '';
             foreach ($newContentCrawler as $content) {
@@ -146,7 +144,10 @@ class KurantyNewRuParser implements ParserInterface
     protected function getDate(string $date): string
     {
         $str = explode('·', $date);
-        return trim(ArrayHelper::getValue($str, 1, ''));
+        $newDate = trim(ArrayHelper::getValue($str, 1, ''));
+        $newDate = new \DateTime($newDate);
+        $newDate->setTimezone(new \DateTimeZone("UTC"));
+        return $newDate->format("Y-m-d H:i:s");
     }
 
 
