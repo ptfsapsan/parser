@@ -81,7 +81,8 @@ class ChrrbcParser extends MediasferaNewsParser implements ParserInterface
                 self::$post->itemHeader = [self::getNodeData('text', $articleCrawler, self::ARTICLE_HEADER), 1];
 
                 $articleCrawler->filter(self::ARTICLE_TEXT)->each(function ($node) {
-                    self::parseNodes($node);
+                    self::parse($node);
+                    self::$post->stopParsing = false;
                 });
             }
 
