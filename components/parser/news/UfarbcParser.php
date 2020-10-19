@@ -66,7 +66,6 @@ class UfarbcParser extends MediasferaNewsParser implements ParserInterface
 
             self::$post->title = self::getNodeData('text', $node, self::NEWSLIST_TITLE);
             self::$post->original = self::getNodeData('href', $node, self::NEWSLIST_LINK);
-
             self::$post->image = self::getNodeImage('src', $node, self::NEWSLIST_IMG);
 
             $articleContent = self::getPage(self::$post->original);
@@ -81,7 +80,8 @@ class UfarbcParser extends MediasferaNewsParser implements ParserInterface
                 self::$post->itemHeader = [self::getNodeData('text', $articleCrawler, self::ARTICLE_HEADER), 1];
 
                 $articleCrawler->filter(self::ARTICLE_TEXT)->each(function ($node) {
-                    self::parseNodes($node);
+                    self::parse($node);
+                    self::$post->stopParsing = false;
                 });
             }
 
