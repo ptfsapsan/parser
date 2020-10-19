@@ -132,53 +132,11 @@ class Mayak33Parser implements ParserInterface
         $post = new NewsPost(static::class, $title, $description, $createdAt, $link, $photoUrl);
 
         /** Skip if no content */
-        if ($content = $detailPageBody->findOne('.main_content')) {
-            self::appendPostAdditionalData($post, $content);
+        if ($content = $detailPageBody->findOne('.main_content .main_post_text')) {
+            self::appendPostBody($post, $content);
         }
 
         return $post;
-    }
-
-    /**
-     * Function appends NewsPostItem objects to NewsPost with additional post data
-     * 
-     * @param NewsPost $post
-     * @param Element $content
-     * 
-     * @return void
-     */
-    public static function appendPostAdditionalData(NewsPost $post, Element $content): void
-    {
-        //Parse post headers
-        $headerBlock = $content->findOne('.top_text_photo');
-
-        //Get header text block
-        $headerTexts = $headerBlock->findOne('.top_text');
-
-        /** Get h1 */
-        $h1 = $headerTexts->findOne('.entry-title');
-        $post->addItem(new NewsPostItem(NewsPostItem::TYPE_HEADER, $h1->asText(),
-            null, null, 1, null));
-
-        /** Get h2 */
-        $h2 = $headerTexts->findOne('p');
-        if (! empty($h2) === true) {
-            $post->addItem(new NewsPostItem(NewsPostItem::TYPE_HEADER, $h2->asText(),
-                null, null, 2, null));
-        }
-
-        /** Get detail image */
-        if ($detailImage = $headerBlock->findOne('.top_image img')) {
-            $detailImage = $detailImage->getAttribute('src') ?: '';
-            if (! empty($detailImage) === true) {
-                $post->addItem(new NewsPostItem(NewsPostItem::TYPE_IMAGE, null,
-                    self::cleanUrl($detailImage), null, null, null));
-            }
-        }
-
-        // Parse detail main block content
-        $mainPostBlock = $content->findOne('.main_post_text');
-        self::appendPostBody($post, $mainPostBlock);
     }
 
     /**
