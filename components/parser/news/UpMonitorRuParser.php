@@ -36,7 +36,7 @@ class UpMonitorRuParser implements ParserInterface
         foreach ($newsList as $newsItem) {
             $itemCrawler = new Crawler($newsItem);
             $title = $itemCrawler->filterXPath('//title')->text();
-            $date = $itemCrawler->filterXPath('//pubDate')->text();
+            $date = $this->getDate($itemCrawler->filterXPath('//pubDate')->text());
             $description = $itemCrawler->filterXPath('//description')->text();
             $url = $itemCrawler->filterXPath('//link')->text();
             $image = null;
@@ -158,5 +158,18 @@ class UpMonitorRuParser implements ParserInterface
         $text = str_replace("&nbsp;",'',$text);
         $text = html_entity_decode($text);
         return $text;
+    }
+
+    /**
+     *
+     * @param string $date
+     *
+     * @return string
+     */
+    protected function getDate(string $date): string
+    {
+        $newDate = new \DateTime($date);
+        $newDate->setTimezone(new \DateTimeZone("UTC"));
+        return $newDate->format("Y-m-d H:i:s");
     }
 }
