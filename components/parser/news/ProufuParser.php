@@ -63,7 +63,7 @@ class ProufuParser extends MediasferaNewsParser implements ParserInterface
 
             $articleCrawler = new Crawler('<body><div>'.$html.'</div></body>');
 
-            static::parseSection($articleCrawler);
+            static::parse($articleCrawler);
 
             $posts[] = self::$post->getNewsPost();
         });
