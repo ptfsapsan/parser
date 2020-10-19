@@ -58,8 +58,6 @@ class MilitaryPlatformRuParser implements ParserInterface
                 $image
             );
 
-            $this->addItemPost($post, NewsPostItem::TYPE_HEADER, $title, null, null, 1);
-
             $newContentCrawler = (new Crawler($itemCrawler->filterXPath("//div[@class='body_likes prelative']")->html()))->filterXPath('//body')->children();
 
             foreach ($newContentCrawler as $content) {
@@ -127,7 +125,9 @@ class MilitaryPlatformRuParser implements ParserInterface
         $yesterday = $now->sub(new \DateInterval('P1D'))->format('Y-m-d');
         $ruMonths = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря', 'сегодня', 'вчера'];
         $enMonths = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december', $today, $yesterday];
-        return $date ? str_ireplace($ruMonths, $enMonths, $date) : '';
+        $newDate = new \DateTime(str_ireplace($ruMonths, $enMonths, $date));
+        $newDate->setTimezone(new \DateTimeZone("UTC"));
+        return $newDate->format("Y-m-d H:i:s");
     }
 
     /**
@@ -202,17 +202,4 @@ class MilitaryPlatformRuParser implements ParserInterface
         return $text;
     }
 
-    /**
-     *
-     * @param string $text
-     *
-     * @return string
-     */
-    protected function getDescription($text): string
-    {
-        if (($f = strpos($text, 'Поделиться в соц. сетях')) !== false ) {
-            $text = substr($text, 0, $f);
-        }
-        return $text;
-    }
 }
