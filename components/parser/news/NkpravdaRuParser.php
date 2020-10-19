@@ -39,7 +39,7 @@ class NkpravdaRuParser implements ParserInterface
             $itemCrawler->addHtmlContent($contentPage, 'UTF-8');
 
             $title = $itemCrawler->filterXPath("//h1[@class='conh1 noicon']")->text();
-            $date = $itemCrawler->filterXPath("//div[@class='dateblock graydb']/p[1]")->text();
+            $date = $this->getDate($itemCrawler->filterXPath("//div[@class='dateblock graydb']/p[1]")->text());
             $image = $this->getHeadUrl($itemCrawler->filterXPath("//div[@class='allcontent']/img")->attr('src'));
             $description = $itemCrawler->filterXPath("//div[@class='allcontent']")->text();
 
@@ -51,8 +51,6 @@ class NkpravdaRuParser implements ParserInterface
                 $url,
                 $image
             );
-
-            $this->addItemPost($post, NewsPostItem::TYPE_HEADER, $title, null, null, 1);
 
             $newContentCrawler = (new Crawler($itemCrawler->filterXPath("//div[@class='allcontent']")->html()))->filterXPath('//body')->children();
 
@@ -192,6 +190,19 @@ class NkpravdaRuParser implements ParserInterface
             $url = str_replace($search, $replace, $url);
         }
         return $url;
+    }
+
+    /**
+     *
+     * @param string $date
+     *
+     * @return string
+     */
+    protected function getDate(string $date): string
+    {
+        $newDate = new \DateTime($date);
+        $newDate->setTimezone(new \DateTimeZone("UTC"));
+        return $newDate->format("Y-m-d H:i:s");
     }
 
 }
