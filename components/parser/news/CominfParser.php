@@ -97,7 +97,7 @@ class CominfParser implements ParserInterface
                 $publishedAt = DateTimeImmutable::createFromFormat('D, d M Y H:i:s O', $publishedAtString);
                 $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
 
-                $preview = strip_tags($newsPreview->filterXPath('//description')->text());
+                $preview = null;
 
                 $previewList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $title, $preview);
             }
@@ -120,8 +120,12 @@ class CominfParser implements ParserInterface
         $newsPageCrawler = new Crawler($newsPage);
         $newsPostCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"field-body")]');
         $image =  $newsPageCrawler->filterXPath('//meta[@property="og:image"]')->attr('content');
-        $newsPost = new NewsPost(self::class, $title, $description, $publishedAt->format('Y-m-d H:i:s'), $uri, $image);
 
+        $description = $newsPostCrawler->filterXPath('//p[1]')->text();
+        $this->removeDomNodes($newsPostCrawler,'//p[1]');
+
+
+        $newsPost = new NewsPost(self::class, $title, $description, $publishedAt->format('Y-m-d H:i:s'), $uri, $image);
         $contentCrawler = $newsPostCrawler;
 
         $this->removeDomNodes($contentCrawler, '//a[starts-with(@href, "javascript")]');
