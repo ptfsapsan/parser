@@ -161,15 +161,24 @@ class Parser
     protected function filterItems(array $items)
     {
         return array_filter($items, function ($item) {
-            if (empty($item)) {
+            if (empty($item['type'])) {
                 return false;
             }
 
-            if (NewsPostItem::TYPE_TEXT != $item['type']) {
-                return true;
+            switch ($item['type']) {
+                case NewsPostItem::TYPE_HEADER:
+                case NewsPostItem::TYPE_TEXT:
+                case NewsPostItem::TYPE_QUOTE:
+                    return strlen(Text::trim($item['text'])) > 0;
+
+                case NewsPostItem::TYPE_IMAGE:
+                    return !empty($item['image']);
+
+                case NewsPostItem::TYPE_VIDEO:
+                    return !empty($item['youtubeId']);
             }
 
-            return strlen(Text::trim($item['text'])) > 0;
+            return false;
         });
     }
 
