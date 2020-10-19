@@ -105,10 +105,7 @@ class SportssmiRuParser implements ParserInterface
                     $publishedAt = DateTimeImmutable::createFromFormat(DATE_RFC3339, $publishedAtString);
                     $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
 
-                    $preview = $newsPreview->filterXPath('//div[contains(@class,"entry-content")]/p[1]');
-                    $preview = Text::trim(strip_tags(html_entity_decode($preview->text())));
-
-                    $previewList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $title, $preview);
+                    $previewList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $title, null);
                 });
 
                 $currentPage++;
@@ -128,7 +125,7 @@ class SportssmiRuParser implements ParserInterface
     {
         $uri = $previewNewsItem->getUri();
         $publishedAt = $previewNewsItem->getDateTime();
-        $description = $previewNewsItem->getPreview();
+        $description = null;
         $title = $previewNewsItem->getTitle();
         $image = null;
 
@@ -148,6 +145,11 @@ class SportssmiRuParser implements ParserInterface
         }
 
         $contentCrawler = $newsPageCrawler->filterXPath('//div[contains(@id,"content")]//div[contains(@class,"entry-content")]');
+        $descriptionCrawler = $contentCrawler->filterXPath('//p[1]');
+        if ($this->crawlerHasNodes($descriptionCrawler)) {
+            $description = Text::trim($this->normalizeSpaces($descriptionCrawler->text()));
+            $this->removeDomNodes($contentCrawler, '//p[1]');
+        }
 
         $this->removeDomNodes($contentCrawler, '//script | //video | //style | //form | //table');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"addtoany_share_save_container")]');
@@ -163,8 +165,16 @@ class SportssmiRuParser implements ParserInterface
                     continue;
                 }
 
+                if ($newsPostItem->type === NewsPostItem::TYPE_TEXT && strlen($newsPostItem->text) === 1) {
+                    continue;
+                }
+
                 if ($newsPostItem->type === NewsPostItem::TYPE_IMAGE && $newsPost->image === null) {
                     $newsPost->image = $newsPostItem->image;
+                }
+
+                if ($newsPostItem->type === NewsPostItem::TYPE_LINK && $newsPostItem->link === $newsPostItem->text) {
+                    $newsPostItem->text = null;
                 }
 
                 $newsPost->addItem($newsPostItem);
