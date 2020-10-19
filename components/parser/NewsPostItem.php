@@ -98,10 +98,8 @@ class NewsPostItem
                     throw new Exception("Invalid postItem link: $parser");
                 break;
             case self::TYPE_IMAGE:
-                if (!$this->image || $this->image == '' || !filter_var($this->image, FILTER_VALIDATE_URL)) {
-                    print_r($this->image); die();
+                if (!$this->image || $this->image == '' || !filter_var($this->image, FILTER_VALIDATE_URL))
                     throw new Exception("Invalid postItem image: $parser");
-                }
                 break;
             case self::TYPE_VIDEO:
                 if (!$this->youtubeId || (strlen($this->youtubeId) != 11))
