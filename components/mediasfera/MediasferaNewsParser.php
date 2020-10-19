@@ -18,7 +18,7 @@ use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\DomCrawler\UriResolver;
 
 /**
- * @version 1.0.2
+ * @version 1.1.1
  *
  * @property NewsPostWrapper $post
  *
@@ -28,9 +28,21 @@ class MediasferaNewsParser
 {
     private const DEBUG = false;
 
+    /**
+     * @see https://www.php.net/manual/ru/datetimezone.construct.php
+     *
+     * */
     public const TIMEZONE = null;
 
+    /**
+     * @see https://www.php.net/manual/ru/datetime.format.php
+     *
+     * */
     public const DATEFORMAT = 'D, d M Y H:i:s O';
+
+    public const CHECK_CHARS =       " \t\n\r\0\x0B\xA0";
+    public const CHECK_EMPTY_CHARS = " \t\n\r\0\x0B\xC2\xA0";
+
 
     // Skip elements. If element value is true, stop parsing article
     public const ARTICLE_BREAKPOINTS = [
@@ -49,39 +61,45 @@ class MediasferaNewsParser
     ];
 
 
-    public const TRIM_CHARS = " \t\n\r\0\x0B\xa0";
+    protected static array $breakpoints = [];
+
+    /**
+     * @var NewsPostWrapper $post
+     */
+
+
+    public static function isDebug() : bool
+    {
+        $class = static::class;
+
+        return (defined("$class::DEBUG")) ? static::class : self::DEBUG;
+    }
 
 
     public static function getBreakpoints() : array
     {
-        return array_replace_recursive(self::ARTICLE_BREAKPOINTS, static::ARTICLE_BREAKPOINTS);
+        if(!static::$breakpoints) {
+            static::$breakpoints = array_replace_recursive(self::ARTICLE_BREAKPOINTS, static::ARTICLE_BREAKPOINTS);
+        }
+
+        return static::$breakpoints;
     }
 
 
-    protected static function parseNodes(Crawler $node) : void
+    protected static function parse(Crawler $node, ?string $filter = null) : void
     {
-        if(static::$post->stopParsing) {
-            return;
-        }
-
-        $nodes = $node->children();
-
-        if(!count($nodes)) {
-            return;
-        }
-
-        $nodes->each(function ($node) {
-            static::parseNode($node);
-        });
-    }
-
-    protected static function parseNode(Crawler $node, ?string $filter = null) : void
-    {
-        if(static::$post->stopParsing) {
-            return;
-        }
-
         $node = static::filterNode($node, $filter);
+        $node = static::clearNode($node);
+
+        static::parseNode($node);
+    }
+
+
+    protected static function checkNode(Crawler $node) : bool
+    {
+        if(static::$post->stopParsing) {
+            return false;
+        }
 
         foreach (static::getBreakpoints() as $key => $array) {
 
@@ -114,23 +132,69 @@ class MediasferaNewsParser
                         static::$post->stopParsing();
                     }
 
-                    return;
+                    return false;
                 }
             }
         }
 
-        $node = static::clearNode($node, false);
+        return true;
+    }
+
+
+    protected static function clearNode(Crawler $crawler, bool $recursive = true, $filter = null) : Crawler
+    {
+        $crawler = static::filterNode($crawler, $filter);
+
+        $crawler->children()->each(function (Crawler $node) use (&$recursive) {
+
+            $remove = false;
+
+            $names = [
+                'script',
+                'noscript',
+                'style',
+            ];
+
+            if(!static::checkNode($node)) {
+                $remove = true;
+            }
+
+            if(static::$post->stopParsing) {
+                $remove = true;
+            }
+
+            if(in_array($node->nodeName(), $names)) {
+                $remove = true;
+            }
+
+            if($recursive && !static::$post->stopParsing && $node->children()->count()) {
+                static::clearNode($node, $recursive);
+            }
+
+            if($remove) {
+                $self = $node->getNode(0);
+                $self->parentNode->removeChild($self);
+            }
+        });
+
+        return $crawler;
+    }
+
+
+    protected static function parseNode(Crawler $node, ?string $filter = null) : void
+    {
+        $node = static::filterNode($node, $filter);
 
         $nodeName = $node->nodeName();
 
         switch ($nodeName)
         {
+            case 'html' :
             case 'body' :
-            case 'figure' :
             case 'center' :
                 $nodes = $node->children();
                 if ($nodes->count()) {
-                    static::parseNodes($node);
+                    static::parseSection($node);
                 }
                 break;
 
@@ -147,23 +211,45 @@ class MediasferaNewsParser
                 break;
 
             case 'img' :
-                static::$post->itemImage = static::getNodeImage('src', $node);
+                static::$post->itemImage = [
+                    $node->attr('alt') ?? $node->attr('title') ?? null,
+                    static::getNodeImage('src', $node)
+                ];
                 break;
 
             case 'picture' :
                 if($node->filter('img')->count()) {
-                    static::$post->itemImage = static::getNodeImage('src', $node->filter('img'));
+                    static::$post->itemImage = [
+                        $node->filter('img')->attr('alt') ?? $node->filter('img')->attr('title') ?? null,
+                        static::getNodeImage('src', $node->filter('img'))
+                    ];
+                }
+                break;
+
+            case 'figure' :
+                if($node->filter('img')->count() == 1) {
+                    static::$post->itemImage = [
+                        $node->text() ?? $node->filter('img')->attr('alt') ?? $node->filter('img')->attr('title') ?? null,
+                        static::getNodeImage('src', $node->filter('img'))
+                    ];
+                }
+                else {
+                    static::parseSection($node);
                 }
                 break;
 
             case 'a' :
-                if($node->text()) {
+                if($node->filter('img')->count() == 1) {
+                    static::$post->itemImage = [
+                        $node->attr('alt') ?? $node->attr('title') ?? null ?? $node->text(),
+                        static::getNodeImage('src', $node->filter('img')),
+                    ];
+                }
+                else {
                     static::$post->itemLink = [
-                        $node->text(),
+                        $node->text() ?? $node->attr('href'),
                         static::getNodeLink('href', $node)
                     ];
-                } else if($node->filter('img')->count()) {
-                    static::$post->itemImage = static::getNodeImage('src', $node->filter('img'));
                 }
                 break;
 
@@ -179,14 +265,6 @@ class MediasferaNewsParser
 
             case 'div' :
             case 'article' :
-                $nodes = $node->children();
-                if ($nodes->count()) {
-                    static::parseNodes($node);
-                } else {
-                    static::$post->itemText = $node->text();
-                }
-                break;
-
             case 'figcaption' :
             case 'span' :
             case 'strong' :
@@ -211,9 +289,7 @@ class MediasferaNewsParser
                 } else {
                     static::$post->itemText = $node->text();
                 }
-                if(static::DEBUG) {
-                    throw new \Exception('Unknown tag ' . $nodeName);
-                } else {
+                if(static::isDebug()) {
                     trigger_error('Unknown tag ' . $nodeName, E_USER_NOTICE);
                 }
         }
@@ -222,21 +298,29 @@ class MediasferaNewsParser
 
     protected static function parseSection(Crawler $node) : void
     {
-        $node = static::clearNode($node);
+        $html = $node->html();
 
         $allow_tags = [
             'br',
-            'p',
             'a',
             'img',
             'q',
+            'blockquote',
             'iframe',
         ];
 
-        $html = strip_tags($node->html(), $allow_tags);
+        $tags = [
+            'p',
+            'blockquote',
+            'b',
+            'span',
+            'strong',
+            'i',
+            'em',
+        ];
 
-        if(!$html) {
-            return;
+        if(in_array($node->nodeName(), $tags)) {
+            $html = strip_tags($html, $allow_tags);
         }
 
         $_html = '<body><div>' . $html . '</div></body>';
@@ -249,51 +333,14 @@ class MediasferaNewsParser
 
             $chunks = explode($nodeHtml, $html, 2);
 
-            $item = trim(array_shift($chunks));
-
-            if($item) {
-                static::$post->itemText = $item;
-            }
+            static::$post->itemText = trim(strip_tags(array_shift($chunks)));
 
             static::parseNode($node);
 
             $html = array_shift($chunks);
         });
 
-        if(strlen(trim($html, static::TRIM_CHARS)) > 1) {
-            static::$post->itemText = trim($html);
-        }
-    }
-
-    protected static function clearNode(Crawler $crawler, bool $recursive = true, $filter = null) : Crawler
-    {
-        $crawler = static::filterNode($crawler, $filter);
-
-        $crawler->children()->each(function (Crawler $node) use (&$recursive) {
-
-            $remove = false;
-
-            $names = [
-                'script',
-                'noscript',
-                'style',
-                'table',
-            ];
-
-            if(in_array($node->nodeName(), $names)) {
-                $remove = true;
-            }
-
-            if($remove) {
-                $self = $node->getNode(0);
-                $self->parentNode->removeChild($self);
-            }
-            else if($recursive && $node->children()->count()) {
-                static::clearNode($node, $recursive);
-            }
-        });
-
-        return $crawler;
+        static::$post->itemText = trim(strip_tags($html));
     }
 
 
@@ -427,6 +474,7 @@ class MediasferaNewsParser
         return static::resolveUrl($src);
     }
 
+
     public static function getNodeVideoId(Crawler $node) : ?string
     {
         switch ($node->nodeName())
@@ -469,7 +517,7 @@ class MediasferaNewsParser
             $parts = parse_url($url);
 
             if(isset($parts['host'])) {
-                if(isset($parts['host']) && strpos($parts['host'], '%') !== false) {
+                if(strpos($parts['host'], '%') !== false) {
                     $parts['host'] = urldecode($parts['host']);
                 }
 
@@ -478,16 +526,22 @@ class MediasferaNewsParser
 
             $url = static::buildUrl($parts);
 
-            if (!filter_var($url, FILTER_VALIDATE_URL)) {
-                throw new \Exception('Incorrect URL:' . $url);
-            }
+
         }
 
-        $url = urlencode($url);
+        if (!filter_var($url, FILTER_VALIDATE_URL)) {
+            $url = urlencode($url);
+        }
+
+        if (static::isDebug() && !filter_var($url, FILTER_VALIDATE_URL)) {
+            trigger_error('Incorrect URL:' . $url, E_USER_NOTICE);
+        }
+
         $url = str_replace(['%3A', '%2F', '%3F'], [':', '/', '?'], $url);
 
         return $url;
     }
+
 
     public static function buildUrl(array $parts) : string
     {
@@ -515,6 +569,7 @@ class MediasferaNewsParser
         $curl->setOption(CURLOPT_HEADER, true);
         $curl->setOption(CURLOPT_RETURNTRANSFER, true);
         $curl->setOption(CURLOPT_USERAGENT, 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)');
+
         $content = $curl->get($url);
 
         $code = $curl->responseCode ?? null;
