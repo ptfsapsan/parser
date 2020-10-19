@@ -618,4 +618,9 @@ abstract class AbstractBaseParser implements ParserInterface
     {
         return $this->curl;
     }
+
+    protected function getNodeStorage(): SplObjectStorage
+    {
+        return $this->nodeStorage;
+    }
 }
