@@ -58,14 +58,10 @@ class TruduSlavaParser implements ParserInterface
 
             $paragraph = $itemCrawler->filterXPath("//*[@id='page']/p");
             foreach ($paragraph as $key => $item) {
-                if ($key >= 2 && $text = $item->nodeValue) {
-                    $text = htmlentities($text);
-                    $text = str_replace("&nbsp;",'',$text);
-                    $text = html_entity_decode($text);
-                    if ($text) {
-                        $description = $description . ' ' . $text;
-                        $p[] = $text;
-                    }
+                $text = $this->clearText($item->nodeValue);
+                if ($key >= 2 && $text) {
+                    $description = $description . ' ' . $text;
+                    $p[] = $text;
                 }
             }
 
@@ -77,8 +73,6 @@ class TruduSlavaParser implements ParserInterface
                 $url,
                 $image
             );
-
-            $this->addItemPost($post, NewsPostItem::TYPE_HEADER, $title, null, null, 1);
 
             foreach ($p as $text) {
                 $this->addItemPost($post, NewsPostItem::TYPE_TEXT, $text);
@@ -135,7 +129,9 @@ class TruduSlavaParser implements ParserInterface
     protected function getDate(string $date): string
     {
         $str = explode(' ', $date);
-        return ArrayHelper::getValue($str, 1, '');
+        $date = new \DateTime(ArrayHelper::getValue($str, 1, ''));
+        $date->setTimezone(new \DateTimeZone("UTC"));
+        return $date->format("Y-m-d H:i:s");
     }
 
     /**
@@ -180,6 +176,20 @@ class TruduSlavaParser implements ParserInterface
         }
 
         throw new RuntimeException("Не удалось скачать страницу {$uri}, код ответа {$httpCode}");
+    }
+
+    /**
+     *
+     * @param string $text
+     *
+     * @return string
+     */
+    protected function clearText(string $text): string
+    {
+        $text = trim($text);
+        $text = htmlentities($text);
+        $text = str_replace("&nbsp;",'',$text);
+        return $text;
     }
 
 }
