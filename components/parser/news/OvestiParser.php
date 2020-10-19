@@ -45,6 +45,9 @@ class OvestiParser implements ParserInterface
      */
     public static function getNewsData(): array
     {
+        /** Вырубаем нотисы */
+        error_reporting(E_ALL & ~E_NOTICE);
+
         /** Get RSS news list */
         $curl = Helper::getCurl();
         $newsList = $curl->get(static::SITE_URL . "/feed");
@@ -267,7 +270,7 @@ class OvestiParser implements ParserInterface
      */
     protected static function isParagraphType(DOMNode $node): bool
     {
-        return $node->tagName === 'p';
+        return isset($node->tagName) === true && $node->tagName === 'p';
     }
 
     /**
@@ -279,7 +282,7 @@ class OvestiParser implements ParserInterface
      */
     protected static function isQuoteType(DOMNode $node): bool
     {
-        return in_array($node->tagName, ['blockquote']);
+        return isset($node->tagName) === true && in_array($node->tagName, ['blockquote']);
     }
 
     /**
@@ -291,7 +294,7 @@ class OvestiParser implements ParserInterface
      */
     protected static function isLinkType(DOMNode $node): bool
     {
-        return $node->tagName === 'a';
+        return isset($node->tagName) === true && $node->tagName === 'a';
     }
 
     /**
@@ -303,7 +306,7 @@ class OvestiParser implements ParserInterface
      */
     protected static function isImageType(DOMNode $node): bool
     {
-        return $node->tagName === 'img';
+        return isset($node->tagName) === true && $node->tagName === 'img';
     }
 
     /**
