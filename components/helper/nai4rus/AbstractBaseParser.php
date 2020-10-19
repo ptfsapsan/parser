@@ -636,4 +636,14 @@ abstract class AbstractBaseParser implements ParserInterface
     {
         return $this->nodeStorage;
     }
+
+    protected function getMicrosecondsDelay(): int
+    {
+        return $this->microsecondsDelay;
+    }
+
+    protected function getPageCountBetweenDelay(): int
+    {
+        return $this->pageCountBetweenDelay;
+    }
 }
