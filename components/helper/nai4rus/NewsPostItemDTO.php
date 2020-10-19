@@ -94,6 +94,11 @@ class NewsPostItemDTO
         return $this->text;
     }
 
+    public function setText(string $text): void
+    {
+        $this->text = $text;
+    }
+
     public function addText(string $text): void
     {
         $this->text .= $text;
