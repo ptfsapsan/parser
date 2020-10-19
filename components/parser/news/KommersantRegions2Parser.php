@@ -47,8 +47,6 @@ class KommersantRegions2Parser extends MediasferaNewsParser implements ParserInt
     public const NEWSLIST_IMG =   '.uho__photo img';
 
     public const ARTICLE_DATE =  'article.b-article meta[itemprop="datePublished"]';
-
-    public const ARTICLE_IMAGE = 'article.b-article .b-article-media img';
     public const ARTICLE_TEXT =  'article.b-article .article_text_wrapper';
 
 
@@ -83,9 +81,8 @@ class KommersantRegions2Parser extends MediasferaNewsParser implements ParserInt
             $articleCrawler = new Crawler($articleContent);
 
             self::$post->createDate = self::getNodeDate('content', $articleCrawler, self::ARTICLE_DATE);
-            self::$post->itemImage = self::getNodeImage('data-lazyimage-src', $articleCrawler, self::ARTICLE_IMAGE);
 
-            self::parseNodes($articleCrawler->filter(self::ARTICLE_TEXT));
+            self::parse($articleCrawler->filter(self::ARTICLE_TEXT));
         }
 
         $posts[] = self::$post->getNewsPost();
@@ -107,9 +104,8 @@ class KommersantRegions2Parser extends MediasferaNewsParser implements ParserInt
                 $articleCrawler = new Crawler($articleContent);
 
                 self::$post->createDate = self::getNodeDate('content', $articleCrawler, self::ARTICLE_DATE);
-                self::$post->itemImage = self::getNodeImage('data-lazyimage-src', $articleCrawler, self::ARTICLE_IMAGE);
 
-                self::parseNodes($articleCrawler->filter(self::ARTICLE_TEXT));
+                self::parse($articleCrawler->filter(self::ARTICLE_TEXT));
             }
 
             $posts[] = self::$post->getNewsPost();
