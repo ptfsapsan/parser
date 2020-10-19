@@ -7,7 +7,6 @@ use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
-use linslin\yii2\curl\Curl;
 use RuntimeException;
 use Symfony\Component\DomCrawler\Crawler;
 
@@ -58,7 +57,15 @@ class UpMonitorRuParser implements ParserInterface
             $contentPage = $this->getPageContent($url);
             $newsCrawler = new Crawler($contentPage);
 
-            $newContentCrawler = (new Crawler($newsCrawler->filterXPath("//*/tbody/tr/td/table")->html()))->filterXPath('//body')->children();
+            $newImgCrawler = $newsCrawler->filterXPath("//*//table[2]//*//div/img");
+            foreach ($newImgCrawler as $img) {
+                $src = $this->getHeadUrl($img->getAttribute('src'));
+                if ($image && $image != $src) {
+                    $this->addItemPost($post, NewsPostItem::TYPE_IMAGE, null, $src);
+                }
+            }
+
+            $newContentCrawler = $newsCrawler->filterXPath("//*//table[2]//*//td/p");
 
             foreach ($newContentCrawler as $content) {
                 foreach ($content->childNodes as $childNode) {
@@ -72,7 +79,6 @@ class UpMonitorRuParser implements ParserInterface
                     }
                 }
             }
-            dd($post);
 
             $posts[] = $post;
         }
@@ -101,6 +107,19 @@ class UpMonitorRuParser implements ParserInterface
                 $headerLevel,
                 $youtubeId
             ));
+    }
+
+    /**
+     *
+     * @param string $url
+     *
+     * @return string
+     */
+    protected function getHeadUrl($url): string
+    {
+        return strpos($url, 'http') === false
+            ? self::SITE_URL . $url
+            : $url;
     }
 
     /**
