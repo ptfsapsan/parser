@@ -94,11 +94,11 @@ class NewsPostItem
                     throw new Exception("Invalid postItem header level: $parser");
                 break;
             case self::TYPE_LINK:
-                if (!$this->link || $this->link == '' || !filter_var($this->link, FILTER_VALIDATE_URL))
+                if (!$this->link || $this->link == '')
                     throw new Exception("Invalid postItem link: $parser");
                 break;
             case self::TYPE_IMAGE:
-                if (!$this->image || $this->image == '' || !filter_var($this->image, FILTER_VALIDATE_URL))
+                if (!$this->image || $this->image == '')
                     throw new Exception("Invalid postItem image: $parser");
                 break;
             case self::TYPE_VIDEO:
