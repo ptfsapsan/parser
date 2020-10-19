@@ -178,6 +178,7 @@ class TruduSlavaParser implements ParserInterface
         throw new RuntimeException("Не удалось скачать страницу {$uri}, код ответа {$httpCode}");
     }
 
+
     /**
      *
      * @param string $text
@@ -186,10 +187,10 @@ class TruduSlavaParser implements ParserInterface
      */
     protected function clearText(string $text): string
     {
-        $text = trim($text);
         $text = htmlentities($text);
-        $text = str_replace("&nbsp;",'',$text);
-        return $text;
+        $text = str_replace("&nbsp;",' ',$text);
+        $text = html_entity_decode($text);
+        return trim($text);
     }
 
 }
