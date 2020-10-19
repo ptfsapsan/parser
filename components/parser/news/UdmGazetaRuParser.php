@@ -138,7 +138,10 @@ class UdmGazetaRuParser implements ParserInterface
         $yesterday = $now->sub(new \DateInterval('P1D'))->format('Y-m-d');
         $ruMonths = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря', 'сегодня', 'вчера'];
         $enMonths = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december', $today, $yesterday];
-        return ArrayHelper::getValue($str, 1) ? str_ireplace($ruMonths, $enMonths, $str[1]) : '';
+        $newDate = ArrayHelper::getValue($str, 1) ? str_ireplace($ruMonths, $enMonths, $str[1]) : '';
+        $newDate = new \DateTime($newDate);
+        $newDate->setTimezone(new \DateTimeZone("UTC"));
+        return $newDate->format("Y-m-d H:i:s");
     }
 
     /**
