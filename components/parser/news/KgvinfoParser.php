@@ -21,11 +21,11 @@ use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\DomCrawler\UriResolver;
 use Throwable;
 
-class OgtrkParser implements ParserInterface
+class KgvinfoParser implements ParserInterface
 {
     public const USER_ID = 2;
     public const FEED_ID = 2;
-    public const SITE_URL = 'https://ogtrk.ru';
+    public const SITE_URL = 'https://kgvinfo.ru/';
 
     private int $microsecondsDelay;
     private int $pageCountBetweenDelay;
@@ -74,32 +74,43 @@ class OgtrkParser implements ParserInterface
     {
         $previewList = [];
 
-        $uriPreviewPage = UriResolver::resolve("/rss.xml", $this->getSiteUri());
+        $timezone = new DateTimeZone('Europe/Moscow');
+        $pageDate = new DateTimeImmutable('now', $timezone);
+        $tries = 0;
 
-        try {
-            $previewNewsContent = $this->getPageContent($uriPreviewPage);
-            $previewNewsCrawler = new Crawler($previewNewsContent);
-        } catch (Throwable $exception) {
-            if (count($previewList) < $minNewsCount) {
-                throw new RuntimeException('Не удалось получить достаточное кол-во новостей', null, $exception);
+
+        while (count($previewList) < $maxNewsCount) {
+            $url = "/novosti/?AJAX_PAGE=Y&NEWSDATE={$pageDate->format('d.m.Y')}&NOSIDEBAR=Y";
+            $uriPreviewPage = UriResolver::resolve($url, $this->getSiteUri());
+            $pageDate = $pageDate->sub(new DateInterval('P1D'));
+            $tries++;
+
+            try {
+                $previewNewsContent = $this->getPageContent($uriPreviewPage);
+                $previewNewsCrawler = new Crawler($previewNewsContent);
+            } catch (Throwable $exception) {
+                if ($tries >= 2 && count($previewList) < $minNewsCount) {
+                    throw new RuntimeException('Не удалось получить достаточное кол-во новостей', null, $exception);
+                }
             }
+
+            $previewNewsCrawler = $previewNewsCrawler->filterXPath('//div[contains(@class,"inner-news__item")]');
+
+            $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$previewList, $timezone) {
+                $titleCrawler = $newsPreview->filterXPath('//a[contains(@class,"inner-news__name")]');
+                $uri = UriResolver::resolve($titleCrawler->attr('href'), "{$this->getSiteUri()}/novosti");
+
+                $date = $newsPreview->filterXPath('//span[contains(@class,"inner-news__tag")]')->text();
+                $time = $newsPreview->filterXPath('//span[contains(@class,"inner-news__time")]')->text();
+                $publishedAtString = $date . ' ' . $time;
+                $publishedAt = DateTimeImmutable::createFromFormat('d.m.Y H:i', $publishedAtString, $timezone);
+                $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
+
+                $preview = $newsPreview->filterXPath('//div[contains(@class,"inner-news__text")]')->text();
+
+                $previewList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $titleCrawler->text(), $preview);
+            });
         }
-
-        $previewNewsCrawler = $previewNewsCrawler->filterXPath('//item');
-
-        $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$previewList) {
-            $title = $newsPreview->filterXPath('//title')->text();
-            $uri = $newsPreview->filterXPath('//link')->text();
-
-            $publishedAtString = $newsPreview->filterXPath('//pubDate')->text();
-            $publishedAt = DateTimeImmutable::createFromFormat('D, d M Y H:i:s O', $publishedAtString);
-            $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
-
-            $preview = $newsPreview->filterXPath('//description')->text();
-
-            $previewList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $title, $preview);
-        });
-
         $previewList = array_slice($previewList, 0, $maxNewsCount);
 
         return $previewList;
@@ -117,19 +128,24 @@ class OgtrkParser implements ParserInterface
         $newsPage = $this->getPageContent($uri);
 
         $newsPageCrawler = new Crawler($newsPage);
-        $newsPostCrawler = $newsPageCrawler->filterXPath('//span[@class="smarttext"]/parent::*');
+        $newsPostCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"container")]/div[contains(@class,"news-detail")]');
 
+        $mainImageCrawler = $newsPageCrawler->filterXPath('//a[contains(@class,"side-menu__picture")]')->first();
+        if ($this->crawlerHasNodes($mainImageCrawler)) {
+            $image = $mainImageCrawler->attr('href');
+        }
+
+        if ($image !== null) {
+            $image = UriResolver::resolve($image, $uri);
+            $image = $this->encodeUri($image);
+        }
 
         $newsPost = new NewsPost(self::class, $title, $description, $publishedAt->format('Y-m-d H:i:s'), $uri, $image);
 
-        $contentCrawler = $newsPostCrawler;
-
-        $this->removeDomNodes($contentCrawler, '//*[name()="i" and self::*/a[contains(@href, "t=author")]]');
-        $this->removeDomNodes($contentCrawler,
-            '//span[@class="smarttext"]/preceding-sibling::* | //span[@class="smarttext"]');
+        $contentCrawler = $newsPostCrawler->filterXPath('//div[contains(@class,"detail-header__text")]');
 
         $this->removeDomNodes($contentCrawler, '//a[starts-with(@href, "javascript")]');
-        $this->removeDomNodes($contentCrawler, '//script | //video');
+        $this->removeDomNodes($contentCrawler, '//script | //video | //style | //form');
         $this->removeDomNodes($contentCrawler, '//table');
 
         foreach ($contentCrawler as $item) {
@@ -143,7 +159,6 @@ class OgtrkParser implements ParserInterface
 
                 if ($newsPostItem->type === NewsPostItem::TYPE_IMAGE && $newsPost->image === null) {
                     $newsPost->image = $newsPostItem->image;
-                    continue;
                 }
 
                 $newsPost->addItem($newsPostItem);
@@ -323,13 +338,13 @@ class OgtrkParser implements ParserInterface
             }
         }
 
-        if ($imageLink === '') {
+        if ($imageLink === '' || mb_stripos($imageLink, 'data:') === 0) {
             return null;
         }
 
         $imageLink = UriResolver::resolve($imageLink, $previewNewsItem->getUri());
         $imageLink = $this->encodeUri($imageLink);
-        if($imageLink === null){
+        if ($imageLink === null) {
             return null;
         }
 
@@ -362,13 +377,11 @@ class OgtrkParser implements ParserInterface
                 return isset($ignoringTags[$parentNode->nodeName]);
             }, 3);
 
-            if ($parentNode) {
-                $attachNode = $parentNode;
-            }
+            $attachNode = $parentNode ?: $node->parentNode;
         }
 
-        if (isset($ignoringTags[$node->nodeName]) || $node->nodeName === '#text') {
-            $attachNode = $node->parentNode;
+        if (isset($ignoringTags[$attachNode->nodeName])) {
+            $attachNode = $attachNode->parentNode;
         }
 
         if ($this->nodeStorage->contains($attachNode)) {
@@ -522,6 +535,10 @@ class OgtrkParser implements ParserInterface
             'q' => true,
             'blockquote' => true
         ];
+
+        if ($node instanceof DOMElement && str_contains($node->getAttribute('class'), 'line')) {
+            return true;
+        }
 
         return $quoteTags[$node->nodeName] ?? false;
     }
