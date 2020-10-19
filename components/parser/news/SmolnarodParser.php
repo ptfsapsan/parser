@@ -38,7 +38,6 @@ class SmolnarodParser extends MediasferaNewsParser implements ParserInterface
     public const NEWSLIST_IMG = '.img-fluid';
 
     public const ARTICLE_HEADER = '#single_article_wrapper_inner h1';
-    public const ARTICLE_IMAGE = '.single_article_content_wrapper .single_article_content_title_photo_wrapper img';
     public const ARTICLE_TEXT = '.single_article_content_wrapper .single_article_content_inner';
 
     public const ARTICLE_BREAKPOINTS = [
@@ -76,7 +75,7 @@ class SmolnarodParser extends MediasferaNewsParser implements ParserInterface
             self::$post = new NewsPostWrapper();
 
             self::$post->title = self::getNodeData('text', $node, self::NEWSLIST_TITLE);
-            self::$post->original = self::getNodeData('href', $node, self::NEWSLIST_LINK);
+            self::$post->original = self::getNodeLink('href', $node, self::NEWSLIST_LINK);
             self::$post->createDate = self::getNodeDate('text', $node, self::NEWSLIST_DATE);
             self::$post->description = self::getNodeData('text', $node, self::NEWSLIST_DESC);
             self::$post->image = self::getNodeImage('src', $node, self::NEWSLIST_IMG);
@@ -88,9 +87,8 @@ class SmolnarodParser extends MediasferaNewsParser implements ParserInterface
                 $articleCrawler = new Crawler($articleContent);
 
                 self::$post->itemHeader = [self::getNodeData('text', $articleCrawler, self::ARTICLE_HEADER), 1];
-                self::$post->itemImage = self::getNodeImage('src', $articleCrawler, self::ARTICLE_IMAGE);
 
-                self::parseNodes($articleCrawler->filter(self::ARTICLE_TEXT));
+                self::parse($articleCrawler->filter(self::ARTICLE_TEXT));
             }
 
             $posts[] = self::$post->getNewsPost();
