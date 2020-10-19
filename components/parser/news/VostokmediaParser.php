@@ -57,8 +57,7 @@ class VostokmediaParser extends MediasferaNewsParser implements ParserInterface
             self::$post->original = self::getNodeData('text', $node, self::NEWSLIST_LINK);
             self::$post->createDate = self::getNodeDate('text', $node, self::NEWSLIST_DATE);
             self::$post->description = self::getNodeData('text', $node, self::NEWSLIST_DESC);
-
-            self::$post->image = self::getNodeData('url', $node, self::NEWSLIST_IMG);
+            self::$post->image = self::getNodeLink('url', $node, self::NEWSLIST_IMG);
 
             $contentNode = ($node->attr('turbo') == 'true') ? '//turbo:content' : '//yandex:full-text';
 
@@ -67,7 +66,7 @@ class VostokmediaParser extends MediasferaNewsParser implements ParserInterface
 
             $articleCrawler = new Crawler('<body><div>'.$html.'</div></body>');
 
-            static::parseSection($articleCrawler);
+            static::parse($articleCrawler);
 
             $posts[] = self::$post->getNewsPost();
         });

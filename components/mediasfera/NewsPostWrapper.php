@@ -29,7 +29,7 @@ use app\components\parser\NewsPostItem;
  *
  * @property-write array  $itemHeader [string text, int level]<br>Property provides adding NewsPostItem::TYPE_HEADER to NewsPost
  * @property-write string $itemText Property provides adding NewsPostItem::TYPE_TEXT to NewsPost
- * @property-write string $itemImage Property provides adding NewsPostItem::TYPE_IMAGE to NewsPost
+ * @property-write array  $itemImage Property provides adding NewsPostItem::TYPE_IMAGE to NewsPost
  * @property-write string $itemQuote Property provides adding NewsPostItem::TYPE_QUOTE to NewsPost
  * @property-write array  $itemLink Property provides adding NewsPostItem::TYPE_LINK to NewsPost
  * @property-write string $itemVideo Property provides adding NewsPostItem::TYPE_VIDEO to NewsPost
@@ -49,11 +49,15 @@ class NewsPostWrapper
 
     private array $items = [];
 
+    public string $check_empty_chars = " \t\n\r\0\x0B\xC2\xA0";
+
     public function __construct()
     {
         [$self, $caller] = debug_backtrace(0, 2);
 
-        $this->parser = $caller['class'];
+        $class = $caller['class'];
+
+        $this->parser = $class;
     }
 
     public function __set($name, $value)
@@ -138,6 +142,12 @@ class NewsPostWrapper
             return;
         }
 
+        $check = trim(strip_tags($value[0]), $this->check_empty_chars);
+
+        if(!$check) {
+            return;
+        }
+
         $this->items[] = new NewsPostItem(
             NewsPostItem::TYPE_HEADER,
             $value[0],
@@ -150,7 +160,9 @@ class NewsPostWrapper
 
     private function addItemText(?string $value) : void
     {
-        if(!$value) {
+        $check = trim(strip_tags($value), $this->check_empty_chars);
+
+        if(!$check) {
             return;
         }
 
@@ -161,23 +173,27 @@ class NewsPostWrapper
     }
 
 
-    private function addItemImage(?string $value) : void
+    private function addItemImage(?array $value) : void
     {
-        if(!$value) {
+        if(!$value || count($value) != 2 || !$value[1]) {
             return;
         }
 
+        $value[0] = $value[0] ?? null;
+
         $this->items[] = new NewsPostItem(
             NewsPostItem::TYPE_IMAGE,
-            null,
-            $value
+            $value[0],
+            $value[1]
         );
     }
 
 
     private function addItemQuote(?string $value) : void
     {
-        if(!$value) {
+        $check = trim(strip_tags($value), $this->check_empty_chars);
+
+        if(!$check) {
             return;
         }
 
