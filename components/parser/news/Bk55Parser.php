@@ -69,9 +69,8 @@ class Bk55Parser extends MediasferaNewsParser implements ParserInterface
                 $articleCrawler = new Crawler($articleContent);
 
                 self::$post->itemHeader = [self::getNodeData('text', $articleCrawler, self::ARTICLE_HEADER), 1];
-                self::$post->itemImage = self::getNodeImage('src', $articleCrawler, self::ARTICLE_IMAGE);
 
-                self::parseNodes($articleCrawler->filter(self::ARTICLE_TEXT));
+                self::parse($articleCrawler->filter(self::ARTICLE_TEXT));
             }
 
             $posts[] = self::$post->getNewsPost();
@@ -79,6 +78,4 @@ class Bk55Parser extends MediasferaNewsParser implements ParserInterface
 
         return $posts;
     }
-
-
 }
