@@ -127,8 +127,9 @@ class NewsPromParser implements ParserInterface
             $image = UriResolver::resolve($image, $uri);
             $image = Helper::encodeUrl($image);
         }
-
-        $description = $newsPostCrawler->filterXPath('//div[contains(@class,"header")]/h1')->text();
+        $this->removeDomNodes($newsPageCrawler,'//div[@class="main-image"]');
+        $description = $newsPostCrawler->filterXPath('//p[1]')->text();
+        $this->removeDomNodes($newsPostCrawler, '//p[1]');
         $publishedAtString = trim($newsPostCrawler->filterXPath('//div[contains(@class, "date")]')->text());
         $publishedAtString = str_replace(['г', '.', ','], '', $this->translateDateToEng($publishedAtString));
         $timezone = new DateTimeZone('Asia/Yekaterinburg');
@@ -142,11 +143,13 @@ class NewsPromParser implements ParserInterface
         $contentCrawler = $newsPostCrawler->filterXPath('//div[contains(@class,"block-detail-view")]');
         $this->removeDomNodes($newsPageCrawler, '//a[starts-with(@href, "javascript")]');
         $this->removeDomNodes($newsPageCrawler, '//div[contains(@class, "block-socials")]');
+        $this->removeDomNodes($newsPageCrawler, '//div[contains(@class, "date")]');
         $this->removeDomNodes($newsPageCrawler, '//div[contains(@class, "tags")]');
         $this->removeDomNodes($newsPageCrawler, '//div[contains(@class, "source")]');
         $this->removeDomNodes($newsPageCrawler, '//div[contains(@class, "print")]');
+        $this->removeDomNodes($newsPageCrawler, '//div[contains(@class, "counter")]');
         $this->removeDomNodes($newsPageCrawler, '//script | //video');
-        $this->removeDomNodes($contentCrawler, '//table');
+        $this->removeDomNodes($contentCrawler, '//table | //h1 | //img[1]');
 
         foreach ($contentCrawler as $item) {
             $nodeIterator = new DOMNodeRecursiveIterator($item->childNodes);
