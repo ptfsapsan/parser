@@ -132,7 +132,9 @@ class VLifeRuParser implements ParserInterface
     protected function getDate(string $date): string
     {
         $str = explode(':', $date);
-        return ArrayHelper::getValue($str, 1, '');
+        $newDate = new \DateTime(ArrayHelper::getValue($str, 1, ''));
+        $newDate->setTimezone(new \DateTimeZone("UTC"));
+        return $newDate->format("Y-m-d H:i:s");
     }
 
     /**
