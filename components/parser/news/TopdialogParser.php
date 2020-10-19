@@ -68,6 +68,15 @@ class TopdialogParser extends AbstractBaseParser
         $newsPageCrawler = new Crawler($newsPage);
         $newsPostCrawler = $newsPageCrawler->filterXPath('//div[@id="content"]');
 
+        $mainImageCrawler = $newsPageCrawler->filterXPath('//meta[@property="og:image"]')->first();
+        if ($this->crawlerHasNodes($mainImageCrawler)) {
+            $image = $mainImageCrawler->attr('content');
+        }
+        if ($image !== null && $image !== '') {
+            $image = UriResolver::resolve($image, $uri);
+            $previewNewsDTO->setImage($this->encodeUri($image));
+        }
+
         $contentCrawler = $newsPostCrawler;
 
         $this->removeDomNodes($contentCrawler, '//span[contains(@class,"gallery_date")]/preceding-sibling::* | //span[contains(@class,"gallery_date")]');
