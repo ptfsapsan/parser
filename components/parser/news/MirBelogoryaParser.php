@@ -96,7 +96,7 @@ class MirBelogoryaParser implements ParserInterface
             $publishedAt = DateTimeImmutable::createFromFormat('D, d M Y H:i:s O', $publishedAtString);
             $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
 
-            $preview = strip_tags($newsPreview->filterXPath('//description')->text());
+            $preview = null;
 
             $previewList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $title, $preview);
         });
@@ -111,7 +111,6 @@ class MirBelogoryaParser implements ParserInterface
         $uri = $previewNewsItem->getUri();
         $title = $previewNewsItem->getTitle();
         $publishedAt = $previewNewsItem->getDateTime();
-        $description = $previewNewsItem->getPreview();
         $image = null;
 
         $newsPage = $this->getPageContent($uri);
@@ -119,11 +118,26 @@ class MirBelogoryaParser implements ParserInterface
         $newsPageCrawler = new Crawler($newsPage);
         $newsPostCrawler = $newsPageCrawler->filterXPath('//div[@class="item-page_region_news"]');
 
+        $mainImageCrawler = $newsPostCrawler->filterXPath('//img[1]')->first();
+        if ($this->crawlerHasNodes($mainImageCrawler)) {
+            $image = $mainImageCrawler->attr('src');
+            $this->removeDomNodes($newsPostCrawler, '//img[1]');
+        }
+
+        if ($image !== null) {
+            $image = UriResolver::resolve($image, $uri);
+        }
+        $this->removeDomNodes($newsPostCrawler, '//span[@class="wf_caption"]');
+        $description = $newsPostCrawler->filterXPath('//span[@itemprop="articleBody"]//p[1]')->text();
+
         $newsPost = new NewsPost(self::class, $title, $description, $publishedAt->format('Y-m-d H:i:s'), $uri, $image);
         $contentCrawler = $newsPostCrawler;
 
         $this->removeDomNodes($contentCrawler, '//a[starts-with(@href, "javascript")]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class, "extranews_box")]');
+        $this->removeDomNodes($contentCrawler, '//h2');
+        $this->removeDomNodes($contentCrawler, '//p[1]');
+        $this->removeDomNodes($contentCrawler, '//span[@class="wf_caption"]');
         $this->removeDomNodes($contentCrawler, '//dl[contains(@class, "article-info")]');
         $this->removeDomNodes($contentCrawler, '//span[contains(@itemprop, "author")]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@itemtype, "https://schema.org/ImageObject")]');
