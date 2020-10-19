@@ -552,7 +552,8 @@ abstract class AbstractBaseParser implements ParserInterface
 
     protected function hasText(DOMNode $node): bool
     {
-        return trim($node->textContent, "⠀ \xAD\t\n\r\0\x0B\xC2\xA0") !== '';
+        $ignoringSymbols = "⠀ -_()[]{}\"\'.,!?;\xAD\t\n\r\0\x0B\xC2\xA0";
+        return trim($node->textContent, $ignoringSymbols) !== '';
     }
 
 
