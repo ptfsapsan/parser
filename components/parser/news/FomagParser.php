@@ -129,7 +129,9 @@ class FomagParser implements ParserInterface
         $contentCrawler = $newsPostCrawler;
 
         $this->removeDomNodes($contentCrawler, '//a[starts-with(@href, "javascript")]');
+        $this->removeDomNodes($contentCrawler, '//p[1] | //p[2] | //h1[1]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"panel-block")]');
+        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"section-panel special")]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"soc-frame")]');
         $this->removeDomNodes($contentCrawler, '//script | //video');
         $this->removeDomNodes($contentCrawler, '//table');
