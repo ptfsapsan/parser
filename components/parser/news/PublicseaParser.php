@@ -51,6 +51,9 @@ class PublicseaParser implements ParserInterface
      */
     public static function getNewsData(int $limit = 100): array
     {
+        /** Вырубаем нотисы */
+        error_reporting(E_ALL & ~E_NOTICE);
+
         $pageNum = 1;
         $posts = [];
         while (self::$parsedCount < $limit) {
@@ -278,7 +281,7 @@ class PublicseaParser implements ParserInterface
      */
     protected static function isParagraphType(DOMNode $node): bool
     {
-        return $node->tagName === 'p';
+        return isset($node->tagName) === true && $node->tagName === 'p';
     }
 
     /**
@@ -290,7 +293,7 @@ class PublicseaParser implements ParserInterface
      */
     protected static function isQuoteType(DOMNode $node): bool
     {
-        return in_array($node->tagName, ['blockquote']);
+        return isset($node->tagName) === true && in_array($node->tagName, ['blockquote']);
     }
 
     /**
@@ -302,7 +305,7 @@ class PublicseaParser implements ParserInterface
      */
     protected static function isLinkType(DOMNode $node): bool
     {
-        return $node->tagName === 'a';
+        return isset($node->tagName) === true && $node->tagName === 'a';
     }
 
     /**
@@ -314,7 +317,7 @@ class PublicseaParser implements ParserInterface
      */
     protected static function isImageType(DOMNode $node): bool
     {
-        return $node->tagName === 'img';
+        return isset($node->tagName) === true && $node->tagName === 'img';
     }
 
     /**
