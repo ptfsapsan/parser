@@ -237,7 +237,7 @@ abstract class AbstractBaseParser implements ParserInterface
             throw new RuntimeException('Тег уже сохранен');
         }
 
-        $newsPostItem = NewsPostItemDTO::createQuoteItem($this->normalizeSpaces($node->textContent));
+        $newsPostItem = NewsPostItemDTO::createQuoteItem($this->normalizeText($node->textContent));
 
         $this->nodeStorage->attach($node, $newsPostItem);
         $this->removeParentsFromStorage($node->parentNode);
@@ -264,7 +264,7 @@ abstract class AbstractBaseParser implements ParserInterface
             throw new RuntimeException('Тег уже сохранен');
         }
 
-        $newsPostItem = NewsPostItemDTO::createHeaderItem($this->normalizeSpaces($node->textContent), $headingLevel);
+        $newsPostItem = NewsPostItemDTO::createHeaderItem($this->normalizeText($node->textContent), $headingLevel);
 
         $this->nodeStorage->attach($node, $newsPostItem);
         $this->removeParentsFromStorage($node->parentNode);
@@ -300,7 +300,7 @@ abstract class AbstractBaseParser implements ParserInterface
             throw new RuntimeException('Тег уже сохранен');
         }
 
-        $linkText = $this->hasText($node) ? $this->normalizeSpaces($node->textContent) : null;
+        $linkText = $this->hasText($node) ? $this->normalizeText($node->textContent) : null;
         $newsPostItem = NewsPostItemDTO::createLinkItem($link, $linkText);
 
         $this->nodeStorage->attach($node, $newsPostItem);
@@ -407,12 +407,12 @@ abstract class AbstractBaseParser implements ParserInterface
         if ($this->nodeStorage->contains($attachNode)) {
             /** @var NewsPostItemDTO $parentNewsPostItem */
             $parentNewsPostItem = $this->nodeStorage->offsetGet($attachNode);
-            $parentNewsPostItem->addText($this->normalizeSpaces($node->textContent));
+            $parentNewsPostItem->addText($this->normalizeText($node->textContent));
 
             throw new RuntimeException('Контент добавлен к существующему объекту NewsPostItemDTO');
         }
 
-        $newsPostItem = NewsPostItemDTO::createTextItem($this->normalizeSpaces($node->textContent));
+        $newsPostItem = NewsPostItemDTO::createTextItem($this->normalizeText($node->textContent));
 
         $this->nodeStorage->attach($attachNode, $newsPostItem);
 
@@ -607,6 +607,11 @@ abstract class AbstractBaseParser implements ParserInterface
         preg_match($youtubeRegex, $link, $matches);
 
         return $matches[5] ?? null;
+    }
+
+    protected function normalizeText(string $string): string
+    {
+        return $this->normalizeSpaces($string);
     }
 
     protected function normalizeSpaces(string $string): string
