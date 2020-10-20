@@ -552,7 +552,15 @@ abstract class AbstractBaseParser implements ParserInterface
 
     protected function hasText(DOMNode $node): bool
     {
-        return trim($node->textContent, "⠀ \xAD\t\n\r\0\x0B\xC2\xA0") !== '';
+        $stringWithoutSpaces = preg_replace('/[\pZ\pC\t\r\n]/u', '', $node->textContent);
+
+        if (mb_strlen($stringWithoutSpaces) > 5) {
+            return true;
+        }
+
+        $stringWithoutPunctuationSymbols = preg_replace('/(\p{P})/u', '', $stringWithoutSpaces);
+
+        return $stringWithoutPunctuationSymbols !== '';
     }
 
 
@@ -630,5 +638,20 @@ abstract class AbstractBaseParser implements ParserInterface
     protected function getCurl(): Curl
     {
         return $this->curl;
+    }
+
+    protected function getNodeStorage(): SplObjectStorage
+    {
+        return $this->nodeStorage;
+    }
+
+    protected function getMicrosecondsDelay(): int
+    {
+        return $this->microsecondsDelay;
+    }
+
+    protected function getPageCountBetweenDelay(): int
+    {
+        return $this->pageCountBetweenDelay;
     }
 }
