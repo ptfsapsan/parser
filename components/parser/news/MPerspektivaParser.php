@@ -23,6 +23,13 @@ class MPerspektivaParser extends AbstractBaseParser
         return 'https://www.mperspektiva.ru';
     }
 
+    public static function run(): array
+    {
+        $parser = new static();
+
+        return $parser->parse(10, 50);
+    }
+
     protected function getPreviewNewsDTOList(int $minNewsCount = 10, int $maxNewsCount = 100): array
     {
         $previewNewsDTOList = [];
@@ -74,6 +81,7 @@ class MPerspektivaParser extends AbstractBaseParser
         $image = null;
 
         $newsPage = $this->getPageContent($uri);
+
 
         $newsPageCrawler = new Crawler($newsPage);
         $newsPostCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"c-news-content__ct")]');
