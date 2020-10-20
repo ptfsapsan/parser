@@ -57,6 +57,17 @@ class Helper
     }
 
     /**
+     * Encode url with scheme
+     * @param $url
+     * @return string
+     */
+    public static function encodeUrlIts($url):string
+    {
+        $pos = strrpos($url, '/') + 1;
+        return substr($url, 0, $pos) . urlencode(substr($url, $pos));
+    }
+
+    /**
      * Get curl object
      * @return Curl
      */
