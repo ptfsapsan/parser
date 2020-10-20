@@ -2,23 +2,12 @@
 
 namespace app\components\parser\news;
 
-use app\components\Helper;
 use app\components\helper\nai4rus\AbstractBaseParser;
-use app\components\helper\nai4rus\DOMNodeRecursiveIterator;
-use app\components\helper\nai4rus\NewsPostItemDTO;
 use app\components\helper\nai4rus\PreviewNewsDTO;
 use app\components\parser\NewsPost;
-use app\components\parser\NewsPostItem;
-use app\components\parser\ParserInterface;
-use DateInterval;
 use DateTimeImmutable;
-use DateTimeInterface;
 use DateTimeZone;
-use DOMElement;
-use DOMNode;
-use linslin\yii2\curl\Curl;
 use RuntimeException;
-use SplObjectStorage;
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\DomCrawler\UriResolver;
 use Throwable;
@@ -35,7 +24,6 @@ class GroznyParser extends AbstractBaseParser
 
     protected function getPreviewNewsDTOList(int $minNewsCount = 10, int $maxNewsCount = 100): array
     {
-        $maxNewsCount =20;
         $previewList = [];
 
         $pageNumber = 1;
@@ -51,7 +39,7 @@ class GroznyParser extends AbstractBaseParser
             }
 
             $previewNewsCrawler = $previewNewsCrawler->filterXPath('//article');
-            if(!$this->crawlerHasNodes($previewNewsCrawler)){
+            if (!$this->crawlerHasNodes($previewNewsCrawler)) {
                 break;
             }
 
@@ -64,7 +52,7 @@ class GroznyParser extends AbstractBaseParser
                 $publishedAtString = $newsPreview->filterXPath('//li[contains(@class,"meta-news__date")]')->text();
                 $publishedAtString = $this->translateDateToEng($publishedAtString);
 
-                $publishedAt = DateTimeImmutable::createFromFormat('d F Y', $publishedAtString, $timezone);
+                $publishedAt = DateTimeImmutable::createFromFormat('d F Y H:i', $publishedAtString, $timezone);
                 $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
                 $preview = null;
 
@@ -91,9 +79,12 @@ class GroznyParser extends AbstractBaseParser
         $newsPostCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"page-news")]');
 
         $image = null;
-        $mainImageCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"bl-news-limg")]/img')->first();
+        $mainImageCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"page-news__images")]');
         if ($this->crawlerHasNodes($mainImageCrawler)) {
-            $image = $mainImageCrawler->attr('src');
+            preg_match('/(?:\([\'\"]?)(.*?)(?:[\'\"]?\))/u', $mainImageCrawler->attr('style'), $matches);
+            if (isset($matches[1])) {
+                $image = $matches[1];
+            }
         }
         if ($image !== null) {
             $image = UriResolver::resolve($image, $uri);
