@@ -160,10 +160,12 @@ class VsluhParser implements ParserInterface
                     $newsPost->image = $newsPostItem->image;
                 }
 
+                if (preg_match('/^(\p{P}|\p{S}|[\pZ\pC])$/u',$newsPostItem->text)) {
+                    continue;
+                }
                 $newsPost->addItem($newsPostItem);
             }
         }
-
         return $newsPost;
     }
 
