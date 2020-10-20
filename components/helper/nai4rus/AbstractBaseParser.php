@@ -554,7 +554,7 @@ abstract class AbstractBaseParser implements ParserInterface
     {
         $stringWithoutSpaces = preg_replace('/[\pZ\pC\t\r\n]/u', '', $node->textContent);
 
-        if (mb_strlen($stringWithoutSpaces) > 6) {
+        if (mb_strlen($stringWithoutSpaces) > 5) {
             return true;
         }
 
