@@ -103,7 +103,7 @@ class NewsPostItem
                 break;
             case self::TYPE_VIDEO:
                 if (!$this->youtubeId || (strlen($this->youtubeId) != 11))
-                    throw new Exception("Invalid postItem image: $parser");
+                    throw new Exception("Invalid postItem video: $parser");
         }
     }
 }
