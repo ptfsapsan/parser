@@ -119,9 +119,12 @@ class TuvaAsiaParser implements ParserInterface
 
         $contentCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"maincont")]');
 
-        $mainImageCrawler = $contentCrawler->filterXPath('//img[1]');
+        $mainImageCrawler = $contentCrawler->filterXPath('//img[1]/parent::a[contains(@class,"highslide")]');
 
         if ($this->crawlerHasNodes($mainImageCrawler)) {
+            $image = $mainImageCrawler->attr('href');
+            $this->removeDomNodes($contentCrawler, '//img[1]/parent::a[contains(@class,"highslide")]');
+        } elseif ($contentCrawler->filterXPath('//img[1]')) {
             $image = $mainImageCrawler->attr('src');
             $this->removeDomNodes($contentCrawler, '//img[1]');
         }
