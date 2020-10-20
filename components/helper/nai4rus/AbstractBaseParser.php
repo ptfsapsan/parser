@@ -552,7 +552,7 @@ abstract class AbstractBaseParser implements ParserInterface
 
     protected function hasText(DOMNode $node): bool
     {
-        $stringWithoutSpaces = preg_replace('/[\pZ\pC\t\r\n]/u', '', $node->textContent);
+        $stringWithoutSpaces = preg_replace('/[\pZ\pC\t\r\n⠀]/u', '', $node->textContent);
 
         if (mb_strlen($stringWithoutSpaces) > 5) {
             return true;
