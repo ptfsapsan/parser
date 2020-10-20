@@ -552,8 +552,15 @@ abstract class AbstractBaseParser implements ParserInterface
 
     protected function hasText(DOMNode $node): bool
     {
-        $ignoringSymbols = "⠀ -_()[]{}\"\'.,!?;\xAD\t\n\r\0\x0B\xC2\xA0";
-        return trim($node->textContent, $ignoringSymbols) !== '';
+        $stringWithoutSpaces = preg_replace('/[\pZ\pC\t\r\n]/u', '', $node->textContent);
+
+        if (mb_strlen($stringWithoutSpaces) > 6) {
+            return true;
+        }
+
+        $stringWithoutPunctuationSymbols = preg_replace('/(\p{P})/u', '', $stringWithoutSpaces);
+
+        return $stringWithoutPunctuationSymbols !== '';
     }
 
 
