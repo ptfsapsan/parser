@@ -44,15 +44,14 @@ class VnashemDvoreRuParser implements ParserInterface
             $title = $itemCrawler->filterXPath("//h2[@class='title']")->text();
 
             $date = $this->getDate($itemCrawler->filterXPath("//div[@class='submitted']")->text());
-            $content = $itemCrawler->filterXPath("//*[class='clear-block']//*//div[@class='content']");
-            dd($content);
+            $content = $itemCrawler->filterXPath("//div[@class='clear-block']/*/div[@class='content']");
             $image = null;
-            $imgSrc = $content->filterXPath("//img");
+            $imgSrc = $content->filterXPath("//div[@class='all-attached-images']//*//img");
             if ($imgSrc->getNode(0)) {
                 $image = $this->getHeadUrl($imgSrc->attr('src'));
             }
 
-            $description = $content->text();
+            $description = $content->filterXPath('//p')->text();
 
             $post = new NewsPost(
                 self::class,
@@ -63,42 +62,36 @@ class VnashemDvoreRuParser implements ParserInterface
                 $image
             );
 
-            dd($title,
-                $description,
-                $date,
-                $url,
-                $image);
-
-            $newContentCrawler = $content->filterXPath('//div[@class="entry-content"]/st_index/p');
-            foreach ($newContentCrawler as $content) {
-                foreach ($content->childNodes as $key => $childNode) {
+            $newContentCrawler = (new Crawler($content->html()))->filterXPath('//body')->children();
+            foreach ($newContentCrawler as $key=>$content) {
+                if ($key < 1) {
+                    continue;
+                }
+                foreach ($content->childNodes as $childNode) {
                     $nodeValue = $this->clearText($childNode->nodeValue);
-                    if (in_array($childNode->nodeName, ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']) && $childNode->nodeValue != $title) {
-
-                        $this->addItemPost($post, NewsPostItem::TYPE_HEADER, $nodeValue, null, null, (int) substr($childNode->nodeName, 1));
-
-                    } elseif ($childNode->nodeName == 'a' && strpos($childNode->getAttribute('href'), 'http') !== false) {
-                        $img = $childNode->firstChild;
-                        if ($img && $img->nodeName == 'img' && $img && $img->getAttribute('src') == $image) {
+                    if (!$nodeValue) {
+                        continue;
+                    }
+                    if ($childNode->nodeName == 'span') {
+                        $spanCrawler = (new Crawler($childNode))->children();
+                        if (!$spanCrawler->getNode(0)) {
+                            $this->addItemPost($post, NewsPostItem::TYPE_TEXT, $nodeValue);
                             continue;
-                        } elseif ($img->nodeName == 'img') {
-
-                            $this->addItemPost($post, NewsPostItem::TYPE_IMAGE, null, $img->getAttribute('src'));
-
-                        } else {
-
-                            $this->addItemPost($post, NewsPostItem::TYPE_LINK, $nodeValue, null, $childNode->getAttribute('href'));
-
                         }
+                        foreach ($spanCrawler as $spanItem) {
+                            foreach ($spanItem->childNodes as $spanValue) {
+                                $spanNode = $this->clearText($spanValue->nodeValue);
+                                if ($spanValue->nodeName == 'a' && strpos($spanValue->getAttribute('href'), 'http') !== false) {
 
-                    } elseif ($childNode->nodeName == 'img' && $childNode->getAttribute('src') != $image) {
+                                    $this->addItemPost($post, NewsPostItem::TYPE_LINK, $spanNode, null, $spanValue->getAttribute('href'));
 
-                        $this->addItemPost($post, NewsPostItem::TYPE_IMAGE, null, $childNode->getAttribute('src'));
-
-                    } elseif ($nodeValue) {
-
+                                } elseif ($spanNode) {
+                                    $this->addItemPost($post, NewsPostItem::TYPE_TEXT, $spanNode);
+                                }
+                            }
+                        }
+                    } else {
                         $this->addItemPost($post, NewsPostItem::TYPE_TEXT, $nodeValue);
-
                     }
                 }
             }
@@ -171,8 +164,8 @@ class VnashemDvoreRuParser implements ParserInterface
      */
     protected function encodeUrl(string $url): string
     {
-        if (preg_match('/[А-Яа-яЁё]/iu', $url)) {
-            preg_match_all('/[А-Яа-яЁё]/iu', $url, $result);
+        if (preg_match('/[А-Яа-яЁё\s]/iu', $url)) {
+            preg_match_all('/[А-Яа-яЁё\s]/iu', $url, $result);
             $search = [];
             $replace = [];
             foreach ($result as $item) {
@@ -240,6 +233,9 @@ class VnashemDvoreRuParser implements ParserInterface
         $text = htmlentities($text);
         $text = str_replace("&nbsp;",' ',$text);
         $text = html_entity_decode($text);
+        if (strpos($text, 'Добавить комментарий') !== false) {
+            $text = '';
+        }
         return trim($text);
     }
 }
