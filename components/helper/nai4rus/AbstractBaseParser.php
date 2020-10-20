@@ -37,10 +37,10 @@ abstract class AbstractBaseParser implements ParserInterface
     {
         $parser = new static();
 
-        return $parser->parse(10, 100);
+        return $parser->parse(10, 50);
     }
 
-    public function parse(int $minNewsCount = 10, int $maxNewsCount = 100): array
+    public function parse(int $minNewsCount = 10, int $maxNewsCount = 50): array
     {
         $previewList = $this->getPreviewNewsDTOList($minNewsCount, $maxNewsCount);
 
@@ -73,10 +73,10 @@ abstract class AbstractBaseParser implements ParserInterface
     abstract protected function getPreviewNewsDTOList(int $minNewsCount = 10, int $maxNewsCount = 100): array;
 
     /**
-     * @param PreviewNewsDTO $newsPostDTO
+     * @param PreviewNewsDTO $previewNewsItem
      * @return NewsPost
      */
-    abstract protected function parseNewsPage(PreviewNewsDTO $newsPostDTO): NewsPost;
+    abstract protected function parseNewsPage(PreviewNewsDTO $previewNewsItem): NewsPost;
 
 
     protected function purifyNewsPostContent(Crawler $contentCrawler): void
@@ -121,7 +121,7 @@ abstract class AbstractBaseParser implements ParserInterface
         $image = $newsPostDTO->getImage();
 
         $title = $newsPostDTO->getTitle();
-        if (!$title) {
+        if ($title === null) {
             throw new InvalidArgumentException('Объект NewsPostDTO не содержит заголовка новости');
         }
 
@@ -256,7 +256,7 @@ abstract class AbstractBaseParser implements ParserInterface
 
         $headingLevel = $this->getHeadingLevel($node);
 
-        if (!$headingLevel || !$this->hasText($node)) {
+        if ($headingLevel === null || !$this->hasText($node)) {
             return null;
         }
 
@@ -327,7 +327,7 @@ abstract class AbstractBaseParser implements ParserInterface
         }
 
         $youtubeVideoId = $this->getYoutubeVideoId($node->getAttribute('src'));
-        if (!$youtubeVideoId) {
+        if ($youtubeVideoId === null) {
             return null;
         }
         $newsPostItem = NewsPostItemDTO::createVideoItem($youtubeVideoId);
@@ -552,7 +552,15 @@ abstract class AbstractBaseParser implements ParserInterface
 
     protected function hasText(DOMNode $node): bool
     {
-        return trim($node->textContent, "⠀ \xAD\t\n\r\0\x0B\xC2\xA0") !== '';
+        $stringWithoutSpaces = preg_replace('/[\pZ\pC\t\r\n⠀]/u', '', $node->textContent);
+
+        if (mb_strlen($stringWithoutSpaces) > 5) {
+            return true;
+        }
+
+        $stringWithoutPunctuationSymbols = preg_replace('/(\p{P})/u', '', $stringWithoutSpaces);
+
+        return $stringWithoutPunctuationSymbols !== '';
     }
 
 
@@ -594,7 +602,7 @@ abstract class AbstractBaseParser implements ParserInterface
             return null;
         }
 
-        if (!$encodedUri || $encodedUri === '' || !filter_var($encodedUri, FILTER_VALIDATE_URL)) {
+        if ($encodedUri === '' || !filter_var($encodedUri, FILTER_VALIDATE_URL)) {
             return null;
         }
 
@@ -616,7 +624,7 @@ abstract class AbstractBaseParser implements ParserInterface
 
     protected function normalizeSpaces(string $string): string
     {
-        return preg_replace('/\s+/u', ' ', $string);
+        return preg_replace('/(\s+|⠀+)/u', ' ', $string);
     }
 
     protected function factoryCurl(): Curl
