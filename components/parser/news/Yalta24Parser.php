@@ -32,10 +32,16 @@ class Yalta24Parser extends AbstractBaseParser
     protected function getPreviewNewsDTOList(int $minNewsCount = 10, int $maxNewsCount = 100): array
     {
         $previewNewsDTOList = [];
-        $pageNumber = 10;
+        $pageNumber = 0;
 
         while (count($previewNewsDTOList) < $maxNewsCount) {
-            $urn = "/vsya-yalta?start={$pageNumber}";
+            if ($pageNumber > 10) {
+                $urn = "/vsya-yalta?start={$pageNumber}";
+
+            } else {
+                $urn = "vsya-yalta";
+            }
+
             $uriPreviewPage = UriResolver::resolve($urn, $this->getSiteUrl());
             $pageNumber += 10;
 
@@ -49,28 +55,22 @@ class Yalta24Parser extends AbstractBaseParser
                 break;
             }
 
-            $previewNewsXPath = '//div[contains(@class,"item")]';
+            $previewNewsXPath = '//div[@class="blog"]//div[contains(@itemprop,"blogPost")]';
             $previewNewsCrawler = $previewNewsCrawler->filterXPath($previewNewsXPath);
 
             $previewNewsCrawler->each(
-                function (Crawler $newsPreview) use (&$previewNewsDTOList) {
-                    $titleCrawler = $newsPreview->filterXPath('//h2');
-                    if ($this->crawlerHasNodes($titleCrawler)) {
-                        $title = $titleCrawler->text();
-                        $uri = UriResolver::resolve($titleCrawler->filterXPath('//a')->attr('href'), $this->getSiteUrl());
-                    }
-                    if (empty($uri)) {
-                        return false;
-                    }
-                    if($this->crawlerHasNodes($newsPreview->filterXPath('//time'))) {
-                        $publishedAtString = $newsPreview->filterXPath('//time')->text();
-                        $publishedAtString = explode(' ', $publishedAtString);
-                        unset($publishedAtString[0]);
-                        $publishedAtString = $publishedAtString[1].' '.$publishedAtString[2];
-                        $timezone = new DateTimeZone('Europe/Moscow');
-                        $publishedAt = DateTimeImmutable::createFromFormat('d.m.Y H:i', $publishedAtString, $timezone);
-                        $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
-                    }
+                function (Crawler $newsPreview) use (&$previewNewsDTOList, $pageNumber) {
+                    $titleCrawler = $newsPreview->filterXPath('//h2[@itemprop="name"]');
+                    $title = $titleCrawler->text();
+                    $uri = UriResolver::resolve($titleCrawler->filterXPath('//a')->attr('href'), $this->getSiteUrl());
+
+                    $publishedAtString = $newsPreview->filterXPath('//time')->text();
+                    $publishedAtString = explode(' ', $publishedAtString);
+                    unset($publishedAtString[0]);
+                    $publishedAtString = $publishedAtString[1] . ' ' . $publishedAtString[2];
+                    $timezone = new DateTimeZone('Europe/Moscow');
+                    $publishedAt = DateTimeImmutable::createFromFormat('d.m.Y H:i', $publishedAtString, $timezone);
+                    $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
 
                     $description = null;
                     $previewNewsDTOList[] = new PreviewNewsDTO(
@@ -101,9 +101,12 @@ class Yalta24Parser extends AbstractBaseParser
         $newsPageCrawler = new Crawler($newsPage);
         $newsPostCrawler = $newsPageCrawler->filterXPath('//div[@itemprop="articleBody"]');
 
-        $mainImageCrawler = $newsPageCrawler->filterXPath('//div[@class="item-image"]//img')->first();
+        $mainImageCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"item-image")]//img[1]');
         if ($this->crawlerHasNodes($mainImageCrawler)) {
             $image = $mainImageCrawler->attr('src');
+            if ($image) {
+                $this->removeDomNodes($newsPostCrawler, '//img[1]');
+            }
         }
         if ($image !== null && $image !== '') {
             $image = UriResolver::resolve($image, $uri);
@@ -117,6 +120,13 @@ class Yalta24Parser extends AbstractBaseParser
 
         $contentCrawler = $newsPostCrawler;
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"mobile-slider")]');
+        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"article-info")]');
+        $this->removeDomNodes($contentCrawler, '//p[contains(@class,"grayfill")][last()]');
+        $this->removeDomNodes($newsPageCrawler, '//div[contains(@class,"item-image")]');
+        $this->removeDomNodes(
+            $contentCrawler,
+            '//div[contains(@class,"jllikeproSharesContayner")] | //div[contains(@class,"jllikeproSharesContayner")]//following-sibling::*'
+        );
         $this->removeDomNodes($contentCrawler, '//div[@class="item-image"]//img');
 
         $this->purifyNewsPostContent($contentCrawler);
