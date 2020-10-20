@@ -121,7 +121,7 @@ abstract class AbstractBaseParser implements ParserInterface
         $image = $newsPostDTO->getImage();
 
         $title = $newsPostDTO->getTitle();
-        if (!$title) {
+        if ($title === null) {
             throw new InvalidArgumentException('Объект NewsPostDTO не содержит заголовка новости');
         }
 
@@ -256,7 +256,7 @@ abstract class AbstractBaseParser implements ParserInterface
 
         $headingLevel = $this->getHeadingLevel($node);
 
-        if (!$headingLevel || !$this->hasText($node)) {
+        if ($headingLevel === null || !$this->hasText($node)) {
             return null;
         }
 
@@ -327,7 +327,7 @@ abstract class AbstractBaseParser implements ParserInterface
         }
 
         $youtubeVideoId = $this->getYoutubeVideoId($node->getAttribute('src'));
-        if (!$youtubeVideoId) {
+        if ($youtubeVideoId === null) {
             return null;
         }
         $newsPostItem = NewsPostItemDTO::createVideoItem($youtubeVideoId);
@@ -602,7 +602,7 @@ abstract class AbstractBaseParser implements ParserInterface
             return null;
         }
 
-        if (!$encodedUri || $encodedUri === '' || !filter_var($encodedUri, FILTER_VALIDATE_URL)) {
+        if ($encodedUri === '' || !filter_var($encodedUri, FILTER_VALIDATE_URL)) {
             return null;
         }
 
@@ -624,7 +624,7 @@ abstract class AbstractBaseParser implements ParserInterface
 
     protected function normalizeSpaces(string $string): string
     {
-        return preg_replace('/\s+/u', ' ', $string);
+        return preg_replace('/(\s+|⠀+)/u', ' ', $string);
     }
 
     protected function factoryCurl(): Curl
