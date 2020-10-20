@@ -4,6 +4,7 @@ namespace app\components\parser\news;
 
 use app\components\Helper;
 use app\components\parser\NewsPost;
+use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use DateTime;
 use DateTimeZone;
@@ -101,9 +102,6 @@ class KomigorParser implements ParserInterface
         $ytContainer = $content->findOne('.youtube-play');
         $videoId = $ytContainer->getAttribute('data-id');
 
-        /** Get item detail link */
-        $link = static::BASE_YOUTUBE_VIDEO_URL . $videoId;
-
         /** Get title */
         $title = self::cleanText($content->findOne('.item-name h3')->asText());
 
@@ -119,6 +117,7 @@ class KomigorParser implements ParserInterface
         $subtitleNode = $content->findOne('.item-sub-name');
         if (! empty($subtitleNode) === true) {
             $description = self::cleanText($subtitleNode->asText());
+            $title .= ' ' . $description;
 
             //parse string for date published
             $stringToDate = preg_replace('/ года/', '', $description);
@@ -127,11 +126,12 @@ class KomigorParser implements ParserInterface
             $createdAt->setTimezone(new DateTimeZone('UTC'));
             $createdAt = $createdAt->format('c');
         } else {
+            $ytLink = static::BASE_YOUTUBE_VIDEO_URL . $videoId;
             $description = $title;
 
             /** Detail page parser creation */
             $curl = Helper::getCurl();
-            $curlResult = $curl->get($link);
+            $curlResult = $curl->get($ytLink);
 
             /** Parse detail video page */
             $pageCrawler = new Crawler($curlResult);
@@ -146,8 +146,14 @@ class KomigorParser implements ParserInterface
             $createdAt = $createdAt->format('c');
         }
 
+        /** Get item fictive detail link https://i.imgur.com/R8T0fp9.png */
+        $link = self::cleanUrl(static::SITE_URL . "/novosti?title=" . urlencode($title));
+
         /** @var NewsPost */
         $post = new NewsPost(static::class, $title, $description, $createdAt, $link, $imageUrl);
+
+        $post->addItem(new NewsPostItem(NewsPostItem::TYPE_VIDEO, null,
+                null, null, null, $videoId));
 
         self::$posts[] = $post;
     }
