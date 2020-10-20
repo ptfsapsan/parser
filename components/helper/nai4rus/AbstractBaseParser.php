@@ -37,10 +37,10 @@ abstract class AbstractBaseParser implements ParserInterface
     {
         $parser = new static();
 
-        return $parser->parse(10, 100);
+        return $parser->parse(10, 50);
     }
 
-    public function parse(int $minNewsCount = 10, int $maxNewsCount = 100): array
+    public function parse(int $minNewsCount = 10, int $maxNewsCount = 50): array
     {
         $previewList = $this->getPreviewNewsDTOList($minNewsCount, $maxNewsCount);
 
@@ -73,10 +73,10 @@ abstract class AbstractBaseParser implements ParserInterface
     abstract protected function getPreviewNewsDTOList(int $minNewsCount = 10, int $maxNewsCount = 100): array;
 
     /**
-     * @param PreviewNewsDTO $newsPostDTO
+     * @param PreviewNewsDTO $previewNewsItem
      * @return NewsPost
      */
-    abstract protected function parseNewsPage(PreviewNewsDTO $newsPostDTO): NewsPost;
+    abstract protected function parseNewsPage(PreviewNewsDTO $previewNewsItem): NewsPost;
 
 
     protected function purifyNewsPostContent(Crawler $contentCrawler): void
