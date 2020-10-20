@@ -11,6 +11,7 @@ use app\components\parser\ParserInterface;
 use DateTime;
 use DateTimeZone;
 use Exception;
+use InvalidArgumentException;
 use Symfony\Component\DomCrawler\Crawler;
 
 /**
@@ -85,6 +86,7 @@ class Ogrik extends Aleks007smolBaseParser implements ParserInterface
         $crawler = new Crawler($rss);
 
         $crawler->filter('channel item')->slice(0, self::MAX_NEWS_COUNT)->each(function ($node) use (&$curl, &$posts) {
+//        $crawler->filter('channel item')->slice(1, 1)->each(function ($node) use (&$curl, &$posts) {
 
             $newPost = new NewsPost(
                 self::class,
@@ -110,7 +112,12 @@ class Ogrik extends Aleks007smolBaseParser implements ParserInterface
                  * Если время в rss указано как timestamp = 0, то берем из html новости
                  */
                 if ($newPost->createDate->format('U') == 0) {
-                    $createDate = (new Crawler($newsContent))->filter('.c-date')->text();
+                    try {
+                        $createDate = (new Crawler($newsContent))->filter('.c-date')->text();
+                    } catch (InvalidArgumentException $e) {
+                        return;
+                    }
+
                     $newPost->createDate = DateTime::createFromFormat('d.m.Y H:i O', $createDate . ' +0800')
                         ->setTimezone(new DateTimeZone('UTC'));
                 }
