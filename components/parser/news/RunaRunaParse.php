@@ -87,23 +87,49 @@ class RunaRunaParse implements ParserInterface
 
         $previewNewsCrawler = $previewNewsCrawler->filterXPath('//item');
 
-        $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$previewList) {
-            $title = $newsPreview->filterXPath('//title')->text();
-            $uri = $newsPreview->filterXPath('//link')->text();
+        $previewNewsCrawler->each(
+            function (Crawler $newsPreview) use (&$previewList) {
+                $title = $newsPreview->filterXPath('//title')->text();
+                $uri = $newsPreview->filterXPath('//link')->text();
 
-            $publishedAtString = $newsPreview->filterXPath('//pubDate')->text();
-            $publishedAt = DateTimeImmutable::createFromFormat('D, d M Y H:i:s O', $publishedAtString);
-            $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
+                $publishedAtString = $newsPreview->filterXPath('//pubDate')->text();
+                $publishedAt = DateTimeImmutable::createFromFormat('D, d M Y H:i:s O', $publishedAtString);
+                $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
 
-            $preview = $newsPreview->filterXPath('//description')->text();
+                $preview = $newsPreview->filterXPath('//description')->text();
 
-            $previewList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $title, $preview);
-        });
+                $previewList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $title, $preview);
+            }
+        );
 
         $previewList = array_slice($previewList, 0, $maxNewsCount);
         return $previewList;
     }
 
+    private function getSiteUri(): string
+    {
+        return self::SITE_URL;
+    }
+
+    private function getPageContent(string $uri): string
+    {
+        $result = $this->curl->get($uri);
+        $this->checkResponseCode($this->curl);
+
+        return $result;
+    }
+
+    private function checkResponseCode(Curl $curl): void
+    {
+        $responseInfo = $curl->getInfo();
+
+        $httpCode = $responseInfo['http_code'] ?? null;
+        $uri = $responseInfo['url'] ?? null;
+
+        if ($httpCode < 200 || $httpCode >= 400) {
+            throw new RuntimeException("Не удалось скачать страницу {$uri}, код ответа {$httpCode}");
+        }
+    }
 
     private function parseNewsPage(PreviewNewsDTO $previewNewsItem): NewsPost
     {
@@ -117,12 +143,18 @@ class RunaRunaParse implements ParserInterface
 
         $newsPageCrawler = new Crawler($newsPage);
         $newsPostCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"main_content")]');
+        $mainImageCrawler = $newsPostCrawler->filterXPath('//img[contains(@class,"img")]')->first();
+        if ($this->crawlerHasNodes($mainImageCrawler)) {
+            $image = $mainImageCrawler->attr('src');
+        }
 
+        if ($image !== null && $image !== '') {
+            $image = UriResolver::resolve($image, $uri);
+        }
 
         $newsPost = new NewsPost(self::class, $title, $description, $publishedAt->format('Y-m-d H:i:s'), $uri, $image);
         $contentCrawler = $newsPostCrawler;
 
-        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"social_block")]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"social_block")]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"article-content")]/p[1]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"imgwrap")][1]');
@@ -155,6 +187,22 @@ class RunaRunaParse implements ParserInterface
         return $newsPost;
     }
 
+    private function crawlerHasNodes(Crawler $crawler): bool
+    {
+        return $crawler->count() >= 1;
+    }
+
+    private function removeDomNodes(Crawler $crawler, string $xpath): void
+    {
+        $crawler->filterXPath($xpath)->each(
+            function (Crawler $crawler) {
+                $domNode = $crawler->getNode(0);
+                if ($domNode) {
+                    $domNode->parentNode->removeChild($domNode);
+                }
+            }
+        );
+    }
 
     private function parseDOMNode(DOMNode $node, PreviewNewsDTO $previewNewsItem): ?NewsPostItem
     {
@@ -204,9 +252,12 @@ class RunaRunaParse implements ParserInterface
     private function searchQuoteNewsItem(DOMNode $node): ?NewsPostItem
     {
         if ($node->nodeName === '#text') {
-            $parentNode = $this->getRecursivelyParentNode($node, function (DOMNode $parentNode) {
-                return $this->isQuoteType($parentNode);
-            });
+            $parentNode = $this->getRecursivelyParentNode(
+                $node,
+                function (DOMNode $parentNode) {
+                    return $this->isQuoteType($parentNode);
+                }
+            );
             $node = $parentNode ?: $node;
         }
 
@@ -226,12 +277,75 @@ class RunaRunaParse implements ParserInterface
         return $newsPostItem;
     }
 
+    private function getRecursivelyParentNode(DOMNode $node, callable $callback, int $maxLevel = 5): ?DOMNode
+    {
+        if ($callback($node)) {
+            return $node;
+        }
+
+        if ($maxLevel <= 0 || !$node->parentNode) {
+            return null;
+        }
+
+        $maxLevel--;
+
+        return $this->getRecursivelyParentNode($node->parentNode, $callback, $maxLevel);
+    }
+
+    private function isQuoteType(DOMNode $node): bool
+    {
+        $quoteTags = [
+            'q' => true,
+            'blockquote' => true
+        ];
+
+        return $quoteTags[$node->nodeName] ?? false;
+    }
+
+    private function hasText(DOMNode $node): bool
+    {
+        return trim($node->textContent, "⠀ \t\n\r\0\x0B\xC2\xA0") !== '';
+    }
+
+    private function removeParentsFromStorage(
+        DOMNode $node,
+        int $maxLevel = 5,
+        array $exceptNewsPostItemTypes = null
+    ): void {
+        if ($maxLevel <= 0 || !$node->parentNode) {
+            return;
+        }
+
+        if ($exceptNewsPostItemTypes === null) {
+            $exceptNewsPostItemTypes = [NewsPostItem::TYPE_HEADER, NewsPostItem::TYPE_QUOTE, NewsPostItem::TYPE_LINK];
+        }
+
+        if ($this->nodeStorage->contains($node)) {
+            /** @var NewsPostItem $newsPostItem */
+            $newsPostItem = $this->nodeStorage->offsetGet($node);
+
+            if (in_array($newsPostItem->type, $exceptNewsPostItemTypes, true)) {
+                return;
+            }
+
+            $this->nodeStorage->detach($node);
+            return;
+        }
+
+        $maxLevel--;
+
+        $this->removeParentsFromStorage($node->parentNode, $maxLevel);
+    }
+
     private function searchHeadingNewsItem(DOMNode $node): ?NewsPostItem
     {
         if ($node->nodeName === '#text') {
-            $parentNode = $this->getRecursivelyParentNode($node, function (DOMNode $parentNode) {
-                return $this->getHeadingLevel($parentNode);
-            });
+            $parentNode = $this->getRecursivelyParentNode(
+                $node,
+                function (DOMNode $parentNode) {
+                    return $this->getHeadingLevel($parentNode);
+                }
+            );
             $node = $parentNode ?: $node;
         }
 
@@ -252,12 +366,22 @@ class RunaRunaParse implements ParserInterface
         return $newsPostItem;
     }
 
+    private function getHeadingLevel(DOMNode $node): ?int
+    {
+        $headingTags = ['h1' => 1, 'h2' => 2, 'h3' => 3, 'h4' => 4, 'h5' => 5, 'h6' => 6];
+
+        return $headingTags[$node->nodeName] ?? null;
+    }
+
     private function searchLinkNewsItem(DOMNode $node, PreviewNewsDTO $previewNewsItem): ?NewsPostItem
     {
         if ($node->nodeName === '#text') {
-            $parentNode = $this->getRecursivelyParentNode($node, function (DOMNode $parentNode) {
-                return $this->isLink($parentNode);
-            });
+            $parentNode = $this->getRecursivelyParentNode(
+                $node,
+                function (DOMNode $parentNode) {
+                    return $this->isLink($parentNode);
+                }
+            );
             $node = $parentNode ?: $node;
         }
 
@@ -286,12 +410,21 @@ class RunaRunaParse implements ParserInterface
         return $newsPostItem;
     }
 
+    private function isLink(DOMNode $node): bool
+    {
+        return $node->nodeName === 'a';
+    }
+
     private function searchYoutubeVideoNewsItem(DOMNode $node): ?NewsPostItem
     {
         if ($node->nodeName === '#text') {
-            $parentNode = $this->getRecursivelyParentNode($node, function (DOMNode $parentNode) {
-                return $parentNode->nodeName === 'iframe';
-            }, 3);
+            $parentNode = $this->getRecursivelyParentNode(
+                $node,
+                function (DOMNode $parentNode) {
+                    return $parentNode->nodeName === 'iframe';
+                },
+                3
+            );
             $node = $parentNode ?: $node;
         }
 
@@ -305,6 +438,14 @@ class RunaRunaParse implements ParserInterface
         }
 
         return new NewsPostItem(NewsPostItem::TYPE_VIDEO, null, null, null, null, $youtubeVideoId);
+    }
+
+    private function getYoutubeVideoId(string $link): ?string
+    {
+        $youtubeRegex = '/(youtu\.be\/|youtube\.com\/(watch\?(.*&)?v=|(embed|v)\/))([\w-]{11})/iu';
+        preg_match($youtubeRegex, $link, $matches);
+
+        return $matches[5] ?? null;
     }
 
     private function searchImageNewsItem(DOMNode $node, PreviewNewsDTO $previewNewsItem): ?NewsPostItem
@@ -340,6 +481,15 @@ class RunaRunaParse implements ParserInterface
         return new NewsPostItem(NewsPostItem::TYPE_IMAGE, $alt, $imageLink);
     }
 
+    private function isPictureType(DOMNode $node): bool
+    {
+        return $node->nodeName === 'source' && $node->parentNode->nodeName === 'picture';
+    }
+
+    private function isImageType(DOMNode $node): bool
+    {
+        return $node->nodeName === 'img';
+    }
 
     private function searchTextNewsItem(DOMNode $node): ?NewsPostItem
     {
@@ -358,9 +508,13 @@ class RunaRunaParse implements ParserInterface
 
         $attachNode = $node;
         if ($node->nodeName === '#text') {
-            $parentNode = $this->getRecursivelyParentNode($node, function (DOMNode $parentNode) use ($ignoringTags) {
-                return isset($ignoringTags[$parentNode->nodeName]);
-            }, 3);
+            $parentNode = $this->getRecursivelyParentNode(
+                $node,
+                function (DOMNode $parentNode) use ($ignoringTags) {
+                    return isset($ignoringTags[$parentNode->nodeName]);
+                },
+                3
+            );
 
             if ($parentNode) {
                 $attachNode = $parentNode;
@@ -384,52 +538,6 @@ class RunaRunaParse implements ParserInterface
         $this->nodeStorage->attach($attachNode, $newsPostItem);
 
         return $newsPostItem;
-    }
-
-
-    private function removeParentsFromStorage(
-        DOMNode $node,
-        int $maxLevel = 5,
-        array $exceptNewsPostItemTypes = null
-    ): void {
-        if ($maxLevel <= 0 || !$node->parentNode) {
-            return;
-        }
-
-        if ($exceptNewsPostItemTypes === null) {
-            $exceptNewsPostItemTypes = [NewsPostItem::TYPE_HEADER, NewsPostItem::TYPE_QUOTE, NewsPostItem::TYPE_LINK];
-        }
-
-        if ($this->nodeStorage->contains($node)) {
-            /** @var NewsPostItem $newsPostItem */
-            $newsPostItem = $this->nodeStorage->offsetGet($node);
-
-            if (in_array($newsPostItem->type, $exceptNewsPostItemTypes, true)) {
-                return;
-            }
-
-            $this->nodeStorage->detach($node);
-            return;
-        }
-
-        $maxLevel--;
-
-        $this->removeParentsFromStorage($node->parentNode, $maxLevel);
-    }
-
-    private function getRecursivelyParentNode(DOMNode $node, callable $callback, int $maxLevel = 5): ?DOMNode
-    {
-        if ($callback($node)) {
-            return $node;
-        }
-
-        if ($maxLevel <= 0 || !$node->parentNode) {
-            return null;
-        }
-
-        $maxLevel--;
-
-        return $this->getRecursivelyParentNode($node->parentNode, $callback, $maxLevel);
     }
 
     private function parseHumanDateTime(string $dateTime, DateTimeZone $timeZone): DateTimeInterface
@@ -460,93 +568,12 @@ class RunaRunaParse implements ParserInterface
         throw new RuntimeException("Не удалось распознать дату: {$dateTime}");
     }
 
-
     private function getJsonContent(string $uri): array
     {
         $result = $this->curl->get($uri, false);
         $this->checkResponseCode($this->curl);
 
         return $result;
-    }
-
-
-    private function getPageContent(string $uri): string
-    {
-        $result = $this->curl->get($uri);
-        $this->checkResponseCode($this->curl);
-
-        return $result;
-    }
-
-
-    private function checkResponseCode(Curl $curl): void
-    {
-        $responseInfo = $curl->getInfo();
-
-        $httpCode = $responseInfo['http_code'] ?? null;
-        $uri = $responseInfo['url'] ?? null;
-
-        if ($httpCode < 200 || $httpCode >= 400) {
-            throw new RuntimeException("Не удалось скачать страницу {$uri}, код ответа {$httpCode}");
-        }
-    }
-
-
-    private function isPictureType(DOMNode $node): bool
-    {
-        return $node->nodeName === 'source' && $node->parentNode->nodeName === 'picture';
-    }
-
-
-    private function isImageType(DOMNode $node): bool
-    {
-        return $node->nodeName === 'img';
-    }
-
-
-    private function isLink(DOMNode $node): bool
-    {
-        return $node->nodeName === 'a';
-    }
-
-
-    private function hasText(DOMNode $node): bool
-    {
-        return trim($node->textContent, "⠀ \t\n\r\0\x0B\xC2\xA0") !== '';
-    }
-
-
-    private function isQuoteType(DOMNode $node): bool
-    {
-        $quoteTags = [
-            'q' => true,
-            'blockquote' => true
-        ];
-
-        return $quoteTags[$node->nodeName] ?? false;
-    }
-
-
-    private function getHeadingLevel(DOMNode $node): ?int
-    {
-        $headingTags = ['h1' => 1, 'h2' => 2, 'h3' => 3, 'h4' => 4, 'h5' => 5, 'h6' => 6];
-
-        return $headingTags[$node->nodeName] ?? null;
-    }
-
-    private function removeDomNodes(Crawler $crawler, string $xpath): void
-    {
-        $crawler->filterXPath($xpath)->each(function (Crawler $crawler) {
-            $domNode = $crawler->getNode(0);
-            if ($domNode) {
-                $domNode->parentNode->removeChild($domNode);
-            }
-        });
-    }
-
-    private function crawlerHasNodes(Crawler $crawler): bool
-    {
-        return $crawler->count() >= 1;
     }
 
     private function translateDateToEng(string $date)
@@ -587,19 +614,6 @@ class RunaRunaParse implements ParserInterface
         $date = str_replace($ruMonthShort, $enMonth, $date);
 
         return $date;
-    }
-
-    private function getYoutubeVideoId(string $link): ?string
-    {
-        $youtubeRegex = '/(youtu\.be\/|youtube\.com\/(watch\?(.*&)?v=|(embed|v)\/))([\w-]{11})/iu';
-        preg_match($youtubeRegex, $link, $matches);
-
-        return $matches[5] ?? null;
-    }
-
-    private function getSiteUri(): string
-    {
-        return self::SITE_URL;
     }
 
 }
