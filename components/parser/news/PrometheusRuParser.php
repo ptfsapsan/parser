@@ -150,6 +150,10 @@ class PrometheusRuParser implements ParserInterface
                     continue;
                 }
 
+                if (mb_strlen($newsPostItem->text) < 2) {
+                    continue;
+                }
+
                 if ($newsPostItem->type === NewsPostItem::TYPE_IMAGE && $newsPost->image === null) {
                     $newsPost->image = $newsPostItem->image;
                 }
