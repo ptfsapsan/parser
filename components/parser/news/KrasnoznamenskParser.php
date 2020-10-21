@@ -22,21 +22,21 @@ class KrasnoznamenskParser implements ParserInterface
     const ROOT_SRC = "http://inkrasnoznamensk.ru";
 
     const FEED_SRC = "/novosti";
-    const LIMIT = 10;
+    const LIMIT = 100;
     const NEWS_PER_PAGE = 16;
     const EMPTY_DESCRIPTION = "empty";
     const MONTHS = [
         "янв." => "01",
-        "фев." => "02",
-        "мар." => "03",
+        "февр." => "02",
+        "марта" => "03",
         "апр." => "04",
         "мая" => "05",
-        "июн." => "06",
+        "июня" => "06",
         "июл." => "07",
         "авг." => "08",
         "сен." => "09",
         "окт." => "10",
-        "ноя." => "11",
+        "нояб." => "11",
         "дек." => "12",
     ];
 
@@ -55,11 +55,15 @@ class KrasnoznamenskParser implements ParserInterface
 
             $listSourcePath = $listSourcePath = self::ROOT_SRC . self::FEED_SRC . "?page=" . $pageId;
             $listSourceData = $curl->get("$listSourcePath");
-
+            if (empty($listSourceData)) {
+                throw new Exception("Получен пустой ответ от источника списка новостей: " . $listSourcePath);
+            }
             $crawler = new Crawler($listSourceData);
-            $content = $crawler->filter("div.news-itm");
-
-            foreach ($content as $newsItem) {
+            $items = $crawler->filter("div.news-itm");
+            if ($items->count() === 0) {
+                throw new Exception("Пустой список новостей в ленте: " . $listSourcePath);
+            }
+            foreach ($items as $newsItem) {
                 try {
                     $node = new Crawler($newsItem);
                     $newsPost = self::inflatePost($node);
@@ -144,47 +148,40 @@ class KrasnoznamenskParser implements ParserInterface
     private static function inflatePostContent(NewsPost $post, Curl $curl)
     {
         $url = $post->original;
+        $post->description = "";
 
         $pageData = $curl->get($url);
-        if ($pageData === false) {
-            throw new Exception("Url is wrong? nothing received: " . $url);
+        if (empty($pageData)) {
+            throw new Exception("Получен пустой ответ от страницы новости: " . $url);
         }
 
         $crawler = new Crawler($pageData);
 
         $content = $crawler->filter("div.b-page__main");
 
-        $header = $content->filter("h1.b-page__title");
-        if ($header->count() !== 0) {
-            self::addHeader($post, $header->text(), 1);
-        }
-
         $header = $content->filter("div.b-page__start");
-        if ($header->count() !== 0) {
-            self::addText($post, $header->text());
-        }
-
-        $image = $content->filter("div.b-page__image img");
-        if ($image->count() !== 0) {
-            self::addImage($post, self::ROOT_SRC . $image->attr("src"));
+        if ($header->count() !== 0 && !empty(trim($header->text(), "\xC2\xA0"))) {
+            $post->description = Helper::prepareString($header->text());
         }
 
         $body = $content->filter("div.b-page__content");
-
+        if ($body->count() === 0) {
+            throw new Exception("Не найден блок новости в полученой странице: " . $url);
+        }
 
         foreach ($body->children() as $bodyNode) {
             $node = new Crawler($bodyNode);
 
-            if ($node->matches("blockquote")) {
-
+            if ($node->matches("blockquote") && !empty(trim($node->text(), "\xC2\xA0"))) {
                 self::addQuote($post, $node->text());
                 continue;
             }
 
             if ($node->matches("p") && !empty(trim($node->text(), "\xC2\xA0"))) {
-                self::addText($post, $node->text());
-                if ($post->description === self::EMPTY_DESCRIPTION) {
+                if (empty($post->description)) {
                     $post->description = Helper::prepareString($node->text());
+                } else {
+                    self::addText($post, $node->text());
                 }
                 continue;
             }
