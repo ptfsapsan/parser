@@ -38,10 +38,17 @@ class GazetaMaiakParser implements ParserInterface
 
         $listSourceData = $curl->get($listSourcePath);
 
-        $crawler = new Crawler($listSourceData);
+        if (empty($listSourceData)) {
+            throw new Exception("Получен пустой ответ от источника списка новостей: " . $listSourcePath);
+        }
 
+        $crawler = new Crawler($listSourceData);
+        $items = $crawler->filter("item");
+        if ($items->count() === 0) {
+            throw new Exception("Пустой список новостей в ленте: " . $listSourcePath);
+        }
         $counter = 0;
-        foreach ($crawler->filter("item") as $item) {
+        foreach ($items as $item) {
             try {
                 $node = new Crawler($item);
                 $newsPost = self::inflatePost($node);
@@ -120,34 +127,19 @@ class GazetaMaiakParser implements ParserInterface
         $url = $post->original;
 
         $pageData = $curl->get($url);
-        if ($pageData === false) {
-            throw new Exception("Url is wrong? nothing received: " . $url);
+        if (empty($pageData)) {
+            throw new Exception("Получен пустой ответ от страницы новости: " . $url);
         }
+
 
         $crawler = new Crawler($pageData);
 
         $content = $crawler->filter("ul.newsdeails li.block.inside-content");
-        if ($content->count() === 0) {
-            throw new Exception("Empty news Item: " . $post->original);
-        }
-
-        $header = $content->filter("h2.block-title");
-        if ($header->count() !== 0) {
-            self::addHeader($post, $header->text(), 2);
-        }
-
-
-        $image = $content->children("img");
-        if ($image->count() !== 0) {
-            self::addImage($post, self::ROOT_SRC . $image->attr("src"));
-        }
-
-        $intro = $content->children("div.intro");
-        if ($intro->count() !== 0 && !empty(trim($intro->text(), "\xC2\xA0"))) {
-            self::addText($post, $intro->text());
-        }
 
         $body = $content->filter("div.text p");
+        if ($body->count() === 0) {
+            throw new Exception("Не найден блок новости в полученой странице: " . $url);
+        }
 
         foreach ($body as $bodyNode) {
             $node = new Crawler($bodyNode);
