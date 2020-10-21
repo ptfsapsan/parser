@@ -43,10 +43,14 @@ class KubanscoeParser implements ParserInterface
             $listSourcePath = self::ROOT_SRC . self::FEED_SRC . "?page=" . $pageId;
 
             $listSourceData = $curl->get($listSourcePath);
-
+            if (empty($listSourceData)) {
+                throw new Exception("Получен пустой ответ от источника списка новостей: " . $listSourcePath);
+            }
             $crawler = new Crawler($listSourceData);
             $content = $crawler->filter("section > div.post-container.ajax-page > div.post-card");
-
+            if ($content->count() === 0) {
+                throw new Exception("Пустой список новостей в ленте: " . $listSourcePath);
+            }
             foreach ($content as $newsItem) {
                 try {
                     $node = new Crawler($newsItem);
@@ -125,38 +129,25 @@ class KubanscoeParser implements ParserInterface
         $url = $post->original;
 
         $pageData = $curl->get($url);
-        if ($pageData === false) {
-            throw new Exception("Url is wrong? nothing received: " . $url);
+        if (empty($pageData)) {
+            throw new Exception("Получен пустой ответ от страницы новости: " . $url);
         }
 
         $crawler = new Crawler($pageData);
 
         $content = $crawler->filter("section div.page.article");
 
-        $header = $content->filter("h1");
-        if ($header->count() !== 0) {
-            self::addHeader($post, $header->text(), 1);
-        }
-
-
-        $image = $content->filter("div.thumb img");
-        if ($image->count() !== 0) {
-            self::addImage($post, self::ROOT_SRC . $image->attr("src"));
-        }
-
         $dateStr = $content->filter("div.info span.date")->text();
         $createDate = new DateTime($dateStr . " +03:00");
         $createDate->setTimezone(new DateTimeZone("UTC"));
         $post->createDate = $createDate;
 
-        $header = $content->filter("div.content div.detail-news__title");
-        if ($header->count() !== 0) {
-            self::addHeader($post, $header->text(), 2);
-        }
-
         $body = $content->filter("div.detail-news__text-b__item__text");
         if ($body->count() === 0) {
             $body = $content->filter("div.content p");
+        }
+        if ($body->count() === 0) {
+            throw new Exception("Не найден блок новости в полученой странице: " . $url);
         }
 
         /** @var DOMNode $bodyNode */
@@ -164,7 +155,11 @@ class KubanscoeParser implements ParserInterface
             $node = new Crawler($bodyNode);
 
             if (!empty(trim($node->text(), "\xC2\xA0"))) {
-                self::addText($post, $node->text());
+                if ($post->description === self::EMPTY_DESCRIPTION) {
+                    $post->description = Helper::prepareString($node->text());
+                } else {
+                    self::addText($post, $node->text());
+                }
                 continue;
             }
         }
