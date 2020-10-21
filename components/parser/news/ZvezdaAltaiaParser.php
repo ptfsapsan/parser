@@ -25,7 +25,7 @@ class ZvezdaAltaiaParser implements ParserInterface
     const FEED_SRC = "/feed";
     const LIMIT = 100;
 
-
+    const EMPTY_DESCRIPTION = "empty";
     /**
      * @return array
      * @throws Exception
@@ -38,11 +38,17 @@ class ZvezdaAltaiaParser implements ParserInterface
         $listSourcePath = self::ROOT_SRC . self::FEED_SRC;
 
         $listSourceData = $curl->get($listSourcePath);
+        if (empty($listSourceData)) {
+            throw new Exception("Получен пустой ответ от источника списка новостей: " . $listSourcePath);
+        }
 
         $crawler = new Crawler($listSourceData);
-
+        $items = $crawler->filter("item");
+        if ($items->count() === 0) {
+            throw new Exception("Пустой список новостей в ленте: " . $listSourcePath);
+        }
         $counter = 0;
-        foreach ($crawler->filter("item") as $item) {
+        foreach ($items as $item) {
             try {
                 $node = new Crawler($item);
                 $newsPost = self::inflatePost($node);
@@ -90,15 +96,7 @@ class ZvezdaAltaiaParser implements ParserInterface
             $imageUrl = $image->attr("url");
         }
 
-        $description = null;
-
-        $descrContainer = $postData->filter("description")->html();
-        $descrArr = explode(">", $descrContainer);
-        if (isset($descrArr[1])) {
-            $description = trim(explode("<", $descrArr[1])[0]);
-        } else {
-            $description = $descrContainer;
-        }
+        $description = self::EMPTY_DESCRIPTION;
 
 
         return new NewsPost(
@@ -121,34 +119,36 @@ class ZvezdaAltaiaParser implements ParserInterface
     private static function inflatePostContent(NewsPost $post, Curl $curl)
     {
         $url = $post->original;
+        $post->description = "";
 
         $pageData = $curl->get($url);
-        if ($pageData === false) {
-            throw new Exception("Url is wrong? nothing received: " . $url);
+        if (empty($pageData)) {
+            throw new Exception("Получен пустой ответ от страницы новости: " . $url);
         }
 
         $crawler = new Crawler($pageData);
 
         $content = $crawler->filter("div.mg-blog-post-box");
 
-        $header = $content->filter("div.mg-header h1");
-        if ($header->count() !== 0) {
-            self::addHeader($post, $header->text(), 1);
-        }
-
         $image = $crawler->filter("div.mg-blog-post-box img");
         if ($image->count() !== 0) {
-            self::addImage($post, $image->attr("src"));
+            $post->image = self::normalizeUrl($image->attr("src"));
         }
 
 
         $body = $content->filter("article");
-
+        if ($body->count() === 0) {
+            throw new Exception("Не найден блок новости в полученой странице: " . $url);
+        }
         /** @var DOMNode $bodyNode */
         foreach ($body->children() as $bodyNode) {
             $node = new Crawler($bodyNode);
             if ($node->matches("p") && !empty(trim($node->text(), "\xC2\xA0"))) {
-                self::addText($post, $node->text());
+                if (empty($post->description)) {
+                    $post->description = Helper::prepareString($node->text());
+                } else {
+                    self::addText($post, $node->text());
+                }
                 continue;
             }
         }
