@@ -39,11 +39,18 @@ class NovostiClubParser implements ParserInterface
         $listSourcePath = self::ROOT_SRC . self::FEED_SRC;
 
         $listSourceData = $curl->get($listSourcePath);
+        if(empty($listSourceData)){
+            throw new Exception("Получен пустой ответ от источника списка новостей: ". $listSourcePath);
+        }
+
         $DOMDocument = new DOMDocument();
         $DOMDocument->loadXML($listSourceData);
 
 
         $DOMNodeList = $DOMDocument->getElementsByTagName("item");
+        if($DOMNodeList->count() === 0){
+            throw new Exception("Пустой список новостей в ленте: ". $listSourcePath);
+        }
         $counter = 0;
         /** @var DOMNode $itemNode */
         foreach ($DOMNodeList as $item) {
@@ -137,22 +144,18 @@ class NovostiClubParser implements ParserInterface
         $url = $post->original;
 
         $pageData = $curl->get($url);
-        if ($pageData === false) {
-            throw new Exception("Url is wrong? nothing received: " . $url);
+        if (empty($pageData)) {
+            throw new Exception("Получен пустой ответ от страницы новости: " . $url);
         }
 
         $crawler = new Crawler($pageData);
 
-        $content = $crawler->filter("div.newscontent");
-
-        $header = $content->filter("h1");
-        if ($header->count() !== 0) {
-            self::addHeader($post, $header->text(), 1);
+        $body = $crawler->filter("div.newscontent > p");
+        if($body->count() === 0){
+            throw new Exception("Не найден блок новости в полученой странице: " . $url);
         }
 
-        $bodyList = $crawler->filter("div.newscontent > p");
-
-        foreach ($bodyList as $bodyNode) {
+        foreach ($body as $bodyNode) {
             $node = new Crawler($bodyNode);
 
             if ($node->filter("img")->count() !== 0) {
