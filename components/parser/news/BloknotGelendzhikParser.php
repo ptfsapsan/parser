@@ -156,6 +156,11 @@ class BloknotGelendzhikParser implements ParserInterface
                     $newsPost->image = $newsPostItem->image;
                 }
 
+                similar_text($newsPostItem->text,$description,$percentage);
+                if ($percentage > 40) {
+                    continue;
+                }
+
                 $newsPost->addItem($newsPostItem);
             }
         }
