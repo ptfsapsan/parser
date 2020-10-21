@@ -11,9 +11,9 @@ class Parser
 
     protected $selectors = [
         'header' => ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
+        'link'   => ['a'],
         'image'  => ['img'],
         'quote'  => ['blockquote'],
-        'link'   => ['a'],
         'video'  => ['iframe'],
     ];
 
@@ -92,6 +92,12 @@ class Parser
     public function parse(Crawler $node, int $i)
     {
         if (count($this->ignore)) {
+            foreach ($this->ignore as $selector) {
+                if ($node->matches($selector)) {
+                    return [];
+                }
+            }
+
             $node->filterXPath('//'.implode('|//', $this->ignore))->each(function (Crawler $crawler) {
                 $domNode = $crawler->getNode(0);
 
@@ -316,11 +322,6 @@ class Parser
             return false;
         }
 
-        // Если внутри ссылки содержится изображение, возвращаем его
-        if ($this->isNodeContains($node, 'image')) {
-            return $this->parseImage($node, $i);
-        }
-
         $type  = NewsPostItem::TYPE_LINK;
         $link  = $node->filter($this->glued['link'])->first();
         $image = null;
@@ -332,6 +333,14 @@ class Parser
             list($image, $url) = [$url, $image];
 
             $type = NewsPostItem::TYPE_IMAGE;
+        } elseif ($this->isNodeContains($node, 'image')) {
+            // Если внутри ссылки содержится изображение, возвращаем его
+
+            return $this->parseImage($node, $i);
+        }
+
+        if (!preg_match('/^(?:(?:(?<proto>https?|ftp):)?\/)?\//i', $link->attr('href'))) {
+            return $this->textNode($text ?: $link->attr('href'));
         }
 
         if (!preg_match('/^(?:(?:(?<proto>https?|ftp):)?\/)?\//i', $link->attr('href'))) {
