@@ -22,7 +22,7 @@ class VerhneKamieParser implements ParserInterface
     const ROOT_SRC = "http://vk-online.ru";
 
     const FEED_SRC = "/news.feed?type=rss";
-    const LIMIT = 2;
+    const LIMIT = 100;
     const EMPTY_DESCRIPTION = "empty";
 
     /**
