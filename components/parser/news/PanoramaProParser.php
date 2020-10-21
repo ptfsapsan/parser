@@ -164,13 +164,12 @@ class PanoramaProParser implements ParserInterface
                     $newsPost->image = $newsPostItem->image;
                 }
 
+                similar_text($description, $newsPostItem->text, $percent);
 
-                $sim = similar_text($description, $newsPostItem->text, $percent);
-
-                if ($sim > 80) {
+                if ($percent > 50) {
                     continue;
                 }
-//                if ($newsPostItem->text() == $description)
+
                 $newsPost->addItem($newsPostItem);
             }
         }
