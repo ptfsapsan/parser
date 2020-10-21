@@ -38,11 +38,16 @@ class NewsNNovParser implements ParserInterface
         $listSourcePath = self::ROOT_SRC . self::FEED_SRC;
 
         $listSourceData = $curl->get($listSourcePath);
-
+        if (empty($listSourceData)) {
+            throw new Exception("Получен пустой ответ от источника списка новостей: " . $listSourcePath);
+        }
         $crawler = new Crawler($listSourceData);
-
+        $items = $crawler->filter("item");
+        if ($items->count() === 0) {
+            throw new Exception("Пустой список новостей в ленте: " . $listSourcePath);
+        }
         $counter = 0;
-        foreach ($crawler->filter("item") as $item) {
+        foreach ($items as $item) {
             try {
                 $node = new Crawler($item);
                 $newsPost = self::inflatePost($node);
@@ -91,7 +96,7 @@ class NewsNNovParser implements ParserInterface
             $imageUrl = $image->attr("url");
         }
 
-        $description = $postData->filter("description")->text();
+        $description = trim($postData->filter("description")->text(), "&hellip;");
         if (empty($description)) {
             $text = $postData->filterXPath("item/yandex:full-text");
 
@@ -121,27 +126,27 @@ class NewsNNovParser implements ParserInterface
         $url = $post->original;
 
         $pageData = $curl->get($url);
-        if ($pageData === false) {
-            throw new Exception("Url is wrong? nothing received: " . $url);
+        if (empty($pageData)) {
+            throw new Exception("Получен пустой ответ от страницы новости: " . $url);
         }
 
         $crawler = new Crawler($pageData);
 
         $content = $crawler->filter("#mainPageContent > div > div > div.txtitem_thumb.community");
 
-        $header = $content->filter("div.itemtitle h1");
-        if ($header->count() !== 0) {
-            self::addHeader($post, $header->text(), 1);
+        $body = $content->filter("div.txt");
+        if ($body->count() === 0) {
+            throw new Exception("Не найден блок новости в полученой странице: " . $url);
         }
-
-        $body = $content->filter("div.txt")->getNode(0);
-
         /** @var DOMNode $bodyNode */
-        foreach ($body->childNodes as $bodyNode) {
+        foreach ($body->getNode(0)->childNodes as $bodyNode) {
             $node = new Crawler($bodyNode);
 
             if ($bodyNode->nodeName === "#text" && !empty(trim($node->text(), "\xC2\xA0"))) {
-                self::addText($post, $node->text());
+                $cleanText = str_ireplace($post->description, "", $node->text());
+                if (!empty($cleanText)) {
+                    self::addText($post, $cleanText);
+                }
                 continue;
             }
             if ($bodyNode->nodeName === "h5" && !empty(trim($node->text(), "\xC2\xA0"))) {
