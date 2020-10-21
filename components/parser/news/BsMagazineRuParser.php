@@ -77,6 +77,7 @@ class BsMagazineRuParser implements ParserInterface
                     if ($childNode->nodeValue == $description) {
                         continue;
                     }
+
                     $nodeValue = $this->clearText($childNode->nodeValue);
                     if (in_array($childNode->nodeName, ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'])) {
 
@@ -100,6 +101,14 @@ class BsMagazineRuParser implements ParserInterface
 
                         }
 
+                    } elseif ($childNode->nodeName == 'figure') {
+                        $figureCrawler = new Crawler($childNode);
+                        $imgUrl = $figureCrawler->filterXPath('//img');
+                        if ($imgUrl && $this->getHeadUrl($imgUrl->attr('src')) != $image) {
+
+                            $this->addItemPost($post, NewsPostItem::TYPE_IMAGE, $imgUrl->attr('alt'), $this->getHeadUrl($imgUrl->attr('src')));
+
+                        }
                     } elseif ($nodeValue) {
 
                         $this->addItemPost($post, NewsPostItem::TYPE_TEXT, $nodeValue);
@@ -107,7 +116,6 @@ class BsMagazineRuParser implements ParserInterface
                     }
                 }
             }
-
 
             $authorCrawler = $content->filterXPath('//div[@class="new-detail__author__left flex -justify"]')->children();
             if ($authorCrawler->getNode(0)) {
