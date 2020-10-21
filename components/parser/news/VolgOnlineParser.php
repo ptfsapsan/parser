@@ -153,6 +153,10 @@ class VolgOnlineParser implements ParserInterface
                 if ($newsPostItem->type === NewsPostItem::TYPE_IMAGE && $newsPost->image === null) {
                     $newsPost->image = $newsPostItem->image;
                 }
+                similar_text($description,$newsPostItem->text,$percantage);
+                if ($percantage > 50) {
+                    continue;
+                }
 
                 $newsPost->addItem($newsPostItem);
             }
