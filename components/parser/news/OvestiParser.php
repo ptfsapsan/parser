@@ -165,12 +165,15 @@ class OvestiParser implements ParserInterface
         //Get non-empty links from nodes
         if (self::isLinkType($node) && self::hasText($node)) {
             $link = self::cleanUrl($node->getAttribute('href'));
-            if (! preg_match('/http[s]?/', $link)) {
-                $link = UriResolver::resolve($link, static::SITE_URL);
-            }
-            if ($link && $link !== '' && filter_var($link, FILTER_VALIDATE_URL)) {
-                $linkText = self::hasText($node) ? $node->textContent : null;
-                $post->addItem(new NewsPostItem(NewsPostItem::TYPE_LINK, $linkText, null, $link));
+            if ($link && $link !== '') {
+                if (! preg_match('/https/', $link)) {
+                    $link = UriResolver::resolve($link, static::SITE_URL);
+                }
+                if (filter_var($link, FILTER_VALIDATE_URL)) {
+                    $linkText = self::hasText($node) ? $node->textContent : null;
+                    $linkText = self::cleanText($linkText);
+                    $post->addItem(new NewsPostItem(NewsPostItem::TYPE_LINK, $linkText, null, $link));
+                }
             }
             return;
         }
@@ -179,10 +182,15 @@ class OvestiParser implements ParserInterface
         if (self::isText($node)) {
             if ($skipText === false && self::hasText($node)) {
                 $textContent = self::cleanText($node->textContent);
-                if (empty(trim($textContent)) === true) {
-                    return;
+                if (strlen($post->description) >= strlen($textContent)) {
+                    if (preg_match('/' . preg_quote($textContent, '/') . '/', $post->description)) {
+                        return;
+                    }
                 }
-                $post->addItem(new NewsPostItem(NewsPostItem::TYPE_TEXT, $textContent));
+
+                if (self::hasActualText($textContent) === true) {
+                    $post->addItem(new NewsPostItem(NewsPostItem::TYPE_TEXT, $textContent));
+                }
             }
             return;
         }
@@ -199,10 +207,15 @@ class OvestiParser implements ParserInterface
         //Get entire node text if we not need to parse any special entities, go recursive otherwise
         if ($skipText === false && $needRecursive === false) {
             $textContent = self::cleanText($node->textContent);
-            if (empty(trim($textContent)) === true) {
-                return;
+            if (strlen($post->description) >= strlen($textContent)) {
+                if (preg_match('/' . preg_quote($textContent, '/') . '/', $post->description)) {
+                    return;
+                }
             }
-            $post->addItem(new NewsPostItem(NewsPostItem::TYPE_TEXT, $textContent));
+
+            if (self::hasActualText($textContent) === true) {
+                $post->addItem(new NewsPostItem(NewsPostItem::TYPE_TEXT, $textContent));
+            }
         } else {
             foreach($node->childNodes as $child) {
                 self::parseNode($post, $child, $skipText);
@@ -238,15 +251,15 @@ class OvestiParser implements ParserInterface
     }
 
     /**
-     * Function check if node text content not empty
+     * Function check if string has actual text
      * 
-     * @param DOMNode $node
+     * @param string|null $text
      * 
      * @return bool
      */
-    protected static function hasActualText(DOMNode $node): bool
+    protected static function hasActualText(?string $text): bool
     {
-        return trim($node->textContent) !== '';
+        return trim($text, "⠀ \t\n\r\0\x0B\xC2\xA0") !== '';
     }
 
     /**
