@@ -38,10 +38,17 @@ class KompanionParser implements ParserInterface
 
         $listSourceData = $curl->get($listSourcePath);
 
-        $crawler = new Crawler($listSourceData);
+        if (empty($listSourceData)) {
+            throw new Exception("Получен пустой ответ от источника списка новостей: " . $listSourcePath);
+        }
 
+        $crawler = new Crawler($listSourceData);
+        $items = $crawler->filter("item");
+        if ($items->count() === 0) {
+            throw new Exception("Пустой список новостей в ленте: " . $listSourcePath);
+        }
         $counter = 0;
-        foreach ($crawler->filter("item") as $item) {
+        foreach ($items as $item) {
             try {
                 $node = new Crawler($item);
                 $newsPost = self::inflatePost($node);
@@ -128,20 +135,13 @@ class KompanionParser implements ParserInterface
 
         $content = $crawler->filter("article.nk-article");
 
-        $header = $content->filter("header h1");
-        if ($header->count() !== 0) {
-            self::addHeader($post, $header->text(), 1);
-        }
-
-        $header = $content->filter("header p.nk-text-lead");
-        if ($header->count() !== 0) {
-            self::addText($post, $header->text());
-        }
-
         $image = $content->filter("div figure img");
         if ($image->count() !== 0) {
-            self::addImage($post, self::ROOT_SRC . $image->attr("src"));
             $post->image = self::ROOT_SRC . self::normalizeUrl($image->attr("src"));
+        }
+        $imageCaption = $content->filter("div figure figcaption");
+        if ($imageCaption->count() !== 0) {
+            self::addText($post, $imageCaption->text());
         }
 
 
