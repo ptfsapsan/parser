@@ -39,11 +39,16 @@ class ShapsiguiaParser implements ParserInterface
         $listSourcePath = self::ROOT_SRC . self::FEED_SRC;
 
         $listSourceData = $curl->get($listSourcePath);
-
+        if(empty($listSourceData)){
+            throw new Exception("Получен пустой ответ от источника списка новостей: ". $listSourcePath);
+        }
         $crawler = new Crawler($listSourceData);
-
+        $items = $crawler->filter("item");
+        if($items->count() === 0){
+            throw new Exception("Пустой список новостей в ленте: ". $listSourcePath);
+        }
         $counter = 0;
-        foreach ($crawler->filter("item") as $item) {
+        foreach ($items as $item) {
             try {
                 $node = new Crawler($item);
                 $newsPost = self::inflatePost($node);
@@ -133,27 +138,12 @@ class ShapsiguiaParser implements ParserInterface
 
         $content = $crawler->filter("article.article");
 
-        $header = $content->filter("div.fheader h1");
-        if ($header->count() !== 0) {
-            self::addHeader($post, $header->text(), 1);
+        $body = $content->filter("div.ftext div.fdesc.full-text");
+        if($body->count() === 0){
+            throw new Exception("Не найден блок новости в полученой странице: " . $url);
         }
-
-        $header = $content->filter("div.fshort");
-        if ($header->count() !== 0) {
-            self::addText($post, $header->text());
-        }
-
-        $image = $content->filter("div.fimg img");
-        if ($image->count() !== 0) {
-            if (mb_stripos($image->attr("src"), "/templates/newshub/dleimages/no_image.jpg") === false) {
-                self::addImage($post, self::ROOT_SRC . $image->attr("src"));
-            }
-        }
-
-        $body = $content->filter("div.ftext div.fdesc.full-text")->getNode(0);
-
         /** @var DOMNode $bodyNode */
-        foreach ($body->childNodes as $bodyNode) {
+        foreach ($body->getNode(0)->childNodes as $bodyNode) {
             $node = new Crawler($bodyNode);
 
             if ($bodyNode->nodeName === "#text" && !empty(trim($node->text(), "\xC2\xA0"))) {
@@ -168,7 +158,9 @@ class ShapsiguiaParser implements ParserInterface
             if ($node->matches("div") && $node->filter("img")->count() !== 0) {
                 $image = $node->filter("img");
                 if (mb_stripos($image->attr("src"), "http://zen.yandex.ru") === false) {
-                    self::addImage($post, self::ROOT_SRC . $image->attr("src"));
+                    if(self::ROOT_SRC . $image->attr("src") !== $post->image) {
+                        self::addImage($post, self::ROOT_SRC . $image->attr("src"));
+                    }
                 }
             }
 
