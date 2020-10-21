@@ -39,10 +39,17 @@ class ArhiPerspectivaParser implements ParserInterface
 
         $listSourceData = $curl->get($listSourcePath);
 
-        $crawler = new Crawler($listSourceData);
+        if (empty($listSourceData)) {
+            throw new Exception("Получен пустой ответ от источника списка новостей: " . $listSourcePath);
+        }
 
+        $crawler = new Crawler($listSourceData);
+        $items = $crawler->filter("item");
+        if ($items->count() === 0) {
+            throw new Exception("Пустой список новостей в ленте: " . $listSourcePath);
+        }
         $counter = 0;
-        foreach ($crawler->filter("item") as $item) {
+        foreach ($items as $item) {
             try {
                 $node = new Crawler($item);
                 $newsPost = self::inflatePost($node);
@@ -85,11 +92,7 @@ class ArhiPerspectivaParser implements ParserInterface
         $original = $postData->filter("link")->text();
 
 
-        $image = $postData->filter("enclosure");
         $imageUrl = null;
-        if ($image->count() !== 0) {
-            $imageUrl = $image->attr("url");
-        }
 
         $description = $postData->filter("description")->text();
         if (empty($description)) {
@@ -121,33 +124,39 @@ class ArhiPerspectivaParser implements ParserInterface
         $url = $post->original;
 
         $pageData = $curl->get($url);
-        if ($pageData === false) {
-            throw new Exception("Url is wrong? nothing received: " . $url);
+        if (empty($pageData)) {
+            throw new Exception("Получен пустой ответ от страницы новости: " . $url);
         }
 
         $crawler = new Crawler($pageData);
 
         $content = $crawler->filter("div#dle-content div.entry-box");
 
-        $header = $content->filter("header h1");
-        if ($header->count() !== 0) {
-            self::addHeader($post, $header->text(), 1);
-        }
-
         $body = $content->filter("div.entry-content");
-
+        if ($body->count() === 0) {
+            throw new Exception("Не найден блок новости в полученой странице: " . $url);
+        }
         /** @var DOMNode $bodyNode */
         foreach ($body->children() as $bodyNode) {
             $node = new Crawler($bodyNode);
 
             if ($node->matches("p") && $node->filter("img")->count() !== 0) {
                 $image = $node->filter("img");
-                self::addImage($post, self::ROOT_SRC . $image->attr("src"));
+                $src = self::ROOT_SRC . $image->attr("src");
+                if ($post->image === null) {
+                    $post->image = $src;
+                } else {
+                    self::addImage($post, $src);
+                }
+
                 continue;
             }
 
             if ($node->matches("p") && !empty(trim($node->text(), "\xC2\xA0"))) {
-                self::addText($post, $node->text());
+                $cleanText = str_ireplace($post->description, "", $node->text());
+                if (!empty($cleanText)) {
+                    self::addText($post, $cleanText);
+                }
                 continue;
             }
         }
