@@ -10,7 +10,6 @@ use app\components\parser\ParserInterface;
 use DateTime;
 use DateTimeZone;
 use Exception;
-use InvalidArgumentException;
 use linslin\yii2\curl\Curl;
 use Symfony\Component\DomCrawler\Crawler;
 
@@ -23,7 +22,7 @@ class MediusParser implements ParserInterface
     const ROOT_SRC = "http://mediusinfo.ru";
 
     const FEED_SRC = "";
-    const LIMIT = 100;
+    const LIMIT = 1;
     const EMPTY_DESCRIPTION = "empty";
 
     /**
@@ -39,10 +38,17 @@ class MediusParser implements ParserInterface
 
         $listSourceData = $curl->get($listSourcePath);
 
-        $crawler = new Crawler($listSourceData);
+        if (empty($listSourceData)) {
+            throw new Exception("Получен пустой ответ от источника списка новостей: " . $listSourcePath);
+        }
 
+        $crawler = new Crawler($listSourceData);
+        $items = $crawler->filter("div.t3-module.module div.brick-article");
+        if ($items->count() === 0) {
+            throw new Exception("Пустой список новостей в ленте: " . $listSourcePath);
+        }
         $counter = 0;
-        foreach ($crawler->filter("div.t3-module.module div.brick-article") as $item) {
+        foreach ($items as $item) {
             try {
                 $node = new Crawler($item);
                 $newsPost = self::inflatePost($node);
@@ -93,7 +99,7 @@ class MediusParser implements ParserInterface
 
         $imageArr = explode("(", $imageContainer);
         if (!isset($imageArr[1])) {
-            throw new InvalidArgumentException("Could not parse imgage string");
+            throw new Exception("Could not parse imgage string");
         }
         $imageUrl = self::ROOT_SRC . self::normalizeUrl(explode(")", $imageArr[1])[0]);
 
@@ -121,22 +127,21 @@ class MediusParser implements ParserInterface
         $url = $post->original;
 
         $pageData = $curl->get($url);
-        if ($pageData === false) {
-            throw new Exception("Url is wrong? nothing received: " . $url);
+        if (empty($pageData)) {
+            throw new Exception("Получен пустой ответ от страницы новости: " . $url);
         }
+
 
         $crawler = new Crawler($pageData);
 
         $content = $crawler->filter("article");
+        if ($content->count() === 0) {
+            throw new Exception("Не найден блок новости в полученой странице: " . $url);
+        }
 
         $image = $content->filter("div.article-image.article-image-full img");
         if ($image->count() !== 0) {
             self::addImage($post, self::ROOT_SRC . $image->attr("src"));
-        }
-
-        $header = $content->filter("header h1");
-        if ($header->count() !== 0) {
-            self::addHeader($post, $header->text(), 1);
         }
 
         $dateStr = $content->filter("aside dl dd time")->attr("datetime");
@@ -162,9 +167,10 @@ class MediusParser implements ParserInterface
             }
 
             if (!empty(trim($node->text(), "\xC2\xA0"))) {
-                self::addText($post, $node->text());
                 if ($post->description === self::EMPTY_DESCRIPTION) {
                     $post->description = Helper::prepareString($node->text());
+                } else {
+                    self::addText($post, $node->text());
                 }
                 continue;
             }
