@@ -160,13 +160,15 @@ class BloknotLiskiParser implements ParserInterface
         //Get non-empty links from nodes
         if (self::isLinkType($node) && self::hasText($node)) {
             $link = self::cleanUrl($node->getAttribute('href'));
-            if ($link && $link !== '' && filter_var($link, FILTER_VALIDATE_URL)) {
-                $linkText = self::hasText($node) ? $node->textContent : null;
-                $linkText = self::cleanText($linkText);
+            if ($link && $link !== '') {
                 if (! preg_match('/https/', $link)) {
                     $link = UriResolver::resolve($link, static::SITE_URL);
                 }
-                $post->addItem(new NewsPostItem(NewsPostItem::TYPE_LINK, $linkText, null, $link));
+                if (filter_var($link, FILTER_VALIDATE_URL)) {
+                    $linkText = self::hasText($node) ? $node->textContent : null;
+                    $linkText = self::cleanText($linkText);
+                    $post->addItem(new NewsPostItem(NewsPostItem::TYPE_LINK, $linkText, null, $link));
+                }
             }
             return;
         }
