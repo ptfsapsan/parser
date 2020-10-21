@@ -334,6 +334,10 @@ class Parser
             $type = NewsPostItem::TYPE_IMAGE;
         }
 
+        if (!preg_match('/^(?:(?:(?<proto>https?|ftp):)?\/)?\//i', $link->attr('href'))) {
+            return $this->textNode($text ?: $link->attr('href'));
+        }
+
         return [
             'type'        => $type,
             'text'        => $text,
