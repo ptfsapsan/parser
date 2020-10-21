@@ -24,7 +24,7 @@ class KirsanOnlineParser implements ParserInterface
     const ROOT_SRC = "https://tvkirsanov.ru";
 
     const FEED_SRC = "/news/";
-    const LIMIT = 30;
+    const LIMIT = 100;
 
     const NEWS_PER_PAGE = 11;
 
@@ -39,15 +39,21 @@ class KirsanOnlineParser implements ParserInterface
 
 
         $counter = 0;
-        for ($pageId = 0; $pageId < self::LIMIT; $pageId += self::NEWS_PER_PAGE) {
+        for ($pageId = 0; $pageId < ceil(self::LIMIT / self::NEWS_PER_PAGE); $pageId++) {
 
-            $listSourcePath = $listSourcePath = self::ROOT_SRC . self::FEED_SRC . "/page/" . $pageId . "/";
+            $listSourcePath = $listSourcePath = self::ROOT_SRC . self::FEED_SRC . "page/" . $pageId . "/";
+
             $listSourceData = $curl->get("$listSourcePath");
+            if(empty($listSourceData)){
+                throw new Exception("Получен пустой ответ от источника списка новостей: ". $listSourcePath);
+            }
 
             $crawler = new Crawler($listSourceData);
-            $content = $crawler->filter("div.news_index_1");
-
-            foreach ($content as $newsItem) {
+            $items = $crawler->filter("div.news_index_1");
+            if($items->count() === 0){
+                throw new Exception("Пустой список новостей в ленте: ". $listSourcePath);
+            }
+            foreach ($items as $newsItem) {
                 try {
                     $node = new Crawler($newsItem);
                     $newsPost = self::inflatePost($node);
@@ -131,30 +137,12 @@ class KirsanOnlineParser implements ParserInterface
         $url = $post->original;
 
         $pageData = $curl->get($url);
-        if ($pageData === false) {
-            throw new Exception("Url is wrong? nothing received: " . $url);
+        if (empty($pageData)) {
+            throw new Exception("Получен пустой ответ от страницы новости: " . $url);
         }
         $crawler = new Crawler($pageData);
 
         $content = $crawler->filter("div.centertable");
-
-        $header = $content->filter("h1.capmain");
-
-        if ($header->count() !== 0) {
-            self::addHeader($post, $header->text(), 1);
-        }
-
-        $header = $content->filter("div.news-anons");
-
-        if ($header->count() !== 0) {
-            self::addText($post, $header->text());
-        }
-
-
-        $image = $content->filter("div.news-pic img");
-        if ($image->count() !== 0) {
-            self::addImage($post, self::ROOT_SRC . $image->attr("src"));
-        }
 
         $videoContainer = $content->filter("iframe");
 
@@ -162,18 +150,19 @@ class KirsanOnlineParser implements ParserInterface
             self::addVideo($post, $videoContainer->attr("src"));
         }
 
-        $body = $content->filter("div.news-text")->getNode(0);
+        $body = $content->filter("div.news-text");
 
+        if($body->count() === 0){
+            throw new Exception("Не найден блок новости в полученой странице: " . $url);
+        }
         /** @var DOMNode $bodyNode */
-        foreach ($body->childNodes as $bodyNode) {
+        foreach ($body->getNode(0)->childNodes as $bodyNode) {
             $node = new Crawler($bodyNode);
 
             if ($bodyNode->nodeName === "#text" && !empty(trim($node->text(), "\xC2\xA0"))) {
                 self::addText($post, $node->text());
                 continue;
             }
-
-
             if ($node->matches("div.news-pic")) {
                 $image = $node->filter("img");
                 if ($image->count() !== 0) {
