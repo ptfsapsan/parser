@@ -147,6 +147,9 @@ class KubanscoeParser implements ParserInterface
             $body = $content->filter("div.content p");
         }
         if ($body->count() === 0) {
+            $body = $content->filter("div.content div");
+        }
+        if ($body->count() === 0) {
             throw new Exception("Не найден блок новости в полученой странице: " . $url);
         }
 
