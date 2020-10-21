@@ -51,13 +51,16 @@ class GazetaVolnaParser implements ParserInterface
         $listSourcePath = self::ROOT_SRC . self::FEED_SRC;
 
         $listSourceData = $curl->get($listSourcePath);
+        if (empty($listSourceData)) {
+            throw new Exception("Получен пустой ответ от источника списка новостей: " . $listSourcePath);
+        }
 
         $crawler = new Crawler($listSourceData);
 
         $filterNode = $crawler->filter("h4.module-title");
 
         if ($filterNode->count() === 0) {
-            throw new Exception("Could not get feed list");
+            throw new Exception("Пустой список новостей в ленте: " . $listSourcePath);
         }
 
         $feedNodes = $filterNode->nextAll()->children("div")->children("div");
@@ -120,10 +123,6 @@ class GazetaVolnaParser implements ParserInterface
 
 
         $imageUrl = null;
-        $image = $postData->filter("img");
-        if ($image->count() !== 0) {
-            $imageUrl = self::normalizeUrl(self::ROOT_SRC . $image->attr("src"));
-        }
 
         $description = self::EMPTY_DESCRIPTION;
 
@@ -147,23 +146,23 @@ class GazetaVolnaParser implements ParserInterface
     private static function inflatePostContent(NewsPost $post, Curl $curl)
     {
         $url = $post->original;
+        $post->description = "";
 
         $pageData = $curl->get($url);
-        if ($pageData === false) {
-            throw new Exception("Url is wrong? nothing received: " . $url);
+        if (empty($pageData)) {
+            throw new Exception("Получен пустой ответ от страницы новости: " . $url);
         }
 
         $crawler = new Crawler($pageData);
 
         $content = $crawler->filter("div.item-page");
 
-        $header = $content->filter("div.item-title h2");
-        if ($header->count() !== 0) {
-            self::addHeader($post, $header->text(), 1);
+        $body = $content->filter('div [itemprop="articleBody"]');
+
+        if ($body->count() === 0) {
+            throw new Exception("Не найден блок новости в полученой странице: " . $url);
         }
 
-
-        $body = $content->filter('div [itemprop="articleBody"]');
         foreach ($body->children() as $bodyNode) {
 
             $node = new Crawler($bodyNode);
@@ -173,14 +172,19 @@ class GazetaVolnaParser implements ParserInterface
             }
             if ($node->matches("p") && $node->filter("img")->count() !== 0) {
                 $image = $node->filter("img");
-                self::addImage($post, self::ROOT_SRC . $image->attr("src"));
+                if ($post->image === null) {
+                    $post->image = self::normalizeUrl(self::ROOT_SRC . $image->attr("src"));
+                } else {
+                    self::addImage($post, self::ROOT_SRC . $image->attr("src"));
+                }
                 continue;
             }
 
             if ($node->matches("p") && !empty(trim($node->text(), "\xC2\xA0"))) {
-                self::addText($post, $node->text());
-                if ($post->description === self::EMPTY_DESCRIPTION) {
+                if (empty($post->description)) {
                     $post->description = Helper::prepareString($node->text());
+                } else {
+                    self::addText($post, $node->text());
                 }
                 continue;
             }
