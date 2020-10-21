@@ -54,10 +54,15 @@ class ZapolearniiVestnikParser implements ParserInterface
 
             $listSourcePath = self::ROOT_SRC . self::FEED_SRC . "?page=" . $pageId;
             $listSourceData = $curl->get($listSourcePath);
+            if(empty($listSourceData)){
+                throw new Exception("Получен пустой ответ от источника списка новостей: ". $listSourcePath);
+            }
 
             $crawler = new Crawler($listSourceData);
             $content = $crawler->filter("#container > div.col1 > div > p");
-
+            if($content->count() === 0){
+                throw new Exception("Пустой список новостей в ленте: ". $listSourcePath);
+            }
             foreach ($content as $newsItem) {
                 try {
                     $node = new Crawler($newsItem);
@@ -139,18 +144,14 @@ class ZapolearniiVestnikParser implements ParserInterface
         $url = $post->original;
 
         $pageData = $curl->get($url);
-        if ($pageData === false) {
-            throw new Exception("Url is wrong? nothing received: " . $url);
+        if (empty($pageData)) {
+            throw new Exception("Получен пустой ответ от страницы новости: " . $url);
         }
 
         $crawler = new Crawler($pageData);
 
         $content = $crawler->filter("#container > div.col1 > div");
 
-        $header = $content->filter("center h2");
-        if ($header->count() !== 0) {
-            self::addHeader($post, $header->text(), 2);
-        }
         $header = $content->filter("h3");
         if ($header->count() !== 0) {
             self::addHeader($post, $header->text(), 3);
@@ -164,16 +165,23 @@ class ZapolearniiVestnikParser implements ParserInterface
 
 
         $body = $content->children("p");
-
+        if($body->count() === 0){
+            $body = $content->children("div.wall_post_text");
+        }
+        if($body->count() === 0){
+            throw new Exception("Не найден блок новости в полученой странице: " . $url);
+        }
         /** @var DOMNode $bodyNode */
         foreach ($body as $bodyNode) {
             $node = new Crawler($bodyNode);
 
             if ($node->filter("img")->count() !== 0) {
                 $image = $node->filter("img");
-                self::addImage($post, self::ROOT_SRC . $image->attr("src"));
+
                 if ($post->image === null) {
                     $post->image = self::ROOT_SRC . "/" . self::normalizeUrl($image->attr("src"));
+                }else{
+                    self::addImage($post, self::ROOT_SRC . $image->attr("src"));
                 }
             }
 
