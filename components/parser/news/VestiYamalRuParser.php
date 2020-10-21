@@ -74,7 +74,6 @@ class VestiYamalRuParser extends AbstractBaseParser
         $mainImageCrawler = $newsPageCrawler->filter('meta[property="og:image"]');
         if ($this->crawlerHasNodes($mainImageCrawler)) {
             $image = $mainImageCrawler->attr('content');
-            $this->removeDomNodes($newsPageCrawler, '//img[contains(@class,"article__main-image__image")][1]');
         }
 
         if ($image !== null && $image !== '') {
