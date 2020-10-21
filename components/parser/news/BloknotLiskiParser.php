@@ -162,12 +162,11 @@ class BloknotLiskiParser implements ParserInterface
             $link = self::cleanUrl($node->getAttribute('href'));
             if ($link && $link !== '' && filter_var($link, FILTER_VALIDATE_URL)) {
                 $linkText = self::hasText($node) ? $node->textContent : null;
-                if (! empty($linkText) === true) {
-                    if (! preg_match('/https/', $linkText)) {
-                        $linkText = UriResolver::resolve($linkText, static::SITE_URL);
-                    }
-                    $post->addItem(new NewsPostItem(NewsPostItem::TYPE_LINK, $linkText, null, $link));
+                $linkText = self::cleanText($linkText);
+                if (! preg_match('/https/', $link)) {
+                    $link = UriResolver::resolve($link, static::SITE_URL);
                 }
+                $post->addItem(new NewsPostItem(NewsPostItem::TYPE_LINK, $linkText, null, $link));
             }
             return;
         }
