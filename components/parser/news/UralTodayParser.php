@@ -23,7 +23,7 @@ class UralTodayParser implements ParserInterface
 
     const FEED_SRC = "/feed/";
     const LIMIT = 100;
-
+    const EMPTY_DESCRIPTION = "empty";
 
     /**
      * @return array
@@ -37,11 +37,17 @@ class UralTodayParser implements ParserInterface
         $listSourcePath = self::ROOT_SRC . self::FEED_SRC;
 
         $listSourceData = $curl->get($listSourcePath);
+        if(empty($listSourceData)){
+            throw new Exception("Получен пустой ответ от источника списка новостей: ". $listSourcePath);
+        }
 
         $crawler = new Crawler($listSourceData);
-
+        $items = $crawler->filter("item");
+        if($items->count() === 0){
+            throw new Exception("Пустой список новостей в ленте: ". $listSourcePath);
+        }
         $counter = 0;
-        foreach ($crawler->filter("item") as $item) {
+        foreach ($items as $item) {
             try {
                 $node = new Crawler($item);
                 $newsPost = self::inflatePost($node);
@@ -90,13 +96,7 @@ class UralTodayParser implements ParserInterface
             $imageUrl = $image->attr("url");
         }
 
-        $description = $postData->filter("description")->text();
-        if (empty($description)) {
-            $text = $postData->filterXPath("item/yandex:full-text");
-
-            $sentences = preg_split('/(?<=[.?!])\s+(?=[а-я])/i', $text->text());
-            $description = implode(" ", array_slice($sentences, 0, 3));
-        }
+        $description = self::EMPTY_DESCRIPTION;
 
         return new NewsPost(
             self::class,
@@ -128,26 +128,27 @@ class UralTodayParser implements ParserInterface
 
         $content = $crawler->filter("#right-content");
 
-
-        $header = $content->filter("div.body-articles-header h1");
-        if ($header->count() !== 0) {
-            self::addHeader($post, $header->text(), 1);
-        }
-
         $header = $content->filter("div.body-articles-header__description");
         if ($header->count() !== 0) {
-            self::addText($post, $header->text());
+            $post->description = Helper::prepareString($header->text());
         }
 
         $image = $content->filter("div.body-articles-header__image img");
         if ($image->count() !== 0) {
-            self::addImage($post, $image->attr("src"));
+            $post->image = self::normalizeUrl($image->attr("src"));
         }
 
         $body = $content->filter("div.body-article");
-
+        if($body->count() === 0){
+            throw new Exception("Не найден блок новости в полученой странице: " . $url);
+        }
         foreach ($body->children() as $bodyNode) {
             $node = new Crawler($bodyNode);
+
+            if ($node->matches("p") && $node->filter("b > i")->count() !== 0) {
+                self::addQuote($post, $node->text());
+                continue;
+            }
 
             if ($node->matches("p") && !empty(trim($node->text(), "\xC2\xA0"))) {
                 self::addText($post, $node->text());
@@ -164,6 +165,10 @@ class UralTodayParser implements ParserInterface
                 continue;
             }
 
+        }
+        $author = $content->filter("div.footer-articles__body-author__element-text");
+        if ($author->count() !== 0) {
+            self::addText($post, $author->text());
         }
 
     }
