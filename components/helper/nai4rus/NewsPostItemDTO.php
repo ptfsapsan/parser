@@ -22,11 +22,11 @@ class NewsPostItemDTO
         ?int $headerLevel = null,
         ?string $youtubeId = null
     ) {
-        if ($link && ($link === '' || !filter_var($link, FILTER_VALIDATE_URL))) {
+        if ($link && ($link === '')) {
             throw new InvalidArgumentException('Невалидный аргумент $link: ' . $link);
         }
 
-        if ($image && ($image === '' || !filter_var($image, FILTER_VALIDATE_URL))) {
+        if ($image && ($image === '')) {
             throw new InvalidArgumentException('Невалидный аргумент $image: ' . $image);
         }
 
