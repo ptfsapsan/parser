@@ -22,8 +22,8 @@ class VerhneKamieParser implements ParserInterface
     const ROOT_SRC = "http://vk-online.ru";
 
     const FEED_SRC = "/news.feed?type=rss";
-    const LIMIT = 100;
-
+    const LIMIT = 2;
+    const EMPTY_DESCRIPTION = "empty";
 
     /**
      * @return array
@@ -38,10 +38,17 @@ class VerhneKamieParser implements ParserInterface
 
         $listSourceData = $curl->get($listSourcePath);
 
-        $crawler = new Crawler($listSourceData);
+        if (empty($listSourceData)) {
+            throw new Exception("Получен пустой ответ от источника списка новостей: " . $listSourcePath);
+        }
 
+        $crawler = new Crawler($listSourceData);
+        $items = $crawler->filter("item");
+        if ($items->count() === 0) {
+            throw new Exception("Пустой список новостей в ленте: " . $listSourcePath);
+        }
         $counter = 0;
-        foreach ($crawler->filter("item") as $item) {
+        foreach ($items as $item) {
             try {
                 $node = new Crawler($item);
                 $newsPost = self::inflatePost($node);
@@ -90,13 +97,7 @@ class VerhneKamieParser implements ParserInterface
             $imageUrl = $image->attr("url");
         }
 
-        $description = $postData->filter("description")->text();
-        if (empty($description)) {
-            $text = $postData->filterXPath("item/yandex:full-text");
-
-            $sentences = preg_split('/(?<=[.?!])\s+(?=[а-я])/i', $text->text());
-            $description = implode(" ", array_slice($sentences, 0, 3));
-        }
+        $description = self::EMPTY_DESCRIPTION;
 
         return new NewsPost(
             self::class,
@@ -120,18 +121,13 @@ class VerhneKamieParser implements ParserInterface
         $url = $post->original;
 
         $pageData = $curl->get($url);
-        if ($pageData === false) {
-            throw new Exception("Url is wrong? nothing received: " . $url);
+        if (empty($pageData)) {
+            throw new Exception("Получен пустой ответ от страницы новости: " . $url);
         }
 
         $crawler = new Crawler($pageData);
 
         $content = $crawler->filter("#incontent");
-
-        $header = $content->filter("table.contentpaneopen td.contentheading");
-        if ($header->count() !== 0) {
-            self::addHeader($post, $header->text(), 1);
-        }
 
         $body = $content->filter("#incontent > table:nth-child(3) > tr:nth-child(4) > td p");
 
@@ -139,13 +135,19 @@ class VerhneKamieParser implements ParserInterface
             $node = new Crawler($bodyNode);
             if ($node->filter("img")->count() !== 0) {
                 $image = $node->filter("img");
-                self::addImage($post, self::ROOT_SRC . $image->attr("src"));
+
                 if ($post->image === null) {
                     $post->image = self::ROOT_SRC . self::normalizeUrl($image->attr("src"));
+                } else {
+                    self::addImage($post, self::ROOT_SRC . $image->attr("src"));
                 }
             }
             if (!empty(trim($node->text(), "\xC2\xA0"))) {
-                self::addText($post, $node->text());
+                if ($post->description === self::EMPTY_DESCRIPTION) {
+                    $post->description = Helper::prepareString($node->text());
+                } else {
+                    self::addText($post, $node->text());
+                }
                 continue;
             }
         }
