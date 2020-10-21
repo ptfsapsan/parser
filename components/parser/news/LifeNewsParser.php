@@ -24,7 +24,7 @@ class LifeNewsParser implements ParserInterface
 
     const FEED_SRC = "/rss.xml";
     const LIMIT = 100;
-
+    const EMPTY_DESCRIPTION = "empty";
 
     /**
      * @return array
@@ -38,11 +38,17 @@ class LifeNewsParser implements ParserInterface
         $listSourcePath = self::ROOT_SRC . self::FEED_SRC;
 
         $listSourceData = $curl->get($listSourcePath);
+        if (empty($listSourceData)) {
+            throw new Exception("Получен пустой ответ от источника списка новостей: " . $listSourcePath);
+        }
 
         $crawler = new Crawler($listSourceData);
-
+        $items = $crawler->filter("item");
+        if ($items->count() === 0) {
+            throw new Exception("Пустой список новостей в ленте: " . $listSourcePath);
+        }
         $counter = 0;
-        foreach ($crawler->filter("item") as $item) {
+        foreach ($items as $item) {
             try {
                 $node = new Crawler($item);
                 $newsPost = self::inflatePost($node);
@@ -92,13 +98,7 @@ class LifeNewsParser implements ParserInterface
             $imageUrl = $image->attr("url");
         }
 
-        $description = $postData->filter("description")->text();
-        if (empty($description)) {
-            $text = $postData->filterXPath("item/yandex:full-text");
-
-            $sentences = preg_split('/(?<=[.?!])\s+(?=[а-я])/i', $text->text());
-            $description = implode(" ", array_slice($sentences, 0, 3));
-        }
+        $description = self::EMPTY_DESCRIPTION;
 
         return new NewsPost(
             self::class,
@@ -122,38 +122,39 @@ class LifeNewsParser implements ParserInterface
         $url = $post->original;
 
         $pageData = $curl->get($url);
-        if ($pageData === false) {
-            throw new Exception("Url is wrong? nothing received: " . $url);
+        if (empty($pageData)) {
+            throw new Exception("Получен пустой ответ от страницы новости: " . $url);
         }
 
         $crawler = new Crawler($pageData);
 
         $content = $crawler->filter("#dle-content > table > tr > td:nth-child(2) > table > tr > td:nth-child(2) > table");
 
-        $header = $content->filter("tr h1");
-        if ($header->count() !== 0) {
-            self::addHeader($post, $header->text(), 1);
+        $body = $content->filter("tr:nth-child(4) > td > div");
+        if ($body->count() === 0) {
+            throw new Exception("Не найден блок новости в полученой странице: " . $url);
         }
-
-        $image = $content->filter("img");
-        if ($image->count() !== 0) {
-            $post->image = self::ROOT_SRC . self::normalizeUrl($image->attr("src"));
-        }
-
-        $body = $content->filter("tr:nth-child(4) > td > div")->getNode(0);
 
         /** @var DOMNode $bodyNode */
-        foreach ($body->childNodes as $bodyNode) {
+        foreach ($body->getNode(0)->childNodes as $bodyNode) {
             $node = new Crawler($bodyNode);
 
             if ($bodyNode->nodeName === "#text" && !empty(trim($node->text(), "\xC2\xA0"))) {
-                self::addText($post, $node->text());
+                if ($post->description === self::EMPTY_DESCRIPTION) {
+                    $post->description = $node->text();
+                } else {
+                    self::addText($post, $node->text());
+                }
                 continue;
             }
 
             if ($node->matches("img")) {
+                if ($post->image === null) {
+                    $post->image = self::normalizeUrl(self::ROOT_SRC . $node->attr("src"));
+                } else {
+                    self::addImage($post, self::ROOT_SRC . $node->attr("src"));
+                }
 
-                self::addImage($post, self::ROOT_SRC . $node->attr("src"));
             }
         }
     }
