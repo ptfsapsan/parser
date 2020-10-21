@@ -26,36 +26,33 @@ class OrenburzhieRuParser extends AbstractBaseParser
     {
         $previewNewsDTOList = [];
 
-        while (count($previewNewsDTOList) < $maxNewsCount) {
-            $uriPreviewPage = UriResolver::resolve('/feed', $this->getSiteUrl());
+        $uriPreviewPage = UriResolver::resolve('/feed', $this->getSiteUrl());
 
-            try {
-                $previewNewsContent = $this->getPageContent($uriPreviewPage);
-                $previewNewsCrawler = new Crawler($previewNewsContent);
-            } catch (Throwable $exception) {
-                if (count($previewNewsDTOList) < $minNewsCount) {
-                    throw new RuntimeException('Не удалось получить достаточное кол-во новостей', null, $exception);
-                }
-                break;
+        try {
+            $previewNewsContent = $this->getPageContent($uriPreviewPage);
+            $previewNewsCrawler = new Crawler($previewNewsContent);
+        } catch (Throwable $exception) {
+            if (count($previewNewsDTOList) < $minNewsCount) {
+                throw new RuntimeException('Не удалось получить достаточное кол-во новостей', null, $exception);
+            }
+        }
+
+        $previewNewsCrawler = $previewNewsCrawler->filterXPath('//item');
+
+        $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$previewNewsDTOList, $maxNewsCount) {
+            if (count($previewNewsDTOList) >= $maxNewsCount) {
+                return;
             }
 
-            $previewNewsCrawler = $previewNewsCrawler->filterXPath('//item');
+            $title = $newsPreview->filterXPath('//title')->text();
+            $uri = $newsPreview->filterXPath('//link')->text();
 
-            $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$previewNewsDTOList, $maxNewsCount) {
-                if (count($previewNewsDTOList) >= $maxNewsCount) {
-                    return;
-                }
+            $publishedAtString = $newsPreview->filterXPath('//pubDate')->text();
+            $publishedAt = DateTimeImmutable::createFromFormat(DATE_RFC1123, $publishedAtString);
+            $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
 
-                $title = $newsPreview->filterXPath('//title')->text();
-                $uri = $newsPreview->filterXPath('//link')->text();
-
-                $publishedAtString = $newsPreview->filterXPath('//pubDate')->text();
-                $publishedAt = DateTimeImmutable::createFromFormat(DATE_RFC1123, $publishedAtString);
-                $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
-
-                $previewNewsDTOList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $title, null);
-            });
-        }
+            $previewNewsDTOList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $title, null);
+        });
 
         $previewNewsDTOList = array_slice($previewNewsDTOList, 0, $maxNewsCount);
 
