@@ -158,7 +158,7 @@ class IskraLysvaParser implements ParserInterface
         if (self::isLinkType($node) && self::hasText($node)) {
             $link = self::cleanUrl($node->getAttribute('href'));
             if ($link && $link !== '') {
-                if (! preg_match('/https/', $link)) {
+                if (! preg_match('/http[s]?/', $link)) {
                     $link = UriResolver::resolve($link, static::SITE_URL);
                 }
                 if (filter_var($link, FILTER_VALIDATE_URL)) {
