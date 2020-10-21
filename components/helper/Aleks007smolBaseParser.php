@@ -11,7 +11,7 @@ use Symfony\Component\DomCrawler\Crawler;
 /**
  * Набор базовых методов
  */
-abstract class TyRunBaseParser
+abstract class Aleks007smolBaseParser
 {
     /**
      * Базовый метод для разбора элемента, в основном запускается рекурсивно
@@ -29,27 +29,6 @@ abstract class TyRunBaseParser
     );
 
     /**
-     * Парсер для тегов <a>
-     * @param Crawler $node
-     * @param NewsPost $newPost
-     */
-    protected static function parseLink(Crawler $node, NewsPost $newPost): void
-    {
-        $url = self::urlEncode($node->attr('href'));
-        if (filter_var($url, FILTER_VALIDATE_URL)) {
-            $newPost->addItem(
-                new NewsPostItem(
-                    NewsPostItem::TYPE_LINK,
-                    null,
-                    null,
-                    $node->attr('href'),
-                    null,
-                    null
-                ));
-        }
-    }
-
-    /**
      * Парсер для тегов <ul>, <ol> и т.п.
      * Разбирает списки в текст с переносом строки
      * @param Crawler $node
@@ -61,6 +40,7 @@ abstract class TyRunBaseParser
         $node->filter('li')->each(function ($node) use (&$parsedUl) {
             $parsedUl .= static::UL_PREFIX . $node->text() . PHP_EOL;
         });
+
         if (!empty($parsedUl)) {
             $newPost->addItem(
                 new NewsPostItem(
@@ -98,11 +78,11 @@ abstract class TyRunBaseParser
      * Парсер для тегов <img>
      * @param Crawler $node
      * @param NewsPost $newPost
-     * @param string $lazySrcAttr название атрибута в котором лежит ссылка на изображение при lazyLoad
      */
-    protected static function parseImage(Crawler $node, NewsPost $newPost, $lazySrcAttr = 'data-src'): void
+    protected static function parseImage(Crawler $node, NewsPost $newPost): void
     {
-        $src = self::getProperImageSrc($node, $lazySrcAttr);
+        $src = self::getProperImageSrc($node);
+
         if ($src && $src != $newPost->image) {
             $newPost->addItem(
                 new NewsPostItem(
@@ -157,89 +137,23 @@ abstract class TyRunBaseParser
      * - если итоговый src не пустой и в классе указана константа MAIN_PAGE_UTI,
      * пробуем исправить ссылку, возможно ссылка относительная
      * @param Crawler $node элемент изображения
-     * @param string $lazySrcAttr
      * @return string|null
      */
-    protected static function getProperImageSrc(Crawler $node, string $lazySrcAttr): ?string
+    protected static function getProperImageSrc(Crawler $node): ?string
     {
-        $src = $node->attr('src') ?? $node->attr($lazySrcAttr);
-        $src = self::absoluteUrl($src);
-        return $src ? self::urlEncode($src) : false;
-    }
+        $src = $node->attr('src') ?? $node->attr('data-src');
 
-    /**
-     * Исправляет относительные ссылки на абсолютные для текущего сайта,
-     * указанного в MAIN_PAGE_URI текущего класса
-     * @param string $url
-     * @return string|null
-     */
-    protected static function absoluteUrl(string $url): ?string
-    {
-        if ($url && !filter_var($url, FILTER_VALIDATE_URL)) {
+        if ($src && !filter_var($src, FILTER_VALIDATE_URL)) {
             if (static::MAIN_PAGE_URI) {
-                if (strpos($url, '/') == 0) {
-                    return static::MAIN_PAGE_URI . $url;
+                if (strpos($src, '/') == 0) {
+                    return static::MAIN_PAGE_URI . $src;
                 } else {
-                    return static::MAIN_PAGE_URI . '/' . $url;
+                    return static::MAIN_PAGE_URI . '/' . $src;
                 }
             }
             return false;
         }
-        return $url;
-    }
-
-    /**
-     * Парсер для тегов <p> для сайтов у которых описание содержит часть текста статьи.
-     * Дополнительно сверяем содержимое тегов с описанием новости (по предложениям), дубли не добавляем
-     * @param Crawler $node текущий элемент для парсинга
-     * @param NewsPost $newPost объект новости
-     * @param array $descriptionSentences массив предложений описания новости (explode('. ', $description))
-     */
-    protected static function parseDescriptionIntersectParagraph(Crawler $node, NewsPost $newPost, array $descriptionSentences): void
-    {
-        $nodeSentences = array_map(function ($item) {
-            return !empty($item) ? trim($item, '  \t\n\r\0\x0B.') : false;
-        }, explode('.', $node->text()));
-        $intersect = array_intersect($nodeSentences, $descriptionSentences);
-
-        /**
-         * Если в тексте есть хоть одно уникальное предложение ( по сравнению с описанием новости )
-         */
-        if (!empty($node->text()) && count($intersect) < count($nodeSentences)) {
-            /**
-             * Дополнительно проверяем, что оставшийся текст не является подстрокой описания
-             */
-            $text = trim(implode('. ', array_diff($nodeSentences, $intersect)));
-
-            if (empty($text) || stristr($newPost->description, $text)) {
-                return;
-            }
-
-            $type = NewsPostItem::TYPE_TEXT;
-            if ($node->nodeName() == static::QUOTE_TAG) {
-                $type = NewsPostItem::TYPE_QUOTE;
-            }
-
-            $newPost->addItem(
-                new NewsPostItem(
-                    $type,
-                    $text,
-                    null,
-                    null,
-                    null,
-                    null
-                ));
-        }
-    }
-
-    /**
-     * Кодирует кириллицу в ссылках, для прохождения валидации Url (FILTER_VALIDATE_URL)
-     * @param string $url
-     * @return string
-     */
-    protected static function urlEncode(string $url): string
-    {
-        return str_replace(['%3A', '%2F'], [':', '/'], rawurlencode($url));
+        return $src;
     }
 
 }
