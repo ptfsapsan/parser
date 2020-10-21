@@ -24,7 +24,7 @@ class SmiOneParser implements ParserInterface
 
     const FEED_SRC = "/feed/";
     const LIMIT = 100;
-
+    const EMPTY_DESCRIPTION = "empty";
 
     /**
      * @return array
@@ -39,10 +39,17 @@ class SmiOneParser implements ParserInterface
 
         $listSourceData = $curl->get($listSourcePath);
 
-        $crawler = new Crawler($listSourceData);
+        if (empty($listSourceData)) {
+            throw new Exception("Получен пустой ответ от источника списка новостей: " . $listSourcePath);
+        }
 
+        $crawler = new Crawler($listSourceData);
+        $items = $crawler->filter("item");
+        if ($items->count() === 0) {
+            throw new Exception("Пустой список новостей в ленте: " . $listSourcePath);
+        }
         $counter = 0;
-        foreach ($crawler->filter("item") as $item) {
+        foreach ($items as $item) {
             try {
                 $node = new Crawler($item);
                 $newsPost = self::inflatePost($node);
@@ -91,13 +98,7 @@ class SmiOneParser implements ParserInterface
             $imageUrl = $image->attr("url");
         }
 
-        $description = $postData->filter("description")->text();
-        if (empty($description)) {
-            $text = $postData->filterXPath("item/yandex:full-text");
-
-            $sentences = preg_split('/(?<=[.?!])\s+(?=[а-я])/i', $text->text());
-            $description = implode(" ", array_slice($sentences, 0, 3));
-        }
+        $description = self::EMPTY_DESCRIPTION;
 
         return new NewsPost(
             self::class,
@@ -129,14 +130,8 @@ class SmiOneParser implements ParserInterface
 
         $content = $crawler->filter("article.post")->first();
 
-        $header = $content->filter("header h1");
-        if ($header->count() !== 0) {
-            self::addHeader($post, $header->text(), 1);
-        }
-
         $image = $content->filter("div.zox-post-img img");
         if ($image->count() !== 0) {
-            self::addImage($post, $image->attr("src"));
             $post->image = self::normalizeUrl($image->attr("src"));
         }
 
@@ -154,7 +149,13 @@ class SmiOneParser implements ParserInterface
             }
             if (!empty(trim($node->text(), "\xC2\xA0"))) {
                 $node->filter("p")->each(function (Crawler $pnode) use ($post) {
-                    self::addText($post, $pnode->text());
+                    if (!empty(Helper::prepareString($pnode->text()))) {
+                        if ($post->description === self::EMPTY_DESCRIPTION) {
+                            $post->description = Helper::prepareString($pnode->text());
+                        } else {
+                            self::addText($post, $pnode->text());
+                        }
+                    }
                 });
 
                 continue;
