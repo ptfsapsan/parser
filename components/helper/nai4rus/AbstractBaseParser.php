@@ -417,7 +417,7 @@ abstract class AbstractBaseParser implements ParserInterface
 
     protected function searchTextNewsItem(DOMNode $node): ?NewsPostItemDTO
     {
-        if ($node->nodeName === '#comment' || !$this->hasText($node)) {
+        if ($node->nodeName === '#comment') {
             return null;
         }
 
@@ -443,6 +443,10 @@ abstract class AbstractBaseParser implements ParserInterface
             $parentNewsPostItem->addText($this->normalizeText($node->textContent));
 
             throw new RuntimeException('Контент добавлен к существующему объекту NewsPostItemDTO');
+        }
+
+        if (!$this->hasText($node)) {
+            return null;
         }
 
         $newsPostItem = NewsPostItemDTO::createTextItem($this->normalizeText($node->textContent));
