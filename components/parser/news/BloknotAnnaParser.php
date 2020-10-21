@@ -164,12 +164,13 @@ class BloknotAnnaParser implements ParserInterface
         //Get non-empty links from nodes
         if (self::isLinkType($node) && self::hasText($node)) {
             $link = self::cleanUrl($node->getAttribute('href'));
-            if ($link && $link !== '' && filter_var($link, FILTER_VALIDATE_URL)) {
-                $linkText = self::hasText($node) ? $node->textContent : null;
-                if (! empty($linkText) === true) {
-                    if (! preg_match('/https/', $linkText)) {
-                        $linkText = UriResolver::resolve($linkText, static::SITE_URL);
-                    }
+            if ($link && $link !== '') {
+                if (! preg_match('/http[s]?/', $link)) {
+                    $link = UriResolver::resolve($link, static::SITE_URL);
+                }
+                if (filter_var($link, FILTER_VALIDATE_URL)) {
+                    $linkText = self::hasText($node) ? $node->textContent : null;
+                    $linkText = self::cleanText($linkText);
                     $post->addItem(new NewsPostItem(NewsPostItem::TYPE_LINK, $linkText, null, $link));
                 }
             }
