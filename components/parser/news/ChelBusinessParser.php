@@ -25,7 +25,7 @@ class ChelBusinessParser implements ParserInterface
 
     const FEED_SRC = "/feed/";
     const LIMIT = 100;
-
+    const EMPTY_DESCRIPTION = "empty";
 
     /**
      * @return array
@@ -39,11 +39,17 @@ class ChelBusinessParser implements ParserInterface
         $listSourcePath = self::ROOT_SRC . self::FEED_SRC;
 
         $listSourceData = $curl->get($listSourcePath);
+        if (empty($listSourceData)) {
+            throw new Exception("Получен пустой ответ от источника списка новостей: " . $listSourcePath);
+        }
 
         $crawler = new Crawler($listSourceData);
-
+        $items = $crawler->filter("item");
+        if ($items->count() === 0) {
+            throw new Exception("Пустой список новостей в ленте: " . $listSourcePath);
+        }
         $counter = 0;
-        foreach ($crawler->filter("item") as $item) {
+        foreach ($items as $item) {
             try {
                 $node = new Crawler($item);
                 $newsPost = self::inflatePost($node);
@@ -92,13 +98,7 @@ class ChelBusinessParser implements ParserInterface
             $imageUrl = $image->attr("url");
         }
 
-        $description = $postData->filter("description")->text();
-        if (empty($description)) {
-            $text = $postData->filterXPath("item/yandex:full-text");
-
-            $sentences = preg_split('/(?<=[.?!])\s+(?=[а-я])/i', $text->text());
-            $description = implode(" ", array_slice($sentences, 0, 3));
-        }
+        $description = self::EMPTY_DESCRIPTION;
 
         return new NewsPost(
             self::class,
@@ -122,36 +122,41 @@ class ChelBusinessParser implements ParserInterface
         $url = $post->original;
 
         $pageData = $curl->get($url);
-        if ($pageData === false) {
-            throw new Exception("Url is wrong? nothing received: " . $url);
+        if (empty($pageData)) {
+            throw new Exception("Получен пустой ответ от страницы новости: " . $url);
         }
 
         $crawler = new Crawler($pageData);
 
         $content = $crawler->filter("div.post-alt.blog")->first();
 
-        $header = $content->filter("h3");
-        if ($header->count() !== 0) {
-            self::addHeader($post, $header->text(), 3);
-        }
-
         $body = $content->filter("div.entry");
-
+        if ($body->count() === 0) {
+            throw new Exception("Не найден блок новости в полученой странице: " . $url);
+        }
         /** @var DOMNode $bodyNode */
         foreach ($body->children() as $bodyNode) {
             $node = new Crawler($bodyNode);
 
-            if ($node->matches("p") && $node->filter("img")->count() !== 0) {
+            if ($node->matches("div , p") && $node->filter("img")->count() !== 0) {
                 $image = $node->filter("img");
-                self::addImage($post, $image->attr("src"));
                 if ($post->image === null) {
                     $post->image = self::normalizeUrl($image->attr("src"));
+                } else {
+                    self::addImage($post, $image->attr("src"));
+                }
+                if(!empty(trim($node->text(), "\xC2\xA0"))){
+                    self::addText($post, $node->text());
                 }
                 continue;
             }
 
             if ($node->matches("p") && !empty(trim($node->text(), "\xC2\xA0"))) {
-                self::addText($post, $node->text());
+                if ($post->description === self::EMPTY_DESCRIPTION) {
+                    $post->description = Helper::prepareString($node->text());
+                } else {
+                    self::addText($post, $node->text());
+                }
                 continue;
             }
 
