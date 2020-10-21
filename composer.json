@@ -15,7 +15,8 @@
     "league/uri": "^6.3",
     "rowbot/punycode": "^1.0",
     "symfony/css-selector": "^5.1",
-    "ext-curl": "*"
+    "ext-curl": "*",
+    "ext-zlib": "*"
   },
   "config": {
     "process-timeout": 1800,
