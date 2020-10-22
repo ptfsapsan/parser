@@ -198,7 +198,12 @@ abstract class TyRunBaseParser
      */
     protected static function parseDescriptionIntersectParagraph(Crawler $node, NewsPost $newPost, array $descriptionSentences): void
     {
-        if (empty($node->text())) return;
+        /**
+         * Пропускаем, если строка состоит только из html символов (например &nbsp;) либо пустая изначально
+         */
+        if (empty($node->text()) || empty(trim(self::sanitizeHtmlEntities($node->text())))) {
+            return;
+        }
 
         $nodeSentences = array_map(function ($item) {
             return !empty($item) ? trim($item, '  \t\n\r\0\x0B.') : false;
@@ -263,6 +268,16 @@ abstract class TyRunBaseParser
             preg_match($pattern, $description, $matches);
         }
         return !empty($matches[1]) ? $matches[1] : $description;
+    }
+
+    /**
+     * Убирает из строки html мнемоники
+     * @param string $str
+     * @return string
+     */
+    protected static function sanitizeHtmlEntities(string $str): string
+    {
+       return preg_replace("/&#?[a-z0-9]{2,8};/i","", htmlentities($str));
     }
 
 }
