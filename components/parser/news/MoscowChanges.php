@@ -12,25 +12,25 @@ use Exception;
 use Symfony\Component\DomCrawler\Crawler;
 
 /**
- * Парсер новостей из RSS ленты 4s-info.ru
+ * Парсер новостей из RSS ленты moscowchanges.ru
  *
  */
-class Pnz1 extends TyRunBaseParser implements ParserInterface
+class MoscowChanges extends TyRunBaseParser implements ParserInterface
 {
     const USER_ID = 2;
     const FEED_ID = 2;
 
-    const MAIN_PAGE_URI = 'https://1pnz.ru';
+    const MAIN_PAGE_URI = 'https://moscowchanges.ru';
 
     /**
      * CSS класс, где хранится содержимое новости
      */
-    const BODY_CONTAINER_CSS_SELECTOR = '.simple_html';
+    const BODY_CONTAINER_CSS_SELECTOR = '.single-content';
 
     /**
      * CSS  класс для параграфов - цитат
      */
-    const QUOTE_TAG = 'em';
+    const QUOTE_TAG = 'blockquote';
 
     /**
      * Классы эоементов, которые не нужно парсить, например блоки с рекламой и т.п.
@@ -47,7 +47,7 @@ class Pnz1 extends TyRunBaseParser implements ParserInterface
     /**
      * Ссылка на RSS фид (XML)
      */
-    const FEED_URL = 'https://1pnz.ru/rss';
+    const FEED_URL = 'https://moscowchanges.ru/feed/';
 
     /**
      *  Максимальная глубина для парсинга <div> тегов
@@ -93,6 +93,10 @@ class Pnz1 extends TyRunBaseParser implements ParserInterface
              * Предложения содержащиеся в описании (для последующей проверки при парсинга тела новости)
              */
             $descriptionSentences = explode('. ', html_entity_decode($newPost->description));
+            if (count($descriptionSentences) > 2) {
+                $descriptionSentences = array_slice($descriptionSentences, 0, 2);
+                $newPost->description = implode('. ', $descriptionSentences);
+            }
 
             /**
              * Получаем полный html новости
@@ -104,7 +108,7 @@ class Pnz1 extends TyRunBaseParser implements ParserInterface
                 /**
                  * Основное фото ( всегда одно в начале статьи)
                  */
-                $mainImage = $newsContent->filter('.fancy_popup_link img');
+                $mainImage = $newsContent->filter('.single-header img');
                 if ($mainImage->count()) {
                     if ($mainImage->attr('src')) {
                         $newPost->image = self::urlEncode($mainImage->attr('src'));
@@ -115,7 +119,7 @@ class Pnz1 extends TyRunBaseParser implements ParserInterface
                  * Текст статьи, может содержать цитаты ( все полезное содержимое в тегах <p> )
                  * Не знаю нужно или нет, но сделал более универсально, с рекурсией
                  */
-                $articleContent = $newsContent->filter('.theme_day')->children();
+                $articleContent = $newsContent->filter('.entire-content')->children();
                 $stopParsing = false;
                 if ($articleContent->count()) {
                     $articleContent->each(function ($node) use ($newPost, &$stopParsing, $descriptionSentences) {
@@ -163,14 +167,13 @@ class Pnz1 extends TyRunBaseParser implements ParserInterface
         }
         $maxDepth--;
 
-        if (stristr($node->text(), 'Фото: ')) {
+        if ($node->text() == 'Поделиться:') {
             return;
         }
 
         switch ($node->nodeName()) {
             case 'div': //запускаем рекурсивно на дочерние ноды, если есть, если нет то там обычно ненужный шлак
             case 'span':
-                self::parseDescriptionIntersectParagraph($node, $newPost, $descriptionSentences);
                 $nodes = $node->children();
                 if ($nodes->count()) {
                     $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing, &$descriptionSentences) {
@@ -179,6 +182,7 @@ class Pnz1 extends TyRunBaseParser implements ParserInterface
                 }
                 break;
             case 'p':
+            case 'blockquote':
                 self::parseDescriptionIntersectParagraph($node, $newPost, $descriptionSentences);
                 break;
             case 'img':

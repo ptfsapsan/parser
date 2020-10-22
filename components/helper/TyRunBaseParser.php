@@ -233,7 +233,7 @@ abstract class TyRunBaseParser
         }
 
         $nodeSentences = array_map(function ($item) {
-            return !empty($item) ? trim($item, '  \t\n\r\0\x0B.') : false;
+            return !empty($item) ? trim($item, '  \t\n\r\0\x0B.') : null;
         }, explode('.', $node->text()));
         $intersect = array_intersect($nodeSentences, $descriptionSentences);
 
@@ -246,6 +246,7 @@ abstract class TyRunBaseParser
              * кроме html символов
              */
             $text = trim(implode('. ', array_diff($nodeSentences, $intersect)));
+
             if (empty(self::sanitizeHtmlEntities($text)) || stristr($newPost->description, $text)) {
                 return;
             }
@@ -295,7 +296,7 @@ abstract class TyRunBaseParser
         if ($pattern) {
             preg_match($pattern, $description, $matches);
         }
-        return !empty($matches[1]) ? html_entity_decode($matches[1]) : $description;
+        return !empty($matches[1]) ? html_entity_decode($matches[1]) : html_entity_decode($description);
     }
 
     /**

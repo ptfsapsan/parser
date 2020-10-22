@@ -162,8 +162,8 @@ class YamalRegion extends TyRunBaseParser implements ParserInterface
             case 'span':
                 $nodes = $node->children();
                 if ($nodes->count()) {
-                    $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing) {
-                        self::parseNode($node, $newPost, $maxDepth, $stopParsing);
+                    $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing, &$descriptionSentences) {
+                        self::parseNode($node, $newPost, $maxDepth, $stopParsing, $descriptionSentences);
                     });
                 } else {
                     self::parseDescriptionIntersectParagraph($node, $newPost, $descriptionSentences);
@@ -172,8 +172,8 @@ class YamalRegion extends TyRunBaseParser implements ParserInterface
             case 'p':
                 self::parseDescriptionIntersectParagraph($node, $newPost, $descriptionSentences);
                 if ($nodes = $node->children()) {
-                    $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing) {
-                        self::parseNode($node, $newPost, $maxDepth, $stopParsing);
+                    $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing, &$descriptionSentences) {
+                        self::parseNode($node, $newPost, $maxDepth, $stopParsing, $descriptionSentences);
                     });
                 }
                 break;
