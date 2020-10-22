@@ -18,6 +18,10 @@ use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
+
+/**
+ * @rss_html
+ */
 class PravdannParser extends MediasferaNewsParser implements ParserInterface
 {
     public const USER_ID = 2;
@@ -28,7 +32,6 @@ class PravdannParser extends MediasferaNewsParser implements ParserInterface
     public const SITE_URL = 'https://pravda-nn.ru/';
     public const NEWSLIST_URL = 'https://pravda-nn.ru/feed/';
 
-    //    public const TIMEZONE = '+0000';
     public const DATEFORMAT = 'D, d M Y H:i:s O';
 
     public const NEWSLIST_POST = '//rss/channel/item';
@@ -36,7 +39,6 @@ class PravdannParser extends MediasferaNewsParser implements ParserInterface
     public const NEWSLIST_LINK = '//link';
     public const NEWSLIST_DATE = '//pubDate';
     public const NEWSLIST_DESC = '//description';
-//    public const NEWSLIST_TEXT = '//content:encoded'; // Контент кривой, не брать rss
 
     public const ARTICLE_HEADER = 'article .article__title h1';
     public const ARTICLE_IMAGE =  'article .article__thumbnail img';
@@ -63,6 +65,7 @@ class PravdannParser extends MediasferaNewsParser implements ParserInterface
         $listCrawler->filterXPath(self::NEWSLIST_POST)->slice(0, self::NEWS_LIMIT)->each(function (Crawler $node) use (&$posts) {
 
             self::$post = new NewsPostWrapper();
+            self::$post->isPrepareItems = false;
 
             self::$post->title = self::getNodeData('text', $node, self::NEWSLIST_TITLE);
             self::$post->original = self::getNodeData('text', $node, self::NEWSLIST_LINK);
@@ -76,8 +79,6 @@ class PravdannParser extends MediasferaNewsParser implements ParserInterface
                 $articleCrawler = new Crawler($articleContent);
 
                 self::$post->image = self::getNodeImage('src', $articleCrawler, self::ARTICLE_IMAGE);
-                self::$post->itemHeader = [self::getNodeData('text', $articleCrawler, self::ARTICLE_HEADER), 1];
-
 
                 self::parse($articleCrawler->filter(self::ARTICLE_TEXT));
             }
