@@ -42,23 +42,38 @@ class ExemplaireParser implements ParserInterface
             $listSourcePath = self::ROOT_SRC . self::FEED_SRC . "?page=" . $pageId;
 
             $listSourceData = $curl->get("$listSourcePath");
-
+            if (empty($listSourceData)) {
+                throw new Exception("Получен пустой ответ от источника списка новостей: " . $listSourcePath);
+            }
             $crawler = new Crawler($listSourceData);
             $content = $crawler->filter(".view-content div.row div.grid_col");
-
+            if ($content->count() === 0) {
+                throw new Exception("Пустой список новостей в ленте: " . $listSourcePath);
+            }
             foreach ($content as $newsItem) {
-                $node = new Crawler($newsItem);
-                $newsPost = self::inflatePost($node);
-                $posts[] = $newsPost;
-                $counter++;
-                if ($counter >= self::LIMIT) {
-                    break 2;
+                try {
+                    $node = new Crawler($newsItem);
+                    $newsPost = self::inflatePost($node);
+                    $posts[] = $newsPost;
+                    $counter++;
+                    if ($counter >= self::LIMIT) {
+                        break 2;
+                    }
+                } catch (Exception $e) {
+                    error_log($e->getMessage());
+                    continue;
                 }
             }
         }
 
-        foreach ($posts as $post) {
-            self::inflatePostContent($post, $curl);
+        foreach ($posts as $key => $post) {
+            try {
+                self::inflatePostContent($post, $curl);
+            } catch (Exception $e) {
+                error_log($e->getMessage());
+                unset($posts[$key]);
+                continue;
+            }
         }
         return $posts;
     }
@@ -104,56 +119,61 @@ class ExemplaireParser implements ParserInterface
     /**
      * @param NewsPost $post
      * @param          $curl
+     *
+     * @throws Exception
      */
     private static function inflatePostContent(NewsPost $post, $curl)
     {
         $url = $post->original;
-
+        if($post->description === self::EMPTY_DESCRIPTION){
+            $post->description = "";
+        }
         $pageData = $curl->get($url);
+        if (empty($pageData)) {
+            throw new Exception("Получен пустой ответ от страницы новости: " . $url);
+        }
 
         $crawler = new Crawler($pageData);
 
         $content = $crawler->filter("div.main-container section");
 
-        $header = $content->filter("h1");
-        if ($header->count() !== 0) {
-            self::addHeader($post, $header->text(), 1);
-        }
-
-        $anonse = $content->filter("div.field-name-field-anons");
-        if ($anonse->count() !== 0) {
-            self::addHeader($post, $anonse->text(), 4);
-        }
-
-        $image = $content->filter("div.field-name-field-image img");
-        if ($image->count() !== 0) {
-            $image->each(function (Crawler $imageNode) use ($post) {
-                self::addImage($post, $imageNode->attr("src"));
-            });
-        }
-
 
         $body = $content->filter("div.field-name-body div.field-item")->children("p, blockquote");
-
+        if($body->count() === 0){
+            throw new Exception("Не найден блок новости в полученой странице: " . $url);
+        }
         $body->each(function (Crawler $node) use ($post) {
             if (empty(trim($node->text(), "\xC2\xA0"))) {
                 return;
             }
 
-            if ($node->nodeName() === "blockquote") {
+            if ($node->matches("blockquote") && !empty(trim($node->text(), "\xC2\xA0"))) {
                 self::addQuote($post, $node->text());
+                return;
             }
-            if ($node->nodeName() === "p" && $node->children("img")->count() != 0) {
-                self::addImage($post, self::ROOT_SRC . $node->children("img")->attr("src"));
-            } elseif ($node->nodeName() === "p") {
-                self::addText($post, $node->text());
-
-                if ($post->description === self::EMPTY_DESCRIPTION) {
-                    $post->description = Helper::prepareString($node->text());
+            if($node->matches("p")){
+                if ($node->children("img")->count() != 0) {
+                    self::addImage($post, self::ROOT_SRC . $node->children("img")->attr("src"));
+                } else{
+                    if (empty($post->description)) {
+                        $post->description = Helper::prepareString($node->text());
+                    }else{
+                        self::addText($post, $node->text());
+                    }
                 }
             }
 
+
         });
+
+        $body = $content->filter("div.field-name-field-autor-foto div.field-item");
+        if($body->count() !== 0){
+            self::addText($post, $body->text());
+        }
+        $body = $content->filter("div.field-name-field-autors div.field-item");
+        if($body->count() !== 0){
+            self::addText($post, $body->text());
+        }
     }
 
     /**
