@@ -8,8 +8,10 @@ use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use DateTime;
+use DateTimeZone;
 use DOMNode;
 use Exception;
+use linslin\yii2\curl\Curl;
 use Symfony\Component\DomCrawler\Crawler;
 
 
@@ -19,8 +21,9 @@ class InterNovostiParser implements ParserInterface
     const FEED_ID = 2;
 
     const ROOT_SRC = "http://www.internovosti.ru";
-
+    const FEED_SRC = "/xmlnews.asp";
     const LIMIT = 100;
+
 
     /**
      * @return array
@@ -28,29 +31,47 @@ class InterNovostiParser implements ParserInterface
      */
     public static function run(): array
     {
-
         $curl = Helper::getCurl();
+        $posts = [];
 
-        $listSourcePath = self::ROOT_SRC . "/xmlnews.asp";
+        $listSourcePath = self::ROOT_SRC . self::FEED_SRC;
 
         $listSourceData = $curl->get($listSourcePath);
 
-        $newsListData = new Crawler($listSourceData);
-        $newsList = $newsListData->filter("item");
+        if (empty($listSourceData)) {
+            throw new Exception("Получен пустой ответ от источника списка новостей: " . $listSourcePath);
+        }
 
-        $posts = [];
-
-        $newsList->each(function ($newsItem, $index) use (&$posts) {
-            $post = self::inflatePost($newsItem);
+        $crawler = new Crawler($listSourceData);
+        $items = $crawler->filter("item");
+        if ($items->count() === 0) {
+            throw new Exception("Пустой список новостей в ленте: " . $listSourcePath);
+        }
+        $counter = 0;
+        foreach ($items as $item) {
             try {
-                self::inflatePostContent($post);
-                $posts[] = $post;
+                $node = new Crawler($item);
+                $newsPost = self::inflatePost($node);
+                $posts[] = $newsPost;
+                $counter++;
+                if ($counter >= self::LIMIT) {
+                    break;
+                }
             } catch (Exception $e) {
-                error_log("error on:" . $post->original . " | " . $e->getMessage());
-                return;
+                error_log($e->getMessage());
+                continue;
             }
-        });
+        }
 
+        foreach ($posts as $key => $post) {
+            try {
+                self::inflatePostContent($post, $curl);
+            } catch (Exception $e) {
+                error_log($e->getMessage());
+                unset($posts[$key]);
+                continue;
+            }
+        }
         return $posts;
     }
 
@@ -65,11 +86,12 @@ class InterNovostiParser implements ParserInterface
     private static function inflatePost(Crawler $entityData): NewsPost
     {
         $title = $entityData->filter("title")->text();
-        $createDate = new DateTime($entityData->filter("pubDate")->text());
-        $createDate->setTimezone(new \DateTimeZone("UTC"));
+
         $description = $entityData->filter("description")->text();
         $original = $entityData->filter("link")->text();
+        $createDate = new DateTime($entityData->filterXPath("item/pubDate")->text());
 
+        $createDate->setTimezone(new DateTimeZone("UTC"));
         $imageUrl = $entityData->filter("enclosure")->attr("url");
 
         return new NewsPost(
@@ -84,40 +106,37 @@ class InterNovostiParser implements ParserInterface
 
     /**
      * @param NewsPost $post
+     * @param Curl     $curl
      *
      * @throws Exception
      */
-    private static function inflatePostContent(NewsPost $post)
+    private static function inflatePostContent(NewsPost $post, Curl $curl)
     {
         $url = $post->original;
-        $curl = Helper::getCurl();
-        $srcData = iconv('Windows-1251', 'UTF-8', $curl->get($url));
 
-        $page = new Crawler($srcData);
-
-        $content = $page->filter("span.mytime")->parents()->first();
-
-
-        $header = $content->filter("h1")->text();
-        if (!empty($header)) {
-            self::addHeader($post, $header, 1);
+        $pageData = iconv('Windows-1251', 'UTF-8', $curl->get($url));
+        if (empty($pageData)) {
+            throw new Exception("Получен пустой ответ от страницы новости: " . $url);
         }
 
-        $image = $content->filter("img")->first()->attr("src");
-        if (!empty($image)) {
-            self::addImage($post, $image);
+
+        $page = new Crawler($pageData);
+
+        $body = $page->filter("span.mytime")->parents()->first();
+        if ($body->count() === 0) {
+            throw new Exception("Не найден блок новости в полученой странице: " . $url);
         }
 
-        $photoText = $content->filter("span.mysmall")->text();
+        $photoText = $body->filter("span.mysmall")->text();
         if (!empty($photoText)) {
             self::addText($post, $photoText);
         }
 
         $text = "";
         /** @var DOMNode $node */
-        foreach ($content->getNode(0)->childNodes as $node) {
-            if(strpos(trim($node->textContent), "Для добавления комментария ") === 0){
-                if(!empty($text)) {
+        foreach ($body->getNode(0)->childNodes as $node) {
+            if (strpos(trim($node->textContent), "Для добавления комментария ") === 0) {
+                if (!empty($text)) {
                     self::addText($post, $text);
                 }
                 break;
@@ -129,7 +148,7 @@ class InterNovostiParser implements ParserInterface
             if ($node->nodeName === 'a' && trim($node->textContent) !== "") {
                 $text .= " " . trim($node->textContent) . " ";
             }
-            if($node->nodeName === "br" && !empty($text)){
+            if ($node->nodeName === "br" && !empty($text)) {
                 self::addText($post, $text);
                 $text = "";
             }
@@ -139,43 +158,8 @@ class InterNovostiParser implements ParserInterface
     /**
      * @param NewsPost $post
      * @param string   $content
-     * @param int      $level
      */
-    protected static function addHeader(NewsPost $post, string $content, int $level): void
-    {
-        $post->addItem(
-            new NewsPostItem(
-                NewsPostItem::TYPE_HEADER,
-                $content,
-                null,
-                null,
-                $level,
-                null
-            ));
-    }
-
-    /**
-     * @param NewsPost $post
-     * @param string   $content
-     */
-    protected static function addImage(NewsPost $post, string $content): void
-    {
-        $post->addItem(
-            new NewsPostItem(
-                NewsPostItem::TYPE_IMAGE,
-                null,
-                $content,
-                null,
-                1,
-                null
-            ));
-    }
-
-    /**
-     * @param NewsPost $post
-     * @param string   $content
-     */
-    protected static function addText(NewsPost $post, string $content): void
+    private static function addText(NewsPost $post, string $content): void
     {
         $post->addItem(
             new NewsPostItem(
@@ -188,21 +172,17 @@ class InterNovostiParser implements ParserInterface
             ));
     }
 
+
     /**
-     * @param NewsPost $post
-     * @param string   $content
+     * @param string $content
+     *
+     * @return string
      */
-    protected static function addQuote(NewsPost $post, string $content): void
+    protected static function normalizeUrl(string $content)
     {
-        $post->addItem(
-            new NewsPostItem(
-                NewsPostItem::TYPE_QUOTE,
-                $content,
-                null,
-                null,
-                null,
-                null
-            ));
+        return preg_replace_callback('/[^\x21-\x7f]/', function ($match) {
+            return rawurlencode($match[0]);
+        }, $content);
     }
 }
 
