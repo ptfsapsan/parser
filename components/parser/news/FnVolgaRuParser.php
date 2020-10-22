@@ -18,7 +18,11 @@ use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
-class FnVolnaParser extends MediasferaNewsParser implements ParserInterface
+
+/**
+ * @fullrss
+ */
+class FnVolgaRuParser extends MediasferaNewsParser implements ParserInterface
 {
     public const USER_ID = 2;
     public const FEED_ID = 2;
@@ -28,7 +32,6 @@ class FnVolnaParser extends MediasferaNewsParser implements ParserInterface
     public const SITE_URL = 'https://fn-volga.ru/';
     public const NEWSLIST_URL = 'https://fn-volga.ru/rss';
 
-    //    public const TIMEZONE = '+0000';
     public const DATEFORMAT = 'D, d M Y H:i:s O';
 
     public const NEWSLIST_POST = '//rss/channel/item';
@@ -49,6 +52,12 @@ class FnVolnaParser extends MediasferaNewsParser implements ParserInterface
 
         $listContent = self::getPage(self::NEWSLIST_URL);
 
+        //на кривых ссылках xml тихо умирает/ ghbvth: https://www.youtube.com/embed/fB6pV7W3_OY&feature=youtu.be
+        $regex = '/<enclosure\s+url=\"((?\'url\'[^)]*))\".*\/>/Um';
+        $listContent = preg_replace_callback($regex, function ($match)  {
+            return str_replace($match['url'], htmlentities($match['url']), $match[0]);
+        }, $listContent);
+
         $listCrawler = new Crawler($listContent);
 
         $listCrawler->filterXPath(self::NEWSLIST_POST)->slice(0, self::NEWS_LIMIT)->each(function (Crawler $node) use (&$posts) {
@@ -58,7 +67,7 @@ class FnVolnaParser extends MediasferaNewsParser implements ParserInterface
             self::$post->title = self::getNodeData('text', $node, self::NEWSLIST_TITLE);
             self::$post->original = self::getNodeData('text', $node, self::NEWSLIST_LINK);
             self::$post->createDate = self::getNodeDate('text', $node, self::NEWSLIST_DATE);
-            self::$post->description = self::getNodeData('text', $node, self::NEWSLIST_DESC);
+            self::$post->description = html_entity_decode(self::getNodeData('text', $node, self::NEWSLIST_DESC));
             self::$post->image = self::getNodeData('url', $node, self::NEWSLIST_IMG);
 
             $content = self::getNodeData('text', $node, self::NEWSLIST_CONTENT);
@@ -71,5 +80,19 @@ class FnVolnaParser extends MediasferaNewsParser implements ParserInterface
         });
 
         return $posts;
+    }
+
+
+    protected static function parseNode(Crawler $node, ?string $filter = null): void
+    {
+        $node = static::filterNode($node, $filter);
+
+        if($node->nodeName() == 'ul') {
+            static::parseSection($node);
+            return;
+        }
+
+
+        parent::parseNode($node);
     }
 }
