@@ -18,6 +18,10 @@ use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
+
+/**
+ * @rss_html
+ */
 class VpravdaParser extends MediasferaNewsParser implements ParserInterface
 {
     public const USER_ID = 2;
@@ -28,16 +32,16 @@ class VpravdaParser extends MediasferaNewsParser implements ParserInterface
     public const SITE_URL = 'https://vpravda.ru/';
     public const NEWSLIST_URL = 'https://vpravda.ru/yandex.turbo.rss';
 
-    //    public const TIMEZONE = '+0000';
     public const DATEFORMAT = 'D, d M Y H:i:s O';
 
     public const NEWSLIST_POST = '//rss/channel/item';
     public const NEWSLIST_TITLE = '//title';
     public const NEWSLIST_LINK = '//link';
     public const NEWSLIST_DATE = '//pubDate';
-    public const NEWSLIST_CONTENT = '//turbo:content';
-//    public const NEWSLIST_DESC = '//description';
-//    public const NEWSLIST_IMG = '//enclosure';
+
+    public const ARTICLE_IMAGE = 'article .field-name-field-article-image img';
+    public const ARTICLE_DESC = 'article .field-name-field-article-lead';
+    public const ARTICLE_TEXT = 'article .field-name-body';
 
     protected static NewsPostWrapper $post;
 
@@ -52,32 +56,27 @@ class VpravdaParser extends MediasferaNewsParser implements ParserInterface
         $listCrawler->filterXPath(self::NEWSLIST_POST)->slice(0, self::NEWS_LIMIT)->each(function (Crawler $node) use (&$posts) {
 
             self::$post = new NewsPostWrapper();
+            self::$post->isPrepareItems = false;
 
             self::$post->title = self::getNodeData('text', $node, self::NEWSLIST_TITLE);
             self::$post->original = self::getNodeData('text', $node, self::NEWSLIST_LINK);
             self::$post->createDate = self::getNodeDate('text', $node, self::NEWSLIST_DATE);
 
-            $html = static::filterNode($node, self::NEWSLIST_CONTENT)->html();
+            $articleContent = self::getPage(self::$post->original);
 
-            $articleCrawler = new Crawler('<body><div>'.$html.'</div></body>');
+            if (!empty($articleContent)) {
 
-            static::parse($articleCrawler);
+                $articleCrawler = new Crawler($articleContent);
 
-            $newsPost = self::$post->getNewsPost();
+                self::$post->description = self::getNodeData('text', $articleCrawler, self::ARTICLE_DESC);
+                self::$post->image = self::getNodeImage('src', $articleCrawler, self::ARTICLE_IMAGE);
 
-            foreach ($newsPost->items as $key => $item) {
-                if(strpos($item->text, '[item') !== false) {
-                    unset($newsPost->items[$key]);
-                    continue;
-                }
-                if($item->type == NewsPostItem::TYPE_TEXT) {
-                    if(strpos($item->text, '–') === 0 && substr_count($item->text, '–') > 1) {
-                        $newsPost->items[$key]->type = NewsPostItem::TYPE_QUOTE;
-                    }
-                }
+                $contentNode = $articleCrawler->filter(self::ARTICLE_TEXT);
+
+                self::parse($contentNode);
+
+                $posts[] = self::$post->getNewsPost();
             }
-
-            $posts[] = $newsPost;
         });
 
         return $posts;
