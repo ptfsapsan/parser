@@ -32,12 +32,13 @@ class BloknotVoronezhMainParser extends AbstractBaseParser
             $previewNewsContent = $this->getPageContent($uriPreviewPage);
             $previewNewsCrawler = new Crawler($previewNewsContent);
         } catch (Throwable $exception) {
-            if (count($previewList) < $minNewsCount) {
-                throw new RuntimeException('Не удалось получить достаточное кол-во новостей', null, $exception);
-            }
+            throw new RuntimeException('Не удалось получить достаточное кол-во новостей', null, $exception);
         }
 
         $previewNewsCrawler = $previewNewsCrawler->filterXPath('//item');
+        if ($previewNewsCrawler->count() < $minNewsCount) {
+            throw new RuntimeException('Не удалось получить достаточное кол-во новостей');
+        }
 
         $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$previewList) {
             $title = $newsPreview->filterXPath('//title')->text();
@@ -52,6 +53,9 @@ class BloknotVoronezhMainParser extends AbstractBaseParser
             $previewList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $title, $preview);
         });
 
+        if (count($previewList) < $minNewsCount) {
+            throw new RuntimeException('Не удалось получить достаточное кол-во новостей');
+        }
         $previewList = array_slice($previewList, 0, $maxNewsCount);
 
         return $previewList;
