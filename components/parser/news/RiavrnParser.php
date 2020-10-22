@@ -17,6 +17,10 @@ use app\components\mediasfera\NewsPostWrapper;
 use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
+
+/**
+ * @fullrss
+ */
 class RiavrnParser extends MediasferaNewsParser implements ParserInterface
 {
     public const USER_ID = 2;
@@ -27,7 +31,6 @@ class RiavrnParser extends MediasferaNewsParser implements ParserInterface
     public const SITE_URL = 'https://riavrn.ru/';
     public const NEWSLIST_URL = 'https://riavrn.ru/news/yandex-rss/';
 
-    //    public const TIMEZONE = '+0000';
     public const DATEFORMAT = 'D, d M Y H:i:s O';
 
     public const NEWSLIST_POST = '//rss/channel/item';
@@ -64,8 +67,8 @@ class RiavrnParser extends MediasferaNewsParser implements ParserInterface
 
             $contentNode = ($node->attr('turbo') == 'true') ? '//turbo:content' : '//yandex:full-text';
 
-
             $html = static::filterNode($node, $contentNode)->html();
+            $html = str_replace("\n", ' ', $html);
 
             $articleCrawler = new Crawler('<body><div>'.$html.'</div></body>');
 
