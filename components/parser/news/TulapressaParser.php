@@ -18,6 +18,8 @@ use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
+
+
 class TulapressaParser extends MediasferaNewsParser implements ParserInterface
 {
     public const USER_ID = 2;
@@ -31,12 +33,13 @@ class TulapressaParser extends MediasferaNewsParser implements ParserInterface
     public const TIMEZONE = '+0300';
     public const DATEFORMAT = 'd.m.Y, H:i';
 
+    public const ATTR_IMAGE = 'data-lazy-src';
+    public const ATTR_VIDEO_IFRAME = 'data-lazy-src';
+
     public const NEWSLIST_POST = '.main-content .right__lenta .last__news_item';
     public const NEWSLIST_TITLE = 'a';
     public const NEWSLIST_LINK = 'a';
-//    public const NEWSLIST_DATE = 'time';
 
-    public const ARTICLE_HEADER = '.single-content .content h1';
     public const ARTICLE_DATE = '.single-content .content .print_date_show';
     public const ARTICLE_DESC = '.single-content .content .preview';
     public const ARTICLE_IMAGE =  '.single-content .content .images img';
@@ -71,7 +74,6 @@ class TulapressaParser extends MediasferaNewsParser implements ParserInterface
                 self::$post->image = self::getNodeImage('data-lazy-src', $articleCrawler, self::ARTICLE_IMAGE);
                 self::$post->createDate = self::getNodeDate('text', $articleCrawler, self::ARTICLE_DATE);
                 self::$post->description = self::getNodeData('text', $articleCrawler, self::ARTICLE_DESC);
-                self::$post->itemHeader = [self::getNodeData('text', $articleCrawler, self::ARTICLE_HEADER), 1];
 
                 self::parse($articleCrawler->filter(self::ARTICLE_TEXT));
             }
@@ -80,87 +82,5 @@ class TulapressaParser extends MediasferaNewsParser implements ParserInterface
         });
 
         return $posts;
-    }
-
-
-    protected static function parseNode(Crawler $node, ?string $filter = null) : void
-    {
-        $node = static::filterNode($node, $filter);
-
-        $nodeName = $node->nodeName();
-
-        switch ($nodeName)
-        {
-            case 'img' :
-                static::$post->itemImage = [
-                    $node->attr('alt') ?? $node->attr('title') ?? null,
-                    static::getNodeImage('data-lazy-src', $node)
-                ];
-                break;
-
-            case 'picture' :
-                if($node->filter('img')->count()) {
-                    static::$post->itemImage = [
-                        $node->filter('img')->attr('alt') ?? $node->filter('img')->attr('title') ?? null,
-                        static::getNodeImage('data-lazy-src', $node->filter('img'))
-                    ];
-                }
-                break;
-
-            case 'figure' :
-                if($node->filter('img')->count() == 1) {
-                    static::$post->itemImage = [
-                        $node->text() ?? $node->filter('img')->attr('alt') ?? $node->filter('img')->attr('title') ?? null,
-                        static::getNodeImage('data-lazy-src', $node->filter('img'))
-                    ];
-                }
-                else {
-                    static::parseSection($node);
-                }
-                break;
-
-            case 'a' :
-                if($node->filter('img')->count() == 1) {
-                    static::$post->itemImage = [
-                        $node->attr('alt') ?? $node->attr('title') ?? null ?? $node->text(),
-                        static::getNodeImage('data-lazy-src', $node->filter('img')),
-                    ];
-                }
-                else {
-                    static::$post->itemLink = [
-                        $node->text() ?? $node->attr('href'),
-                        static::getNodeLink('href', $node)
-                    ];
-                }
-                break;
-            default :
-                parent::parseNode($node, $filter);
-        }
-    }
-
-
-    public static function getNodeVideoId(Crawler $node) : ?string
-    {
-        switch ($node->nodeName())
-        {
-            case 'iframe' :
-                $src = $node->attr('data-lazy-src') ?? $node->attr('src');
-                break;
-            default :
-                $src = null;
-                break;
-        }
-
-        if(!$src) {
-            return parent::getNodeVideoId($node);
-        }
-
-        $pattern = '%(?:youtube(?:-nocookie)?\.com/(?:[^/]+/.+/|(?:v|e(?:mbed)?)/|.*[?&]v=)|youtu\.be/)([^"&?/\s]{11})%i';
-
-        if (preg_match($pattern, $src, $match)) {
-            return $match[1];
-        }
-
-        return parent::getNodeVideoId($node);
     }
 }
