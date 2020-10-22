@@ -27,21 +27,17 @@ class PortofrankoVlParser extends MediasferaNewsParser implements ParserInterfac
     public const SITE_URL = 'https://portofranko-vl.ru';
     public const NEWSLIST_URL = 'https://portofranko-vl.ru';
 
-//    public const TIMEZONE = '+1000';
     public const DATEFORMAT = 'd.m.Y H:i O';
 
     public const NEWSLIST_POST = '.block-newslist a.newslist-element';
     public const NEWSLIST_TITLE = '.post-title';
-    public const NEWSLIST_IMAGE = 'img';
 
     public const NEWSLIST_TIME = '.post-time';
     public const ARTICLE_DATE =   '.block-postcontent .post-time';
 
-    public const ARTICLE_HEADER = '.block-postcontent h2';
     public const ARTICLE_IMAGE =  '.block-postcontent img.attachment-post-thumbnail';
-
-
     public const ARTICLE_TEXT = '.block-postcontent div:nth-of-type(3)';
+    public const ARTICLE_DESC = '.block-postcontent div:nth-of-type(3) p:first-of-type';
 
     public const ARTICLE_BREAKPOINTS = [];
 
@@ -61,7 +57,6 @@ class PortofrankoVlParser extends MediasferaNewsParser implements ParserInterfac
 
             self::$post->title = self::getNodeData('text', $node, self::NEWSLIST_TITLE);
             self::$post->original = self::getNodeLink('href', $node);
-            self::$post->image = self::getNodeImage('src', $node, self::NEWSLIST_IMAGE);
 
             $articleContent = self::getPage(self::$post->original);
 
@@ -75,12 +70,8 @@ class PortofrankoVlParser extends MediasferaNewsParser implements ParserInterfac
                 $date = $date . ' ' . trim(array_pop($time)) . ' +1000';
 
                 self::$post->createDate = self::fixDate($date);
-
-                self::$post->itemHeader = [self::getNodeData('text', $articleCrawler, self::ARTICLE_HEADER), 1];
-                self::$post->itemImage = [
-                    self::getNodeData('alt', $articleCrawler, self::ARTICLE_IMAGE),
-                    self::getNodeImage('src', $articleCrawler, self::ARTICLE_IMAGE)
-                ];
+                self::$post->image = self::getNodeImage('src', $articleCrawler, self::ARTICLE_IMAGE);
+                self::$post->description = self::getNodeData('text', $articleCrawler, self::ARTICLE_DESC);
 
                 self::parse($articleCrawler->filter(self::ARTICLE_TEXT));
 
@@ -96,8 +87,6 @@ class PortofrankoVlParser extends MediasferaNewsParser implements ParserInterfac
 
                 $posts[] = $newsPost;
             }
-
-
         });
 
         return $posts;
