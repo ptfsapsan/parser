@@ -104,7 +104,7 @@ class RodKray31Parser implements ParserInterface
                         if ($node->nodeName() === "div") {
                             $innerImage = $node->filter("img");
                             if ($innerImage->count() && !empty($innerImage->attr("src"))) {
-                                self::addImage($post, $innerImage->attr("src"));
+                                self::addImage($post, self::ROOT_SRC . $innerImage->attr("src"));
                             }
                             $photoText = $node->filter("small");
                             if ($photoText->count() && !empty($photoText->text())) {
