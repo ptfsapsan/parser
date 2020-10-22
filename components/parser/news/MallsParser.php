@@ -17,6 +17,9 @@ use app\components\mediasfera\NewsPostWrapper;
 use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
+/**
+ * @rss_html
+ */
 class MallsParser extends MediasferaNewsParser implements ParserInterface
 {
     public const USER_ID = 2;
@@ -27,7 +30,6 @@ class MallsParser extends MediasferaNewsParser implements ParserInterface
     public const SITE_URL = 'https://www.malls.ru/';
     public const NEWSLIST_URL = 'https://www.malls.ru/news.rss';
 
-    //    public const TIMEZONE = '+0000';
     public const DATEFORMAT = 'D, d M Y H:i:s O';
 
     public const NEWSLIST_POST = '//rss/channel/item';
@@ -37,10 +39,25 @@ class MallsParser extends MediasferaNewsParser implements ParserInterface
     public const NEWSLIST_DESC = '//description';
     public const NEWSLIST_IMG = '//enclosure';
 
-    public const ARTICLE_HEADER = 'article h1[itemprop="name"]';
-    public const ARTICLE_TEXT = 'article [itemprop="articleBody"]';
+    public const ARTICLE_TEXT = 'article.article';
 
-        public const ARTICLE_BREAKPOINTS = [];
+    public const ARTICLE_BREAKPOINTS = [
+        'itemprop' => [
+            'name' => false,
+            'datePublished' => false,
+            'description' => false,
+            'publisher' => false,
+        ],
+        'class' => [
+            'addthis_inline_share_toolbox' => false,
+            'at4-jumboshare' => false,
+            'place' => false,
+        ],
+        'id' => [
+            'content_rb_122089' => false,
+            'atstbx' => false,
+        ],
+    ];
 
     protected static NewsPostWrapper $post;
 
@@ -56,11 +73,15 @@ class MallsParser extends MediasferaNewsParser implements ParserInterface
 
             $title = self::getNodeData('text', $node, self::NEWSLIST_TITLE);
 
+            /**
+             * статья с агрегацией новостей
+             */
             if(strpos($title, 'Новости недели:') === 0) {
                 return;
             }
 
             self::$post = new NewsPostWrapper();
+            self::$post->isPrepareItems = false;
 
             self::$post->title = $title;
 
@@ -74,8 +95,6 @@ class MallsParser extends MediasferaNewsParser implements ParserInterface
             if (!empty($articleContent)) {
 
                 $articleCrawler = new Crawler($articleContent);
-
-                self::$post->itemHeader = [self::getNodeData('text', $articleCrawler, self::ARTICLE_HEADER), 1];
 
                 self::parse($articleCrawler->filter(self::ARTICLE_TEXT));
             }
@@ -92,7 +111,12 @@ class MallsParser extends MediasferaNewsParser implements ParserInterface
 
                 $text = ltrim($item->text, static::CHECK_EMPTY_CHARS);
 
-                if((strpos($text, 'Фото:') === 0)) {
+                if(
+                    strpos($text, 'Фото:') === 0 ||
+                    strpos($text, 'Подписывайтесь на') === 0 ||
+                    strpos($text, 'Подробнее про') === 0 ||
+                    strpos($text, 'Источник') === 0
+                ) {
                     unset($newsPost->items[$key]);
                     $removeNext = true;
                 }
