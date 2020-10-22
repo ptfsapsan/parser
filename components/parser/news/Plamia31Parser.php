@@ -36,9 +36,11 @@ class Plamia31Parser implements ParserInterface
 
         $listSourcePath = $listSourcePath = self::ROOT_SRC . self::FEED_SRC . "?limit=" . self::LIMIT;
         $listSourceData = $curl->get("$listSourcePath", false);
-
+        if(empty($listSourceData)){
+            throw new Exception("Получен пустой ответ от источника списка новостей: ". $listSourcePath);
+        }
         if (!isset($listSourceData["results"]) && !isset($listSourceData["results"]["objects"])) {
-            throw new Exception("Could not get news feed.");
+            throw new Exception("Пустой список новостей в ленте: ". $listSourcePath);
         }
 
         $content = $listSourceData["results"]["objects"];
@@ -47,7 +49,6 @@ class Plamia31Parser implements ParserInterface
             try {
                 $entityUrl = $item["entity_url"];
                 $entityData = $curl->get($entityUrl, false);
-
                 $post = self::inflatePost($entityData);
                 $posts[] = $post;
 
@@ -120,8 +121,8 @@ class Plamia31Parser implements ParserInterface
         $url = $post->original;
 
         $pageData = $curl->get($url);
-        if ($pageData === false) {
-            throw new Exception("Url is wrong? nothing received: " . $url);
+        if (empty($pageData)) {
+            throw new Exception("Получен пустой ответ от страницы новости: " . $url);
         }
         $crawler = new Crawler($pageData);
 
@@ -130,16 +131,6 @@ class Plamia31Parser implements ParserInterface
 
         $headerRow = $content->filter("div.container")->eq(1);
 
-        $header = $headerRow->filter("h1");
-
-        if ($header->count() !== 0) {
-            self::addHeader($post, $header->text(), 1);
-        }
-
-        $image = $headerRow->filter("div.topic_image img");
-        if ($image->count() !== 0) {
-            self::addImage($post, self::ROOT_SRC . $image->attr("src"));
-        }
 
         $imageCarousel = $headerRow->filter("div.publication-carousel.photoreport-carousel img");
         if ($imageCarousel->count() !== 0) {
@@ -149,17 +140,11 @@ class Plamia31Parser implements ParserInterface
 
         }
 
-
-        $header = $headerRow->filter("p.lead");
-
-        if ($header->count() !== 0) {
-            self::addHeader($post, $header->text(), 4);
+        $body = $content->filter("div.theme-default > p, div.theme-default > blockquote, div.theme-default > div");
+        if($body->count() === 0){
+            throw new Exception("Не найден блок новости в полученой странице: " . $url);
         }
-
-
-        $bodyNodes = $content->filter("div.theme-default > p, div.theme-default > blockquote, div.theme-default > div");
-
-        foreach ($bodyNodes as $bodyNode) {
+        foreach ($body as $bodyNode) {
             $node = new Crawler($bodyNode);
             if (!empty(trim($node->text(), "\xC2\xA0"))) {
 
