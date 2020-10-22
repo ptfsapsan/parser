@@ -26,7 +26,7 @@ class CORE_InNewsRu_Parser extends ParserCore implements ParserInterface
     // (НЕ ИЗМЕНЯТЬ САМОСТОЯТЕЛЬНО!)
     const FOR_CORE_VERSION = '1.0';
     // дебаг-режим (только для разработки) - выводит информацию о действиях парсера
-    protected const DEBUG = true;
+    protected const DEBUG = false;
 
     public function __construct()
     {
@@ -38,7 +38,7 @@ class CORE_InNewsRu_Parser extends ParserCore implements ParserInterface
 
             // максимальное количество новостей, берушихся с витрины
             // (опционально)
-                        'itemsLimit' => 1,
+            //            'itemsLimit' => 1,
 
             // настройки сайта
             'site'    => [
