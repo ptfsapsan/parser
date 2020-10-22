@@ -12,15 +12,15 @@ use Exception;
 use Symfony\Component\DomCrawler\Crawler;
 
 /**
- * Парсер новостей из RSS ленты arbuztoday.ru
+ * Парсер новостей из RSS ленты 4s-info.ru
  *
  */
-class ArbuzToday extends TyRunBaseParser implements ParserInterface
+class Info4s extends TyRunBaseParser implements ParserInterface
 {
     const USER_ID = 2;
     const FEED_ID = 2;
 
-    const MAIN_PAGE_URI = 'https://arbuztoday.ru';
+    const MAIN_PAGE_URI = 'https://4s-info.ru';
 
     /**
      * CSS класс, где хранится содержимое новости
@@ -41,13 +41,13 @@ class ArbuzToday extends TyRunBaseParser implements ParserInterface
     /**
      * Класс элемента после которого парсить страницу не имеет смысла (контент статьи закончился)
      */
-    const CUT_CSS_CLASS = '';
+    const CUT_CSS_CLASS = 'ya-share2';
 
 
     /**
      * Ссылка на RSS фид (XML)
      */
-    const FEED_URL = 'https://arbuztoday.ru/feed/';
+    const FEED_URL = 'https://4s-info.ru/feed/';
 
     /**
      *  Максимальная глубина для парсинга <div> тегов
@@ -82,7 +82,8 @@ class ArbuzToday extends TyRunBaseParser implements ParserInterface
             $newPost = new NewsPost(
                 self::class,
                 $node->filter('title')->text(),
-                $node->filter('description')->text(),
+                self::prepareDescription($node->filter('description')->text(),
+                    '/(.*)\.(.*)(\[&#8230;])(.*)/'),
                 self::stringToDateTime($node->filter('pubDate')->text()),
                 $node->filter('link')->text(),
                 null
@@ -103,7 +104,7 @@ class ArbuzToday extends TyRunBaseParser implements ParserInterface
                 /**
                  * Основное фото ( всегда одно в начале статьи)
                  */
-                $mainImage = $newsContent->filter('.news-single-prev img');
+                $mainImage = $newsContent->filter('.post-thumbnail img');
                 if ($mainImage->count()) {
                     if ($mainImage->attr('src')) {
                         $newPost->image = self::urlEncode($mainImage->attr('src'));
@@ -113,7 +114,7 @@ class ArbuzToday extends TyRunBaseParser implements ParserInterface
                 /**
                  * Подпись под основным фото
                  */
-                $annotation = $newsContent->filter('.thumbnail_descr');
+                $annotation = $newsContent->filter('.wp-caption-text');
                 if ($annotation->count() && !empty($annotation->text())) {
                     $newPost->addItem(
                         new NewsPostItem(
@@ -130,7 +131,7 @@ class ArbuzToday extends TyRunBaseParser implements ParserInterface
                  * Текст статьи, может содержать цитаты ( все полезное содержимое в тегах <p> )
                  * Не знаю нужно или нет, но сделал более универсально, с рекурсией
                  */
-                $articleContent = $newsContent->filter('.elements-box')->children();
+                $articleContent = $newsContent->filter('.single-content')->children();
                 $stopParsing = false;
                 if ($articleContent->count()) {
                     $articleContent->each(function ($node) use ($newPost, &$stopParsing, $descriptionSentences) {
@@ -178,6 +179,10 @@ class ArbuzToday extends TyRunBaseParser implements ParserInterface
         }
         $maxDepth--;
 
+        if ($node->text() == 'Поделиться:') {
+            return;
+        }
+
         switch ($node->nodeName()) {
             case 'div': //запускаем рекурсивно на дочерние ноды, если есть, если нет то там обычно ненужный шлак
             case 'span':
@@ -190,11 +195,6 @@ class ArbuzToday extends TyRunBaseParser implements ParserInterface
                 break;
             case 'p':
                 self::parseDescriptionIntersectParagraph($node, $newPost, $descriptionSentences);
-                if ($nodes = $node->children()) {
-                    $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing) {
-                        self::parseNode($node, $newPost, $maxDepth, $stopParsing);
-                    });
-                }
                 break;
             case 'img':
                 self::parseImage($node, $newPost);

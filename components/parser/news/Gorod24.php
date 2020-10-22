@@ -12,25 +12,23 @@ use Exception;
 use Symfony\Component\DomCrawler\Crawler;
 
 /**
- * Парсер новостей из RSS ленты arbuztoday.ru
+ * Парсер новостей из RSS ленты gorod24.online
  *
  */
-class ArbuzToday extends TyRunBaseParser implements ParserInterface
+class Gorod24 extends TyRunBaseParser implements ParserInterface
 {
     const USER_ID = 2;
     const FEED_ID = 2;
 
-    const MAIN_PAGE_URI = 'https://arbuztoday.ru';
-
     /**
      * CSS класс, где хранится содержимое новости
      */
-    const BODY_CONTAINER_CSS_SELECTOR = '.post';
+    const BODY_CONTAINER_CSS_SELECTOR = '.content-wrap-news-body';
 
     /**
      * CSS  класс для параграфов - цитат
      */
-    const QUOTE_TAG = 'em';
+    const QUOTE_TAG = 'blockquote';
 
     /**
      * Классы эоементов, которые не нужно парсить, например блоки с рекламой и т.п.
@@ -41,18 +39,17 @@ class ArbuzToday extends TyRunBaseParser implements ParserInterface
     /**
      * Класс элемента после которого парсить страницу не имеет смысла (контент статьи закончился)
      */
-    const CUT_CSS_CLASS = '';
-
+    const CUT_CSS_REGEXP = '/addtoany_share_save_container/';
 
     /**
      * Ссылка на RSS фид (XML)
      */
-    const FEED_URL = 'https://arbuztoday.ru/feed/';
+    const FEED_URL = 'https://gorod24.online/rss';
 
     /**
      *  Максимальная глубина для парсинга <div> тегов
      */
-    const MAX_PARSE_DEPTH = 3;
+    const MAX_PARSE_DEPTH = 10;
 
     /**
      * Префикс для элементов списков (ul, ol и т.п.)
@@ -64,7 +61,7 @@ class ArbuzToday extends TyRunBaseParser implements ParserInterface
     /**
      * Кол-во новостей, которое необходимо парсить
      */
-    const MAX_NEWS_COUNT = 10;
+    const MAX_NEWS_COUNT = 3;
 
     /**
      * @return array
@@ -78,59 +75,46 @@ class ArbuzToday extends TyRunBaseParser implements ParserInterface
 
         $crawler = new Crawler($rss);
         $crawler->filter('rss channel item')->slice(0, self::MAX_NEWS_COUNT)->each(function (Crawler $node) use (&$curl, &$posts) {
-
             $newPost = new NewsPost(
                 self::class,
                 $node->filter('title')->text(),
-                $node->filter('description')->text(),
+                $node->filter('description')->text() ? $node->filter('description')->text() : '-',
                 self::stringToDateTime($node->filter('pubDate')->text()),
                 $node->filter('link')->text(),
-                null
+                $node->filterXPath('//media:thumbnail')->attr('url')
             );
-
-            /**
-             * Предложения содержащиеся в описании (для последующей проверки при парсинга тела новости)
-             */
-            $descriptionSentences = explode('. ', html_entity_decode($newPost->description));
 
             /**
              * Получаем полный html новости
              */
             $newsContent = $curl->get($newPost->original);
-
             if (!empty($newsContent)) {
                 $newsContent = (new Crawler($newsContent))->filter(self::BODY_CONTAINER_CSS_SELECTOR);
                 /**
-                 * Основное фото ( всегда одно в начале статьи)
+                 * Если в rss нет описания то берем первый абзац из новости
                  */
-                $mainImage = $newsContent->filter('.news-single-prev img');
-                if ($mainImage->count()) {
-                    if ($mainImage->attr('src')) {
-                        $newPost->image = self::urlEncode($mainImage->attr('src'));
+                if ($newPost->description === '-') {
+                    foreach ($newsContent->filter('p') as $content) {
+                        $node = new Crawler($content);
+                        if ($node->text()) {
+                            $newPost->description = $node->text();
+                            break;
+                        }
                     }
                 }
 
                 /**
-                 * Подпись под основным фото
+                 * Предложения содержащиеся в описании (для последующей проверки при парсинга тела новости)
                  */
-                $annotation = $newsContent->filter('.thumbnail_descr');
-                if ($annotation->count() && !empty($annotation->text())) {
-                    $newPost->addItem(
-                        new NewsPostItem(
-                            NewsPostItem::TYPE_TEXT,
-                            $annotation->text(),
-                            null,
-                            null,
-                            null,
-                            null
-                        ));
-                }
+                $descriptionSentences = explode(
+                    '. ',
+                    html_entity_decode(trim($newPost->description, '  \t\n\r\0\x0B.'))
+                );
 
                 /**
                  * Текст статьи, может содержать цитаты ( все полезное содержимое в тегах <p> )
-                 * Не знаю нужно или нет, но сделал более универсально, с рекурсией
                  */
-                $articleContent = $newsContent->filter('.elements-box')->children();
+                $articleContent = $newsContent->children();
                 $stopParsing = false;
                 if ($articleContent->count()) {
                     $articleContent->each(function ($node) use ($newPost, &$stopParsing, $descriptionSentences) {
@@ -164,7 +148,8 @@ class ArbuzToday extends TyRunBaseParser implements ParserInterface
          * (до определенного элемента с классом указанным в @see CUT_CSS_CLASS )
          *
          */
-        if (self::CUT_CSS_CLASS && stristr($node->attr('class'), self::CUT_CSS_CLASS)) {
+        $stringForCheck = $node->attr('id').' '.$node->attr('class');
+        if (self::CUT_CSS_REGEXP && preg_match(self::CUT_CSS_REGEXP, $stringForCheck)) {
             $maxDepth = 0;
             $stopParsing = true;
         }
@@ -179,8 +164,7 @@ class ArbuzToday extends TyRunBaseParser implements ParserInterface
         $maxDepth--;
 
         switch ($node->nodeName()) {
-            case 'div': //запускаем рекурсивно на дочерние ноды, если есть, если нет то там обычно ненужный шлак
-            case 'span':
+            case 'div':
                 $nodes = $node->children();
                 if ($nodes->count()) {
                     $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing) {
@@ -196,6 +180,9 @@ class ArbuzToday extends TyRunBaseParser implements ParserInterface
                     });
                 }
                 break;
+            case self::QUOTE_TAG:
+                self::parseQuote($node, $newPost);
+                break;
             case 'img':
                 self::parseImage($node, $newPost);
                 break;
@@ -205,11 +192,6 @@ class ArbuzToday extends TyRunBaseParser implements ParserInterface
                 break;
             case 'a':
                 self::parseLink($node, $newPost);
-                if ($nodes = $node->children()) {
-                    $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing) {
-                        self::parseNode($node, $newPost, $maxDepth, $stopParsing);
-                    });
-                }
                 break;
             case 'iframe':
                 $videoId = self::extractYouTubeId($node->attr('src'));
@@ -221,7 +203,34 @@ class ArbuzToday extends TyRunBaseParser implements ParserInterface
                 break;
         }
 
-
     }
 
+    protected static function parseQuote(Crawler $node, NewsPost $newPost): void
+    {
+        $newPost->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_QUOTE,
+                $node->text(),
+                null,
+                null,
+                null,
+                null
+            ));
+    }
+
+    protected static function parseLink(Crawler $node, NewsPost $newPost): void
+    {
+        if (filter_var($node->attr('href'), FILTER_VALIDATE_URL)
+            && !stristr($node->attr('class'), 'link-more')) {
+            $newPost->addItem(
+                new NewsPostItem(
+                    NewsPostItem::TYPE_LINK,
+                    null,
+                    null,
+                    $node->attr('href'),
+                    null,
+                    null
+                ));
+        }
+    }
 }
