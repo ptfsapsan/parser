@@ -9,7 +9,9 @@ use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use DateTime;
 use DateTimeZone;
+use DOMNode;
 use Exception;
+use linslin\yii2\curl\Curl;
 use Symfony\Component\DomCrawler\Crawler;
 
 
@@ -19,9 +21,11 @@ class LegitimistParser implements ParserInterface
     const FEED_ID = 2;
 
     const ROOT_SRC = "https://www.legitimist.ru";
-
+    const FEED_SRC = "/news/";
     const LIMIT = 100;
-    const ITEMS_PER_PAGE = 27;
+    const NEWS_PER_PAGE = 27;
+    const EMPTY_DESCRIPTION = "empty";
+
     /**
      * @return array
      * @throws Exception
@@ -30,85 +34,50 @@ class LegitimistParser implements ParserInterface
     {
 
         $curl = Helper::getCurl();
-
-        $path = self::ROOT_SRC . "/news/";
         $posts = [];
 
-        for($page = 1; $page <= ceil(self::LIMIT / self::ITEMS_PER_PAGE); $page++){
-            $payloadData = $curl->get($path . "?page=" . $page);
+        $counter = 0;
+        for ($pageId = 1; $pageId <= ceil(self::LIMIT / self::NEWS_PER_PAGE); $pageId++) {
 
-            $crawler = new Crawler($payloadData);
+            $listSourcePath = self::ROOT_SRC . self::FEED_SRC . "?page=" . $pageId;
 
-            $srcNewsList = $crawler->filter("table.main-list tr");
+            $listSourceData = $curl->get($listSourcePath);
+            if (empty($listSourceData)) {
+                throw new Exception("Получен пустой ответ от источника списка новостей: " . $listSourcePath);
+            }
+            $crawler = new Crawler($listSourceData);
+            $items = $crawler->filter("table.main-list tr");
+            if ($items->count() === 0) {
+                throw new Exception("Пустой список новостей в ленте: " . $listSourcePath);
+            }
+            foreach ($items as $newsItem) {
+                try {
 
-            $srcNewsList->each(function(Crawler $node, $index) use (&$posts) {
-
-                if($node->children()->filter("ul.paging")->count() !== 0){
-                    return;
+                    $node = new Crawler($newsItem);
+                    if (empty($node->filter("td")->text())) {
+                        continue;
+                    }
+                    $newsPost = self::inflatePost($node);
+                    $posts[] = $newsPost;
+                    $counter++;
+                    if ($counter >= self::LIMIT) {
+                        break 2;
+                    }
+                } catch (Exception $e) {
+                    error_log($e->getMessage());
+                    continue;
                 }
-
-                $post = self::inflatePost($node);
-                $posts[] = $post;
-            });
+            }
         }
 
-        /** @var NewsPost $post */
-        foreach ($posts as $post) {
-            $payloadData = $curl->get($post->original);
-
-            $crawler = new Crawler($payloadData);
-            $content = $crawler->filter("div#article_block");
-
-            $image = $content->filter("div#imgn img");
-
-            if ($image->count() !== 0) {
-                $imgUrl = $image->attr("src");
-                self::addImage($post, $imgUrl);
-                $post->image = self::normalizeUrl(self::ROOT_SRC . $imgUrl);
+        foreach ($posts as $key => $post) {
+            try {
+                self::inflatePostContent($post, $curl);
+            } catch (Exception $e) {
+                error_log($e->getMessage());
+                unset($posts[$key]);
+                continue;
             }
-
-            $header = $content->filter("div.outro h1");
-            if ($header->count() !== 0) {
-                self::addHeader($post, $header->text(), 1);
-            }
-
-
-            $content->filter("div.content")->children()->each(function (Crawler $node, $index) use ($post) {
-                if ($node->nodeName() === "p" && $node->children()->count() === 0 && !empty($node->text())) {
-                    self::addText($post, $node->text());
-                    return;
-                }
-                if ($node->nodeName() === "p" && $node->filter("br")->count() !== 0 && !empty($node->text())) {
-                    self::addText($post, $node->text());
-                    return;
-                }
-                if ($node->nodeName() === "p" && $node->filter("span")->count() !== 0 && !empty($node->text())) {
-                    self::addText($post, $node->text());
-                    return;
-                }
-                if ($node->nodeName() === "p" && $node->filter("a")->count() !== 0 && !empty($node->text())) {
-                    self::addText($post, $node->text());
-                    return;
-                }
-                if ($node->nodeName() === "div" && $node->filter("strong")->count() !== 0 && !empty($node->text())) {
-                    self::addHeader($post, $node->text(), 6);
-                    return;
-                }
-
-                if ($node->nodeName() === "p" && $node->filter("em")->count() !== 0 && !empty($node->text())) {
-                    self::addQuote($post, $node->text());
-                    return;
-                }
-                if ($node->nodeName() === "h3") {
-                    self::addHeader($post, $node->text(), 3);
-                    return;
-                }
-                if ($node->filter("img")->count() !== 0) {
-                    self::addImage($post, "/" . $node->filter("img")->attr("src"));
-                    return;
-                }
-
-            });
         }
 
         return $posts;
@@ -125,11 +94,16 @@ class LegitimistParser implements ParserInterface
     private static function inflatePost(Crawler $entityData): NewsPost
     {
 
-        $timeString = $entityData->filter("span.time")->html();
-        $timeString = str_replace("\xc2\xa0",'',$timeString);
+        $timeString = $entityData->filter("td span.time")->html();
+        $timeString = str_replace("\xc2\xa0", '', $timeString);
         $timeArr = explode(" ", $timeString);
+        if (count($timeArr) <= 1) {
+            throw new Exception("Could not divide date string");
+        }
         $date = explode(".", $timeArr[0]);
-
+        if (count($date) <= 1) {
+            throw new Exception("Could not parse date string");
+        }
         $newDateString = "";
         $newDateString .= $date[2] ?? date("Y");
         $newDateString .= "-" . $date[1];
@@ -139,10 +113,14 @@ class LegitimistParser implements ParserInterface
 
         $createDate = new DateTime($newDateString, new DateTimeZone("Europe/Moscow"));
         $createDate->setTimezone(new DateTimeZone("UTC"));
-        $title = $entityData->filter("h3 a")->text();
-        $original = $entityData->filter("h3 a")->attr("href");
-        $description = rtrim($entityData->filter("h3 a")->text(), "→");
+        $title = $entityData->filter("td h3 a")->text();
+        $original = $entityData->filter("td h3 a")->attr("href");
 
+        $description = self::EMPTY_DESCRIPTION;
+        $descrStr = $entityData->filter("td p a");
+        if ($descrStr->count() !== 0) {
+            $description = rtrim($descrStr->text(), "→");
+        }
         return new NewsPost(
             self::class,
             $title,
@@ -153,12 +131,121 @@ class LegitimistParser implements ParserInterface
         );
     }
 
+
+    /**
+     * @param NewsPost $post
+     * @param Curl     $curl
+     *
+     * @throws Exception
+     */
+    private static function inflatePostContent(NewsPost $post, Curl $curl)
+    {
+        $url = $post->original;
+        if (empty($post->description)) {
+            $post->description = "";
+        }
+
+        $pageData = $curl->get($url);
+        if (empty($pageData)) {
+            throw new Exception("Получен пустой ответ от страницы новости: " . $url);
+        }
+
+        $crawler = new Crawler($pageData);
+
+        $body = $crawler->filter("div.content");
+
+        if ($body->count() === 0) {
+            throw new Exception("Не найден блок новости в полученой странице: " . $url);
+        }
+        $image = $crawler->filter("div#imgn img");
+        if ($image->count() !== 0) {
+            $imgUrl = $image->attr("src");
+            $post->image = self::normalizeUrl(self::ROOT_SRC . $imgUrl);
+        }
+
+        /** @var DOMNode $bodyNode */
+        foreach ($body->children() as $bodyNode) {
+            $node = new Crawler($bodyNode);
+            if ($node->matches("p") && !empty(trim($node->text(), "\xC2\xA0"))) {
+                if ($node->children()->count() === 0) {
+                    if (empty($post->description)) {
+                        $post->description = Helper::prepareString($node->text());
+                    } else {
+                        self::addText($post, $node->text());
+                    }
+                    continue;
+                }
+                if ($node->filter("br")->count() !== 0) {
+                    if (empty($post->description)) {
+                        $post->description = Helper::prepareString($node->text());
+                    } else {
+                        self::addText($post, $node->text());
+                    }
+                    continue;
+                }
+                if ($node->filter("span")->count() !== 0) {
+                    if (empty($post->description)) {
+                        $post->description = Helper::prepareString($node->text());
+                    } else {
+                        self::addText($post, $node->text());
+                    }
+                    continue;
+                }
+                if ($node->filter("a")->count() !== 0) {
+                    if (empty($post->description)) {
+                        $post->description = Helper::prepareString($node->text());
+                    } else {
+                        self::addText($post, $node->text());
+                    }
+                    continue;
+                }
+                if ($node->filter("em")->count() !== 0) {
+                    if (empty($post->description)) {
+                        $post->description = Helper::prepareString($node->text());
+                    } else {
+                        self::addText($post, $node->text());
+                    }
+                    continue;
+                }
+            }
+
+
+            if (
+                $node->matches("div")
+                && $node->filter("strong")->count() !== 0
+                && !empty(trim($node->text(), "\xC2\xA0"))
+            ) {
+                self::addHeader($post, $node->text(), 6);
+                continue;
+            }
+            if (
+                $node->matches("div.details")
+                && !empty(trim($node->text(), "\xC2\xA0"))
+            ) {
+                $node->children()->each(function (Crawler $detNode) use ($post) {
+                    self::addText($post, str_ireplace('­', "", $detNode->text()));
+                });
+                continue;
+            }
+
+            if ($node->nodeName() === "h3") {
+                self::addHeader($post, $node->text(), 3);
+                continue;
+            }
+            if ($node->filter("img")->count() !== 0) {
+                self::addImage($post, self::normalizeUrl(self::ROOT_SRC . "/" . $node->filter("img")->attr("src")));
+                continue;
+            }
+        }
+    }
+
+
     /**
      * @param NewsPost $post
      * @param string   $content
      * @param int      $level
      */
-    protected static function addHeader(NewsPost $post, string $content, int $level): void
+    private static function addHeader(NewsPost $post, string $content, int $level): void
     {
         $post->addItem(
             new NewsPostItem(
@@ -171,21 +258,20 @@ class LegitimistParser implements ParserInterface
             ));
     }
 
-
     /**
      * @param NewsPost $post
      * @param string   $content
      */
-    protected static function addImage(NewsPost $post, string $content): void
+    private static function addImage(NewsPost $post, string $content): void
     {
-        $url = self::normalizeUrl($content);
+        $content = self::normalizeUrl($content);
         $post->addItem(
             new NewsPostItem(
                 NewsPostItem::TYPE_IMAGE,
                 null,
-                self::ROOT_SRC . $url,
+                $content,
                 null,
-                1,
+                null,
                 null
             ));
     }
@@ -194,28 +280,11 @@ class LegitimistParser implements ParserInterface
      * @param NewsPost $post
      * @param string   $content
      */
-    protected static function addText(NewsPost $post, string $content): void
+    private static function addText(NewsPost $post, string $content): void
     {
         $post->addItem(
             new NewsPostItem(
                 NewsPostItem::TYPE_TEXT,
-                $content,
-                null,
-                null,
-                null,
-                null
-            ));
-    }
-
-    /**
-     * @param NewsPost $post
-     * @param string   $content
-     */
-    protected static function addQuote(NewsPost $post, string $content): void
-    {
-        $post->addItem(
-            new NewsPostItem(
-                NewsPostItem::TYPE_QUOTE,
                 $content,
                 null,
                 null,
@@ -231,8 +300,8 @@ class LegitimistParser implements ParserInterface
      */
     protected static function normalizeUrl(string $content)
     {
-        return preg_replace_callback('/[^\x20-\x7f]/', function ($match) {
-            return urlencode($match[0]);
+        return preg_replace_callback('/[^\x21-\x7f]/', function ($match) {
+            return rawurlencode($match[0]);
         }, $content);
     }
 }
