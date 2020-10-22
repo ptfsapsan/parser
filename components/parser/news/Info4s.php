@@ -12,40 +12,42 @@ use Exception;
 use Symfony\Component\DomCrawler\Crawler;
 
 /**
- * Парсер новостей из RSS ленты moe-belgorod.ru
+ * Парсер новостей из RSS ленты 4s-info.ru
  *
  */
-class MoeOnline extends TyRunBaseParser implements ParserInterface
+class Info4s extends TyRunBaseParser implements ParserInterface
 {
     const USER_ID = 2;
     const FEED_ID = 2;
 
+    const MAIN_PAGE_URI = 'https://4s-info.ru';
+
     /**
      * CSS класс, где хранится содержимое новости
      */
-    const BODY_CONTAINER_CSS_SELECTOR = '.stat_centr_wr';
+    const BODY_CONTAINER_CSS_SELECTOR = '.post';
 
     /**
      * CSS  класс для параграфов - цитат
      */
-    const QUOTE_TAG = '-';
+    const QUOTE_TAG = 'em';
 
     /**
      * Классы эоементов, которые не нужно парсить, например блоки с рекламой и т.п.
      * в формате RegExp
      */
-    const EXCLUDE_CSS_CLASSES_PATTERN = '/plitka_wr|vrezka_1/';
+    const EXCLUDE_CSS_CLASSES_PATTERN = '';
 
     /**
      * Класс элемента после которого парсить страницу не имеет смысла (контент статьи закончился)
      */
-    const CUT_CSS_CLASS = '';
+    const CUT_CSS_CLASS = 'ya-share2';
 
 
     /**
      * Ссылка на RSS фид (XML)
      */
-    const FEED_URL = 'https://moe-belgorod.ru/rss';
+    const FEED_URL = 'https://4s-info.ru/feed/';
 
     /**
      *  Максимальная глубина для парсинга <div> тегов
@@ -80,11 +82,17 @@ class MoeOnline extends TyRunBaseParser implements ParserInterface
             $newPost = new NewsPost(
                 self::class,
                 $node->filter('title')->text(),
-                $node->filter('description')->text(),
+                self::prepareDescription($node->filter('description')->text(),
+                    '/(.*)\.(.*)(\[&#8230;])(.*)/'),
                 self::stringToDateTime($node->filter('pubDate')->text()),
                 $node->filter('link')->text(),
-                $node->filter('enclosure')->attr('url')
+                null
             );
+
+            /**
+             * Предложения содержащиеся в описании (для последующей проверки при парсинга тела новости)
+             */
+            $descriptionSentences = explode('. ', html_entity_decode($newPost->description));
 
             /**
              * Получаем полный html новости
@@ -94,9 +102,19 @@ class MoeOnline extends TyRunBaseParser implements ParserInterface
             if (!empty($newsContent)) {
                 $newsContent = (new Crawler($newsContent))->filter(self::BODY_CONTAINER_CSS_SELECTOR);
                 /**
+                 * Основное фото ( всегда одно в начале статьи)
+                 */
+                $mainImage = $newsContent->filter('.post-thumbnail img');
+                if ($mainImage->count()) {
+                    if ($mainImage->attr('src')) {
+                        $newPost->image = self::urlEncode($mainImage->attr('src'));
+                    }
+                }
+
+                /**
                  * Подпись под основным фото
                  */
-                $annotation = $newsContent->filter('.author_main_photo');
+                $annotation = $newsContent->filter('.wp-caption-text');
                 if ($annotation->count() && !empty($annotation->text())) {
                     $newPost->addItem(
                         new NewsPostItem(
@@ -109,19 +127,18 @@ class MoeOnline extends TyRunBaseParser implements ParserInterface
                         ));
                 }
 
-
-
                 /**
-                 * Блок с содержимым статьи
+                 * Текст статьи, может содержать цитаты ( все полезное содержимое в тегах <p> )
+                 * Не знаю нужно или нет, но сделал более универсально, с рекурсией
                  */
-                $articleContent = $newsContent->filter('.app_in_text')->children();
+                $articleContent = $newsContent->filter('.single-content')->children();
                 $stopParsing = false;
                 if ($articleContent->count()) {
-                    $articleContent->each(function ($node) use ($newPost, &$stopParsing) {
+                    $articleContent->each(function ($node) use ($newPost, &$stopParsing, $descriptionSentences) {
                         if ($stopParsing) {
                             return;
                         }
-                        self::parseNode($node, $newPost, self::MAX_PARSE_DEPTH, $stopParsing);
+                        self::parseNode($node, $newPost, self::MAX_PARSE_DEPTH, $stopParsing, $descriptionSentences);
                     });
                 }
             }
@@ -132,7 +149,7 @@ class MoeOnline extends TyRunBaseParser implements ParserInterface
         return $posts;
     }
 
-    protected static function parseNode(Crawler $node, NewsPost $newPost, int $maxDepth, bool &$stopParsing): void
+    protected static function parseNode(Crawler $node, NewsPost $newPost, int $maxDepth, bool &$stopParsing, $descriptionSentences = []): void
     {
         /**
          * Пропускаем элемент, если элемент имеет определенный класс
@@ -162,6 +179,10 @@ class MoeOnline extends TyRunBaseParser implements ParserInterface
         }
         $maxDepth--;
 
+        if ($node->text() == 'Поделиться:') {
+            return;
+        }
+
         switch ($node->nodeName()) {
             case 'div': //запускаем рекурсивно на дочерние ноды, если есть, если нет то там обычно ненужный шлак
             case 'span':
@@ -173,12 +194,7 @@ class MoeOnline extends TyRunBaseParser implements ParserInterface
                 }
                 break;
             case 'p':
-                self::parseParagraph($node, $newPost);
-                if ($nodes = $node->children()) {
-                    $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing) {
-                        self::parseNode($node, $newPost, $maxDepth, $stopParsing);
-                    });
-                }
+                self::parseDescriptionIntersectParagraph($node, $newPost, $descriptionSentences);
                 break;
             case 'img':
                 self::parseImage($node, $newPost);
@@ -206,54 +222,6 @@ class MoeOnline extends TyRunBaseParser implements ParserInterface
         }
 
 
-    }
-
-
-
-    /**
-     * Парсер для тегов <a>
-     * @param Crawler $node
-     * @param NewsPost $newPost
-     */
-    protected static function parseLink(Crawler $node, NewsPost $newPost): void
-    {
-        if (filter_var($node->attr('href'), FILTER_VALIDATE_URL)
-            && !stristr($node->attr('class'), 'link-more')) {
-            $newPost->addItem(
-                new NewsPostItem(
-                    NewsPostItem::TYPE_LINK,
-                    null,
-                    null,
-                    $node->attr('href'),
-                    null,
-                    null
-                ));
-        }
-    }
-
-    /**
-     * Парсер для тегов <p>
-     * @param Crawler $node
-     * @param NewsPost $newPost
-     */
-    private static function parseParagraph(Crawler $node, NewsPost $newPost): void
-    {
-        if (!empty($node->text())) {
-            $type = NewsPostItem::TYPE_TEXT;
-            if ($node->nodeName() == self::QUOTE_TAG) {
-                $type = NewsPostItem::TYPE_QUOTE;
-            }
-
-            $newPost->addItem(
-                new NewsPostItem(
-                    $type,
-                    $node->text(),
-                    null,
-                    null,
-                    null,
-                    null
-                ));
-        }
     }
 
 }
