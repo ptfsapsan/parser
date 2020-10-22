@@ -12,25 +12,26 @@ use Exception;
 use Symfony\Component\DomCrawler\Crawler;
 
 /**
- * Парсер новостей из RSS ленты 4s-info.ru
+ * Парсер новостей из RSS ленты vsenovostint.ru
  *
+ * В RSS description попадает весь контент страницы без картинок, урезаем.
  */
-class Pnz1 extends TyRunBaseParser implements ParserInterface
+class VseNovostiNt extends TyRunBaseParser implements ParserInterface
 {
     const USER_ID = 2;
     const FEED_ID = 2;
 
-    const MAIN_PAGE_URI = 'https://1pnz.ru';
+    const MAIN_PAGE_URI = 'https://vsenovostint.ru';
 
     /**
      * CSS класс, где хранится содержимое новости
      */
-    const BODY_CONTAINER_CSS_SELECTOR = '.simple_html';
+    const BODY_CONTAINER_CSS_SELECTOR = 'article';
 
     /**
      * CSS  класс для параграфов - цитат
      */
-    const QUOTE_TAG = 'em';
+    const QUOTE_TAG = 'blockquote';
 
     /**
      * Классы эоементов, которые не нужно парсить, например блоки с рекламой и т.п.
@@ -47,7 +48,7 @@ class Pnz1 extends TyRunBaseParser implements ParserInterface
     /**
      * Ссылка на RSS фид (XML)
      */
-    const FEED_URL = 'https://1pnz.ru/rss';
+    const FEED_URL = 'https://vsenovostint.ru/feed/';
 
     /**
      *  Максимальная глубина для парсинга <div> тегов
@@ -83,7 +84,7 @@ class Pnz1 extends TyRunBaseParser implements ParserInterface
                 self::class,
                 $node->filter('title')->text(),
                 self::prepareDescription($node->filter('description')->text(),
-                    '/(.*)\.(.*)(\[&#8230;])(.*)/'),
+                    '/(.*)\.(.*)(The post)(.*)/'),
                 self::stringToDateTime($node->filter('pubDate')->text()),
                 $node->filter('link')->text(),
                 null
@@ -93,6 +94,10 @@ class Pnz1 extends TyRunBaseParser implements ParserInterface
              * Предложения содержащиеся в описании (для последующей проверки при парсинга тела новости)
              */
             $descriptionSentences = explode('. ', html_entity_decode($newPost->description));
+            if (count($descriptionSentences) > 4) {
+                $descriptionSentences = array_slice($descriptionSentences, 0, 4);
+                $newPost->description = implode('. ', $descriptionSentences);
+            }
 
             /**
              * Получаем полный html новости
@@ -101,21 +106,12 @@ class Pnz1 extends TyRunBaseParser implements ParserInterface
 
             if (!empty($newsContent)) {
                 $newsContent = (new Crawler($newsContent))->filter(self::BODY_CONTAINER_CSS_SELECTOR);
-                /**
-                 * Основное фото ( всегда одно в начале статьи)
-                 */
-                $mainImage = $newsContent->filter('.fancy_popup_link img');
-                if ($mainImage->count()) {
-                    if ($mainImage->attr('src')) {
-                        $newPost->image = self::urlEncode($mainImage->attr('src'));
-                    }
-                }
 
                 /**
                  * Текст статьи, может содержать цитаты ( все полезное содержимое в тегах <p> )
                  * Не знаю нужно или нет, но сделал более универсально, с рекурсией
                  */
-                $articleContent = $newsContent->filter('.theme_day')->children();
+                $articleContent = $newsContent->filter('.js-mediator-article')->children();
                 $stopParsing = false;
                 if ($articleContent->count()) {
                     $articleContent->each(function ($node) use ($newPost, &$stopParsing, $descriptionSentences) {
@@ -163,22 +159,35 @@ class Pnz1 extends TyRunBaseParser implements ParserInterface
         }
         $maxDepth--;
 
-        if (stristr($node->text(), 'Фото: ')) {
+        if ($node->text() == 'Поделиться:') {
             return;
         }
 
         switch ($node->nodeName()) {
             case 'div': //запускаем рекурсивно на дочерние ноды, если есть, если нет то там обычно ненужный шлак
             case 'span':
-                self::parseDescriptionIntersectParagraph($node, $newPost, $descriptionSentences);
-                $nodes = $node->children();
-                if ($nodes->count()) {
-                    $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing, &$descriptionSentences) {
-                        self::parseNode($node, $newPost, $maxDepth, $stopParsing, $descriptionSentences);
-                    });
+                /**
+                 * Новость может содержать галерею (блок с классом field-type-image),
+                 * парсим только изображения из таких блоков
+                 */
+                if (stristr($node->attr('class'), 'newsSlider')) {
+                    $images = $node->filter('.slides img');
+                    if ($images->count()) {
+                        $images->each(function (Crawler $node) use (&$newPost) {
+                            self::parseImage($node, $newPost);
+                        });
+                    }
+                } else {
+                    $nodes = $node->children();
+                    if ($nodes->count()) {
+                        $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing, &$descriptionSentences) {
+                            self::parseNode($node, $newPost, $maxDepth, $stopParsin, $descriptionSentences);
+                        });
+                    }
                 }
                 break;
             case 'p':
+            case 'blockquote':
                 self::parseDescriptionIntersectParagraph($node, $newPost, $descriptionSentences);
                 break;
             case 'img':

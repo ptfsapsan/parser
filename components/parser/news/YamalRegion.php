@@ -12,20 +12,20 @@ use Exception;
 use Symfony\Component\DomCrawler\Crawler;
 
 /**
- * Парсер новостей из RSS ленты 4s-info.ru
+ * Парсер новостей из RSS ленты yamal-region.tv
  *
  */
-class Pnz1 extends TyRunBaseParser implements ParserInterface
+class YamalRegion extends TyRunBaseParser implements ParserInterface
 {
     const USER_ID = 2;
     const FEED_ID = 2;
 
-    const MAIN_PAGE_URI = 'https://1pnz.ru';
+    const MAIN_PAGE_URI = 'https://yamal-region.tv';
 
     /**
      * CSS класс, где хранится содержимое новости
      */
-    const BODY_CONTAINER_CSS_SELECTOR = '.simple_html';
+    const BODY_CONTAINER_CSS_SELECTOR = '.page_content';
 
     /**
      * CSS  класс для параграфов - цитат
@@ -41,13 +41,13 @@ class Pnz1 extends TyRunBaseParser implements ParserInterface
     /**
      * Класс элемента после которого парсить страницу не имеет смысла (контент статьи закончился)
      */
-    const CUT_CSS_CLASS = 'ya-share2';
+    const CUT_CSS_CLASS = '';
 
 
     /**
      * Ссылка на RSS фид (XML)
      */
-    const FEED_URL = 'https://1pnz.ru/rss';
+    const FEED_URL = 'https://yamal-region.tv/xml/news_rss.xml';
 
     /**
      *  Максимальная глубина для парсинга <div> тегов
@@ -82,8 +82,7 @@ class Pnz1 extends TyRunBaseParser implements ParserInterface
             $newPost = new NewsPost(
                 self::class,
                 $node->filter('title')->text(),
-                self::prepareDescription($node->filter('description')->text(),
-                    '/(.*)\.(.*)(\[&#8230;])(.*)/'),
+                $node->filter('description')->text(),
                 self::stringToDateTime($node->filter('pubDate')->text()),
                 $node->filter('link')->text(),
                 null
@@ -93,6 +92,10 @@ class Pnz1 extends TyRunBaseParser implements ParserInterface
              * Предложения содержащиеся в описании (для последующей проверки при парсинга тела новости)
              */
             $descriptionSentences = explode('. ', html_entity_decode($newPost->description));
+            if (count($descriptionSentences) > 4) {
+                $descriptionSentences = array_slice($descriptionSentences, 0, 4);
+                $newPost->description = implode('. ', $descriptionSentences);
+            }
 
             /**
              * Получаем полный html новости
@@ -101,21 +104,12 @@ class Pnz1 extends TyRunBaseParser implements ParserInterface
 
             if (!empty($newsContent)) {
                 $newsContent = (new Crawler($newsContent))->filter(self::BODY_CONTAINER_CSS_SELECTOR);
-                /**
-                 * Основное фото ( всегда одно в начале статьи)
-                 */
-                $mainImage = $newsContent->filter('.fancy_popup_link img');
-                if ($mainImage->count()) {
-                    if ($mainImage->attr('src')) {
-                        $newPost->image = self::urlEncode($mainImage->attr('src'));
-                    }
-                }
 
                 /**
                  * Текст статьи, может содержать цитаты ( все полезное содержимое в тегах <p> )
                  * Не знаю нужно или нет, но сделал более универсально, с рекурсией
                  */
-                $articleContent = $newsContent->filter('.theme_day')->children();
+                $articleContent = $newsContent->filter('.news_content .text')->children();
                 $stopParsing = false;
                 if ($articleContent->count()) {
                     $articleContent->each(function ($node) use ($newPost, &$stopParsing, $descriptionSentences) {
@@ -163,23 +157,25 @@ class Pnz1 extends TyRunBaseParser implements ParserInterface
         }
         $maxDepth--;
 
-        if (stristr($node->text(), 'Фото: ')) {
-            return;
-        }
-
         switch ($node->nodeName()) {
             case 'div': //запускаем рекурсивно на дочерние ноды, если есть, если нет то там обычно ненужный шлак
             case 'span':
-                self::parseDescriptionIntersectParagraph($node, $newPost, $descriptionSentences);
                 $nodes = $node->children();
                 if ($nodes->count()) {
                     $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing, &$descriptionSentences) {
                         self::parseNode($node, $newPost, $maxDepth, $stopParsing, $descriptionSentences);
                     });
+                } else {
+                    self::parseDescriptionIntersectParagraph($node, $newPost, $descriptionSentences);
                 }
                 break;
             case 'p':
                 self::parseDescriptionIntersectParagraph($node, $newPost, $descriptionSentences);
+                if ($nodes = $node->children()) {
+                    $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing, &$descriptionSentences) {
+                        self::parseNode($node, $newPost, $maxDepth, $stopParsing, $descriptionSentences);
+                    });
+                }
                 break;
             case 'img':
                 self::parseImage($node, $newPost);

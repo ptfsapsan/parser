@@ -12,25 +12,25 @@ use Exception;
 use Symfony\Component\DomCrawler\Crawler;
 
 /**
- * Парсер новостей из RSS ленты 4s-info.ru
+ * Парсер новостей из RSS ленты kadara.ru
  *
  */
-class Pnz1 extends TyRunBaseParser implements ParserInterface
+class Kadara extends TyRunBaseParser implements ParserInterface
 {
     const USER_ID = 2;
     const FEED_ID = 2;
 
-    const MAIN_PAGE_URI = 'https://1pnz.ru';
+    const MAIN_PAGE_URI = 'https://kadara.ru/';
 
     /**
      * CSS класс, где хранится содержимое новости
      */
-    const BODY_CONTAINER_CSS_SELECTOR = '.simple_html';
+    const BODY_CONTAINER_CSS_SELECTOR = '.article';
 
     /**
      * CSS  класс для параграфов - цитат
      */
-    const QUOTE_TAG = 'em';
+    const QUOTE_TAG = 'blockquote';
 
     /**
      * Классы эоементов, которые не нужно парсить, например блоки с рекламой и т.п.
@@ -41,13 +41,13 @@ class Pnz1 extends TyRunBaseParser implements ParserInterface
     /**
      * Класс элемента после которого парсить страницу не имеет смысла (контент статьи закончился)
      */
-    const CUT_CSS_CLASS = 'ya-share2';
+    const CUT_CSS_CLASS = '';
 
 
     /**
      * Ссылка на RSS фид (XML)
      */
-    const FEED_URL = 'https://1pnz.ru/rss';
+    const FEED_URL = 'https://kadara.ru/feed/';
 
     /**
      *  Максимальная глубина для парсинга <div> тегов
@@ -86,13 +86,17 @@ class Pnz1 extends TyRunBaseParser implements ParserInterface
                     '/(.*)\.(.*)(\[&#8230;])(.*)/'),
                 self::stringToDateTime($node->filter('pubDate')->text()),
                 $node->filter('link')->text(),
-                null
+                self::urlEncode( $node->filter('enclosure')->attr('url'))
             );
 
             /**
              * Предложения содержащиеся в описании (для последующей проверки при парсинга тела новости)
              */
             $descriptionSentences = explode('. ', html_entity_decode($newPost->description));
+            if (count($descriptionSentences) > 2) {
+                $descriptionSentences = array_slice($descriptionSentences, 0, 2);
+                $newPost->description = implode('. ', $descriptionSentences);
+            }
 
             /**
              * Получаем полный html новости
@@ -101,21 +105,12 @@ class Pnz1 extends TyRunBaseParser implements ParserInterface
 
             if (!empty($newsContent)) {
                 $newsContent = (new Crawler($newsContent))->filter(self::BODY_CONTAINER_CSS_SELECTOR);
-                /**
-                 * Основное фото ( всегда одно в начале статьи)
-                 */
-                $mainImage = $newsContent->filter('.fancy_popup_link img');
-                if ($mainImage->count()) {
-                    if ($mainImage->attr('src')) {
-                        $newPost->image = self::urlEncode($mainImage->attr('src'));
-                    }
-                }
 
                 /**
                  * Текст статьи, может содержать цитаты ( все полезное содержимое в тегах <p> )
                  * Не знаю нужно или нет, но сделал более универсально, с рекурсией
                  */
-                $articleContent = $newsContent->filter('.theme_day')->children();
+                $articleContent = $newsContent->filter('.entry-content')->children();
                 $stopParsing = false;
                 if ($articleContent->count()) {
                     $articleContent->each(function ($node) use ($newPost, &$stopParsing, $descriptionSentences) {
@@ -163,14 +158,13 @@ class Pnz1 extends TyRunBaseParser implements ParserInterface
         }
         $maxDepth--;
 
-        if (stristr($node->text(), 'Фото: ')) {
+        if ($node->text() == 'Поделиться:') {
             return;
         }
 
         switch ($node->nodeName()) {
             case 'div': //запускаем рекурсивно на дочерние ноды, если есть, если нет то там обычно ненужный шлак
             case 'span':
-                self::parseDescriptionIntersectParagraph($node, $newPost, $descriptionSentences);
                 $nodes = $node->children();
                 if ($nodes->count()) {
                     $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing, &$descriptionSentences) {
@@ -179,6 +173,7 @@ class Pnz1 extends TyRunBaseParser implements ParserInterface
                 }
                 break;
             case 'p':
+            case 'blockquote':
                 self::parseDescriptionIntersectParagraph($node, $newPost, $descriptionSentences);
                 break;
             case 'img':
