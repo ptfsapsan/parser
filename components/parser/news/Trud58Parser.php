@@ -21,7 +21,7 @@ class Trud58Parser implements ParserInterface
     const ROOT_SRC = "http://www.trud58.ru";
 
     const FEED_SRC = "/news.rss";
-    const LIMIT = 20;
+    const LIMIT = 100;
 
 
     /**
@@ -36,21 +36,38 @@ class Trud58Parser implements ParserInterface
         $listSourcePath = self::ROOT_SRC . self::FEED_SRC;
 
         $listSourceData = $curl->get($listSourcePath);
-
+        if (empty($listSourceData)) {
+            throw new Exception("Получен пустой ответ от источника списка новостей: " . $listSourcePath);
+        }
         $crawler = new Crawler($listSourceData);
+        $items = $crawler->filter("item");
+        if ($items->count() === 0) {
+            throw new Exception("Пустой список новостей в ленте: " . $listSourcePath);
+        }
         $counter = 0;
-        foreach ($crawler->filter("item") as $item) {
-            $node = new Crawler($item);
-            $newsPost = self::inflatePost($node);
-            $posts[] = $newsPost;
-            $counter++;
-            if ($counter >= self::LIMIT) {
-                break;
+        foreach ($items as $item) {
+            try {
+                $node = new Crawler($item);
+                $newsPost = self::inflatePost($node);
+                $posts[] = $newsPost;
+                $counter++;
+                if ($counter >= self::LIMIT) {
+                    break;
+                }
+            } catch (Exception $e) {
+                error_log($e->getMessage());
+                continue;
             }
         }
 
-        foreach ($posts as $post) {
-            self::inflatePostContent($post, $curl);
+        foreach ($posts as $key => $post) {
+            try {
+                self::inflatePostContent($post, $curl);
+            } catch (Exception $e) {
+                error_log($e->getMessage());
+                unset($posts[$key]);
+                continue;
+            }
         }
         return $posts;
     }
@@ -89,28 +106,21 @@ class Trud58Parser implements ParserInterface
     /**
      * @param NewsPost $post
      * @param          $curl
+     *
+     * @throws Exception
      */
     private static function inflatePostContent(NewsPost $post, $curl)
     {
         $url = $post->original;
 
         $pageData = $curl->get($url);
+        if (empty($pageData)) {
+            throw new Exception("Получен пустой ответ от страницы новости: " . $url);
+        }
+
         $crawler = new Crawler($pageData);
 
         $content = $crawler->filter("div.inpage");
-
-        $header = $content->filter("h1");
-
-        if ($header->count() !== 0) {
-            self::addHeader($post, $header->text(), 1);
-        }
-
-        $header = $content->filter("div.mnname h2");
-
-        if ($header->count() !== 0) {
-            self::addHeader($post, $header->text(), 2);
-        }
-
 
         $newsData = $content->filter("div.onemidnew > div > p");
 
@@ -119,9 +129,12 @@ class Trud58Parser implements ParserInterface
 
             $image = $node->filter("img");
             if ($image->count() !== 0) {
-                $post->image = Helper::prepareString(self::ROOT_SRC . $image->attr("src"));
                 $image->each(function (Crawler $imageNode) use ($post) {
-                    self::addImage($post, self::ROOT_SRC . $imageNode->attr("src"));
+                    if ($post->image === null) {
+                        $post->image = Helper::prepareString(self::ROOT_SRC . $imageNode->attr("src"));
+                    } else {
+                        self::addImage($post, self::ROOT_SRC . $imageNode->attr("src"));
+                    }
                 });
             }
 
@@ -132,7 +145,10 @@ class Trud58Parser implements ParserInterface
             }
 
             if (!empty(trim($node->text(), "\xC2\xA0"))) {
-                self::addText($post, $node->text());
+                $cleanText = str_ireplace($post->description, "", $node->text());
+                if (!empty($cleanText)) {
+                    self::addText($post, $cleanText);
+                }
             }
 
         }
