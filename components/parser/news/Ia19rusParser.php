@@ -16,6 +16,10 @@ use app\components\mediasfera\NewsPostWrapper;
 use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
+
+/**
+ * @rss_html
+ */
 class Ia19rusParser extends MediasferaNewsParser implements ParserInterface
 {
     public const USER_ID = 2;
@@ -26,17 +30,15 @@ class Ia19rusParser extends MediasferaNewsParser implements ParserInterface
     public const SITE_URL = 'https://19rus.info/';
     public const NEWSLIST_URL = 'https://19rus.info/index.php/component/sdrsssyndicator/?feed_id=13&format=raw';
 
-//    public const TIMEZONE = '+0500';
-    public const DATEFORMAT = 'c';
+    public const DATEFORMAT = 'Y-m-d\TH:i:sP';
 
     public const NEWSLIST_POST = '//feed/entry';
     public const NEWSLIST_TITLE = '//title';
     public const NEWSLIST_LINK = '//link';
     public const NEWSLIST_DATE = '//published';
-    public const NEWSLIST_DESC = '//summary';
 
-    public const ARTICLE_HEADER = '.itemHeader h2.itemTitle';
     public const ARTICLE_TEXT = '.itemView .itemBody .itemFullText';
+    public const ARTICLE_IMAGE = '.itemView .itemImage img';
     public const ARTICLE_GALLERY = '.itemView .itemImageGallery';
 
     public const ARTICLE_BREAKPOINTS = [
@@ -65,8 +67,6 @@ class Ia19rusParser extends MediasferaNewsParser implements ParserInterface
             self::$post->title = self::getNodeData('text', $node, self::NEWSLIST_TITLE);
             self::$post->original = self::getNodeData('href', $node, self::NEWSLIST_LINK);
             self::$post->createDate = self::getNodeDate('text', $node, self::NEWSLIST_DATE);
-            self::$post->description = self::getNodeData('text', $node, self::NEWSLIST_DESC);
-
 
             $articleContent = self::getPage(self::$post->original);
 
@@ -74,7 +74,7 @@ class Ia19rusParser extends MediasferaNewsParser implements ParserInterface
 
                 $articleCrawler = new Crawler($articleContent);
 
-                self::$post->itemHeader = [self::getNodeData('text', $articleCrawler, self::ARTICLE_HEADER), 1];
+                self::$post->image = self::getNodeImage('src', $articleCrawler, self::ARTICLE_IMAGE);
 
                 self::parse($articleCrawler->filter(self::ARTICLE_TEXT));
 
