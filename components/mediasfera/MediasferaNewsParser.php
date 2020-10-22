@@ -280,7 +280,12 @@ class MediasferaNewsParser
                 static::$post->itemVideo = static::getNodeVideoId($node->attr(static::ATTR_VIDEO_IFRAME));
                 break;
             case 'video' :
-                static::$post->itemVideo = static::getNodeVideoId($node->filter('source')->first()->attr('src'));
+                if($node->filter('source')->count()) {
+                    static::$post->itemVideo = static::getNodeVideoId($node->filter('source')->first()->attr('src'));
+                }
+                else {
+                    static::$post->itemVideo = static::getNodeVideoId($node->attr('src'));
+                }
                 break;
 
             case 'blockquote' :
@@ -328,7 +333,7 @@ class MediasferaNewsParser
             'em',
         ];
 
-        if(in_array($node->nodeName(), $tags)) {
+        if (in_array($node->nodeName(), $tags)) {
             $html = strip_tags($html, $allow_tags);
         }
 
