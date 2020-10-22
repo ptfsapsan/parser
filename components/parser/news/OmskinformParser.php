@@ -18,6 +18,10 @@ use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
+
+/**
+ * @rss_html
+ */
 class OmskinformParser extends MediasferaNewsParser implements ParserInterface
 {
     public const USER_ID = 2;
@@ -28,7 +32,6 @@ class OmskinformParser extends MediasferaNewsParser implements ParserInterface
     public const SITE_URL = 'https://www.omskinform.ru/';
     public const NEWSLIST_URL = 'https://www.omskinform.ru/rss/news.rss';
 
-    //    public const TIMEZONE = '+0000';
     public const DATEFORMAT = 'D, d M Y H:i:s O';
 
     public const NEWSLIST_POST = '//rss/channel/item';
@@ -38,11 +41,16 @@ class OmskinformParser extends MediasferaNewsParser implements ParserInterface
     public const NEWSLIST_DESC = '//description';
     public const NEWSLIST_IMG = '//enclosure';
 
-    public const ARTICLE_HEADER = '.n_news .n_cap_lnk_one h1';
-//    public const ARTICLE_IMAGE =  'article .article__thumbnail img';
     public const ARTICLE_TEXT =   'article div[itemtype="http://schema.org/NewsArticle"] .n_text_lnk';
 
-    public const ARTICLE_BREAKPOINTS = [];
+    public const ARTICLE_BREAKPOINTS = [
+        'class' => [
+            'nt_img_handler' => false,
+        ],
+        'text' => [
+            'omskinform.ru' => false,
+        ],
+    ];
 
     protected static NewsPostWrapper $post;
 
@@ -70,8 +78,6 @@ class OmskinformParser extends MediasferaNewsParser implements ParserInterface
 
                 $articleCrawler = new Crawler($articleContent);
 
-                self::$post->itemHeader = [self::getNodeData('text', $articleCrawler, self::ARTICLE_HEADER), 1];
-
                 $contentNode = $articleCrawler->filter(self::ARTICLE_TEXT);
 
                 /**
@@ -83,6 +89,16 @@ class OmskinformParser extends MediasferaNewsParser implements ParserInterface
                 }
 
                 $contentCrawler = new Crawler('<body><div>' . $contentNode->html() . '</div></body>');
+
+                $imgDiv = $contentCrawler->filter('.nt_img_handler');
+
+                if($imgDiv->count()) {
+                    static::$post->itemImage = [
+                        null,
+                        static::getNodeImage(static::ATTR_IMAGE, $imgDiv->filter('img'))
+                    ];
+                }
+
                 self::parse($contentCrawler->filter('body > div'));
             }
 
