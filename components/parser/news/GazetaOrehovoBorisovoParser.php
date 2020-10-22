@@ -8,10 +8,12 @@ use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use DateTime;
+use DateTimeZone;
 use DOMDocument;
 use DOMNode;
 use Exception;
 use InvalidArgumentException;
+use linslin\yii2\curl\Curl;
 use Symfony\Component\DomCrawler\Crawler;
 
 
@@ -23,7 +25,8 @@ class GazetaOrehovoBorisovoParser implements ParserInterface
     const ROOT_SRC = "http://gazeta-orehovo-borisovo-juzhnoe.ru";
 
     const FEED_SRC = "/feed/";
-
+    const LIMIT = 100;
+    const EMPTY_DESCRIPTION = "empty";
 
     /**
      * @return array
@@ -35,26 +38,48 @@ class GazetaOrehovoBorisovoParser implements ParserInterface
         $posts = [];
 
         $listSourcePath = self::ROOT_SRC . self::FEED_SRC;
-
         $listSourceData = $curl->get($listSourcePath);
 
+        if (empty($listSourceData)) {
+            throw new Exception("Получен пустой ответ от источника списка новостей: " . $listSourcePath);
+        }
         $document = new DOMDocument();
         $document->loadXML($listSourceData);
-        /** @var DOMNode $item */
-        foreach ($document->getElementsByTagName("item") as $item) {
-            $post = self::inflatePost($item);
 
-            $posts[] = $post;
+
+        $items = $document->getElementsByTagName("item");
+        if ($items->count() === 0) {
+            throw new Exception("Пустой список новостей в ленте: " . $listSourcePath);
+        }
+        $counter = 0;
+        foreach ($items as $item) {
+            try {
+
+                $newsPost = self::inflatePost($item);
+                $posts[] = $newsPost;
+                $counter++;
+                if ($counter >= self::LIMIT) {
+                    break;
+                }
+            } catch (Exception $e) {
+                error_log($e->getMessage());
+                continue;
+            }
         }
 
-        foreach ($posts as $post) {
-
-            self::inflatePostContent($post);
-
+        foreach ($posts as $key => $post) {
+            try {
+                self::inflatePostContent($post, $curl);
+            } catch (Exception $e) {
+                error_log($e->getMessage());
+                unset($posts[$key]);
+                continue;
+            }
         }
 
         return $posts;
     }
+
 
     /**
      * Собираем исходные данные из ответа API
@@ -69,7 +94,7 @@ class GazetaOrehovoBorisovoParser implements ParserInterface
         $title = null;
         $original = null;
         $dateStr = null;
-        $description = null;
+        $description = self::EMPTY_DESCRIPTION;
         /** @var DOMNode $node */
         foreach ($entityData->childNodes as $node) {
 
@@ -83,9 +108,6 @@ class GazetaOrehovoBorisovoParser implements ParserInterface
                 case "pubDate":
                     $dateStr = $node->nodeValue;
                     break;
-                case "description":
-                    $description = $node->nodeValue;
-                    break;
             }
         }
 
@@ -93,14 +115,13 @@ class GazetaOrehovoBorisovoParser implements ParserInterface
             is_null($title)
             || is_null($original)
             || is_null($dateStr)
-            || is_null($description)
 
         ) {
             throw new InvalidArgumentException("Post data not found in feed");
         }
 
         $createDate = new DateTime($dateStr);
-        $createDate->setTimezone(new \DateTimeZone("UTC"));
+        $createDate->setTimezone(new DateTimeZone("UTC"));
         $imageUrl = null;
         return new NewsPost(
             self::class,
@@ -114,73 +135,72 @@ class GazetaOrehovoBorisovoParser implements ParserInterface
 
     /**
      * @param NewsPost $post
+     * @param Curl     $curl
      *
      * @throws Exception
      */
-    private static function inflatePostContent(NewsPost $post)
+    private static function inflatePostContent(NewsPost $post, Curl $curl)
     {
         $url = $post->original;
-        $curl = Helper::getCurl();
+
+        $post->description = "";
 
         $pageData = $curl->get($url);
+        if (empty($pageData)) {
+            throw new Exception("Получен пустой ответ от страницы новости: " . $url);
+        }
         $crawler = new Crawler($pageData);
 
         $content = $crawler->filter("article");
 
-        $header = $content->filter("header h1");
-        if ($header->count() !== 0) {
-            self::addHeader($post, $header->text(), 1);
+        $body = $content->filter("div.entry-content");
+        if ($body->count() === 0) {
+            throw new Exception("Не найден блок новости в полученой странице: " . $url);
         }
 
-        $image = $content->filter("figure img");
-        if ($image->count() !== 0) {
-            $url = preg_replace_callback('/[^\x20-\x7f]/', function ($match) {
-                return urlencode($match[0]);
-            }, $image->attr("src"));
+        /** @var DOMNode $bodyNode */
+        foreach ($body->children() as $bodyNode) {
 
-            $url = Helper::prepareString($url);
-            self::addImage($post, $url);
-            $post->image = $url;
-        }
+            $node = new Crawler($bodyNode);
 
-        $content->filter("div.entry-content p")->each(function (Crawler $node, $index) use ($post) {
-            if (!empty($node->text() && mb_strpos($node->text(), "Метки:") !== 0)) {
-                self::addText($post, $node->text());
+            if ($node->matches("p") && !empty(trim($node->text(), "\xC2\xA0"))) {
+                if (mb_strpos($node->text(), "Метки:") === 0) {
+                    continue;
+                }
+                if (empty($post->description)) {
+                    $post->description = Helper::prepareString($node->text());
+                } else {
+                    self::addText($post, $node->text());
+                }
+                continue;
             }
-        });
+
+            if ($node->matches("figure") && $node->filter("img")->count() !== 0) {
+                $image = $node->filter("img");
+                if ($post->image === null) {
+                    $post->image = self::normalizeUrl(self::ROOT_SRC . $image->attr("src"));
+                } else {
+                    self::addImage($post, self::ROOT_SRC . $image->attr("src"));
+                }
+            }
+        }
     }
 
-    /**
-     * @param NewsPost $post
-     * @param string   $content
-     * @param int      $level
-     */
-    protected static function addHeader(NewsPost $post, string $content, int $level): void
-    {
-        $post->addItem(
-            new NewsPostItem(
-                NewsPostItem::TYPE_HEADER,
-                $content,
-                null,
-                null,
-                $level,
-                null
-            ));
-    }
 
     /**
      * @param NewsPost $post
      * @param string   $content
      */
-    protected static function addImage(NewsPost $post, string $content): void
+    private static function addImage(NewsPost $post, string $content): void
     {
+        $content = self::normalizeUrl($content);
         $post->addItem(
             new NewsPostItem(
                 NewsPostItem::TYPE_IMAGE,
                 null,
                 $content,
                 null,
-                1,
+                null,
                 null
             ));
     }
@@ -189,7 +209,7 @@ class GazetaOrehovoBorisovoParser implements ParserInterface
      * @param NewsPost $post
      * @param string   $content
      */
-    protected static function addText(NewsPost $post, string $content): void
+    private static function addText(NewsPost $post, string $content): void
     {
         $post->addItem(
             new NewsPostItem(
@@ -202,21 +222,17 @@ class GazetaOrehovoBorisovoParser implements ParserInterface
             ));
     }
 
+
     /**
-     * @param NewsPost $post
-     * @param string   $content
+     * @param string $content
+     *
+     * @return string
      */
-    protected static function addQuote(NewsPost $post, string $content): void
+    protected static function normalizeUrl(string $content)
     {
-        $post->addItem(
-            new NewsPostItem(
-                NewsPostItem::TYPE_QUOTE,
-                $content,
-                null,
-                null,
-                null,
-                null
-            ));
+        return preg_replace_callback('/[^\x21-\x7f]/', function ($match) {
+            return rawurlencode($match[0]);
+        }, $content);
     }
 }
 
