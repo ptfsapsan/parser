@@ -17,6 +17,10 @@ use app\components\mediasfera\NewsPostWrapper;
 use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
+
+/**
+ * @fullrss
+ */
 class Progorod76Parser extends MediasferaNewsParser implements ParserInterface
 {
     public const USER_ID = 2;
@@ -27,7 +31,6 @@ class Progorod76Parser extends MediasferaNewsParser implements ParserInterface
     public const SITE_URL = 'https://progorod76.ru/';
     public const NEWSLIST_URL = 'https://progorod76.ru/rss';
 
-    //    public const TIMEZONE = '+0000';
     public const DATEFORMAT = 'D, d M Y H:i:s O';
 
     public const NEWSLIST_POST = '//rss/channel/item';
@@ -36,6 +39,41 @@ class Progorod76Parser extends MediasferaNewsParser implements ParserInterface
     public const NEWSLIST_DATE = '//pubDate';
     public const NEWSLIST_DESC = '//description';
     public const NEWSLIST_IMG = '//enclosure';
+
+    public const ARTICLE_BREAKPOINTS = [
+        'name' => [
+            'Ext24smiWidget' => false,
+            'menu' => false,
+        ],
+        'href' => [
+            '/news' => false,
+            '/auto' => false,
+            '/afisha' => false,
+            '/cityfaces' => false,
+            '/peoplecontrol' => false,
+            '/sendnews' => false,
+            'http://progorod76.ru/news' => false,
+            'http://progorod76.ru/auto' => false,
+            'http://progorod76.ru/afisha' => false,
+            'http://progorod76.ru/cityfaces' => false,
+            'http://progorod76.ru/peoplecontrol' => false,
+            'http://progorod76.ru/sendnews' => false,
+        ],
+        'class' => [
+            'article__insert' => true,
+            'adsbygoogle' => false,
+        ],
+        'id' => [
+            'adv' => false,
+        ],
+        'data-turbo-ad-id' => [
+            'ad_place' => false,
+            'ad_place_context' => false,
+        ],
+        'data-block' => [
+            'share' => true,
+        ],
+    ];
 
     protected static NewsPostWrapper $post;
 
