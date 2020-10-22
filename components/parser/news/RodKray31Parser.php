@@ -8,6 +8,7 @@ use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use DateTime;
+use DateTimeZone;
 use Exception;
 use InvalidArgumentException;
 use Symfony\Component\DomCrawler\Crawler;
@@ -34,12 +35,11 @@ class RodKray31Parser implements ParserInterface
 
         $curl = Helper::getCurl();
 
-        $path = self::ROOT_SRC . self::API_PATH . self::ALL_NEWS_ID . self::ENDPOINT_NAME . "limit=" . self::LIMIT;
-        $payloadData = $curl->get($path, false);
+        $listSourcePath = self::ROOT_SRC . self::API_PATH . self::ALL_NEWS_ID . self::ENDPOINT_NAME . "limit=" . self::LIMIT;
+        $payloadData = $curl->get($listSourcePath, false);
 
         if (!isset($payloadData["results"]) || !isset($payloadData["results"]["objects"])) {
-            error_log(self::class . "| payload does not contain the necessary data");
-            throw new Exception(self::class . " - No data received");
+            throw new Exception("Получен пустой ответ от источника списка новостей: " . $listSourcePath);
         }
 
         $newsList = $payloadData["results"]["objects"];
@@ -50,8 +50,8 @@ class RodKray31Parser implements ParserInterface
             $entityUrl = $newsItem["entity_url"];
             try {
                 $entityData = $curl->get($entityUrl, false);
-                if (is_null($entityData)) {
-                    throw new InvalidArgumentException("No data received");
+                if (empty($entityData)) {
+                    throw new Exception("No data received");
                 }
                 $post = self::inflatePost($entityData);
 
@@ -59,19 +59,22 @@ class RodKray31Parser implements ParserInterface
                 $newsUrl = $newsItem["extra"]["url"];
 
                 $newsData = $curl->get(self::ROOT_SRC . $newsUrl);
-
-                $crawler = new Crawler($newsData);
-
-
-                $header = $crawler->filter("h1");
-                if ($header->count() && !empty($header->text())) {
-                    self::addHeader($post, $header->text(), 1);
+                if (empty($newsData)) {
+                    throw new Exception("Получен пустой ответ от страницы новости: " . $newsUrl);
                 }
+                $crawler = new Crawler($newsData);
 
 
                 $image = $crawler->filter("div.topic_image img");
                 if ($image->count() and !empty($image->attr("src"))) {
-                    self::addImage($post, $image->attr("src"));
+                    $src = self::ROOT_SRC . self::normalizeUrl($image->attr("src"));
+                    if ($post->image === null) {
+                        $post->image = $src;
+                    } else {
+                        if(mb_stripos($src, $post->image) === false) {
+                            self::addImage($post, self::ROOT_SRC . $image->attr("src"));
+                        }
+                    }
                 }
 
 
@@ -85,15 +88,10 @@ class RodKray31Parser implements ParserInterface
                     self::addText($post, $imageAuth->text());
                 }
 
-                $lead = $crawler->filter("p.lead");
-                if ($lead->count() && !empty($lead->text())) {
-                    self::addHeader($post, $lead->text(), 4);
-                }
-
                 $content = $crawler->filter("div.theme-default");
 
-                $content->each(function (Crawler $item, $idx) use ($post) {
-                    $item->children()->each(function (Crawler $node, $i) use ($post) {
+                $content->each(function (Crawler $item) use ($post) {
+                    $item->children()->each(function (Crawler $node) use ($post) {
                         if (!empty($node->text())) {
                             if ($node->nodeName() === "p") {
                                 self::addText($post, $node->text());
@@ -145,7 +143,7 @@ class RodKray31Parser implements ParserInterface
 
         $title = $entityData["title"];
         $createDate = new DateTime($entityData["created_at"]);
-        $createDate->setTimezone(new \DateTimeZone("UTC"));
+        $createDate->setTimezone(new DateTimeZone("UTC"));
         $description = $entityData["lead"];
         $original = $entityData["detail_url"];
         $galleryItem = array_shift($entityData["gallery"]);
@@ -165,37 +163,22 @@ class RodKray31Parser implements ParserInterface
         );
     }
 
-    /**
-     * @param NewsPost $post
-     * @param string   $content
-     * @param int      $level
-     */
-    protected static function addHeader(NewsPost $post, string $content, int $level): void
-    {
-        $post->addItem(
-            new NewsPostItem(
-                NewsPostItem::TYPE_HEADER,
-                $content,
-                null,
-                null,
-                $level,
-                null
-            ));
-    }
+
 
     /**
      * @param NewsPost $post
      * @param string   $content
      */
-    protected static function addImage(NewsPost $post, string $content): void
+    private static function addImage(NewsPost $post, string $content): void
     {
+        $content = self::normalizeUrl($content);
         $post->addItem(
             new NewsPostItem(
                 NewsPostItem::TYPE_IMAGE,
                 null,
-                self::ROOT_SRC . $content,
+                $content,
                 null,
-                1,
+                null,
                 null
             ));
     }
@@ -204,7 +187,7 @@ class RodKray31Parser implements ParserInterface
      * @param NewsPost $post
      * @param string   $content
      */
-    protected static function addText(NewsPost $post, string $content): void
+    private static function addText(NewsPost $post, string $content): void
     {
         $post->addItem(
             new NewsPostItem(
@@ -221,7 +204,7 @@ class RodKray31Parser implements ParserInterface
      * @param NewsPost $post
      * @param string   $content
      */
-    protected static function addQuote(NewsPost $post, string $content): void
+    private static function addQuote(NewsPost $post, string $content): void
     {
         $post->addItem(
             new NewsPostItem(
@@ -234,5 +217,16 @@ class RodKray31Parser implements ParserInterface
             ));
     }
 
+    /**
+     * @param string $content
+     *
+     * @return string
+     */
+    protected static function normalizeUrl(string $content)
+    {
+        return preg_replace_callback('/[^\x21-\x7f]/', function ($match) {
+            return rawurlencode($match[0]);
+        }, $content);
+    }
 
 }
