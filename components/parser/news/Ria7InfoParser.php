@@ -17,6 +17,10 @@ use app\components\mediasfera\NewsPostWrapper;
 use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
+
+/**
+ * @rss_html
+ */
 class Ria7InfoParser extends MediasferaNewsParser implements ParserInterface
 {
     public const USER_ID = 2;
@@ -27,23 +31,26 @@ class Ria7InfoParser extends MediasferaNewsParser implements ParserInterface
     public const SITE_URL = 'https://7info.ru/';
     public const NEWSLIST_URL = 'https://7info.ru/feed/';
 
-    //    public const TIMEZONE = '+0000';
     public const DATEFORMAT = 'D, d M Y H:i:s O';
 
     public const NEWSLIST_POST = '//rss/channel/item';
     public const NEWSLIST_TITLE = '//title';
     public const NEWSLIST_LINK = '//link';
     public const NEWSLIST_DATE = '//pubDate';
-    public const NEWSLIST_DESC = '//description';
-    public const NEWSLIST_IMG = '//enclosure';
-    public const NEWSLIST_TEXT = '//content:encoded';
+
+    public const ARTICLE_TEXT = '.td-post-content .tdb-block-inner';
 
     protected static NewsPostWrapper $post;
 
     public const ARTICLE_BREAKPOINTS = [
         'href' => [
             'https://7info.ru' => false,
-        ]
+        ],
+        'class' => [
+            'td-a-ad' => false,
+            'id_top_ad' => false,
+            'id_bottom_ad' => true,
+        ],
     ];
 
     public static function run(): array
@@ -61,13 +68,20 @@ class Ria7InfoParser extends MediasferaNewsParser implements ParserInterface
             self::$post->title = self::getNodeData('text', $node, self::NEWSLIST_TITLE);
             self::$post->original = self::getNodeData('text', $node, self::NEWSLIST_LINK);
             self::$post->createDate = self::getNodeDate('text', $node, self::NEWSLIST_DATE);
-            self::$post->image = self::getNodeData('url', $node, self::NEWSLIST_IMG);
 
-            self::$post->description = self::getNodeData('text', $node, self::NEWSLIST_DESC);
+            $articleContent = self::getPage(self::$post->original);
 
-            $html = self::getNodeData('text', $node, self::NEWSLIST_TEXT);
+            if (!empty($articleContent)) {
 
-            static::parse(new Crawler('<body><div>' . $html . '</div></body>'));
+                $articleCrawler = new Crawler($articleContent);
+
+                $css = $articleCrawler->filter('.tdb_single_bg_featured_image style')->text();
+                $selector = '.tdb-featured-image-bg';
+
+                self::$post->image = self::getImageFromCSS($css, $selector);
+
+                self::parse($articleCrawler->filter(self::ARTICLE_TEXT));
+            }
 
             $posts[] = self::$post->getNewsPost();
         });
