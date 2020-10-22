@@ -25,10 +25,10 @@ class Vesti95RuParser extends AbstractBaseParser
 
     protected function getPreviewNewsDTOList(int $minNewsCount = 10, int $maxNewsCount = 100): array
     {
+        $uriPreviewPage = UriResolver::resolve('/feed/', $this->getSiteUrl());
+        $this->getPageContent($uriPreviewPage);
         $this->getCurl()->setHeader('Cookie', 'beget=begetok');
         $previewNewsDTOList = [];
-
-        $uriPreviewPage = UriResolver::resolve('/feed/', $this->getSiteUrl());
 
         try {
             $previewNewsContent = $this->getPageContent($uriPreviewPage);
