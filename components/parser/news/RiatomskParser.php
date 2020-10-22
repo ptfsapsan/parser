@@ -13,9 +13,14 @@ namespace app\components\parser\news;
 
 use app\components\mediasfera\MediasferaNewsParser;
 use app\components\mediasfera\NewsPostWrapper;
+use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
+
+/**
+ * @rss_html
+ */
 class RiatomskParser extends MediasferaNewsParser implements ParserInterface
 {
     public const USER_ID = 2;
@@ -26,7 +31,6 @@ class RiatomskParser extends MediasferaNewsParser implements ParserInterface
     public const SITE_URL = 'https://www.riatomsk.ru/';
     public const NEWSLIST_URL = 'https://www.riatomsk.ru/rss.xml';
 
-//    public const TIMEZONE = '+0500';
     public const DATEFORMAT = 'D, d M Y H:i:s O';
 
     public const NEWSLIST_POST = '//rss/channel/item';
@@ -36,7 +40,6 @@ class RiatomskParser extends MediasferaNewsParser implements ParserInterface
     public const NEWSLIST_DESC = '//description';
     public const NEWSLIST_IMAGE = '//enclosure';
 
-    public const ARTICLE_HEADER = '.statInfoName h1';
     public const ARTICLE_TEXT = '.stat-info > .up';
 
     public const ARTICLE_BREAKPOINTS = [
@@ -45,10 +48,13 @@ class RiatomskParser extends MediasferaNewsParser implements ParserInterface
             'superInjDiv' => false,
             'fotoSign' => false,
             'stat-author' => false,
+            'storyNewDiv' => false,
+            'statInfoName' => false,
         ],
         'id' => [
             'ctl00_InfoPlaceHolder_TimeLabel' => false,
             'ctl00_InfoPlaceHolder_DateLabel' => false,
+            'ctl00_InfoPlaceHolder_StatAboutControl_StoryDiv' => false,
         ],
     ];
 
@@ -57,7 +63,6 @@ class RiatomskParser extends MediasferaNewsParser implements ParserInterface
     public static function run(): array
     {
         $posts = [];
-
 
         //затесался невидимый символ
         $listContent = str_replace('﻿', '', self::getPage(self::NEWSLIST_URL));
@@ -71,16 +76,15 @@ class RiatomskParser extends MediasferaNewsParser implements ParserInterface
             self::$post->title = self::getNodeData('text', $node, self::NEWSLIST_TITLE);
             self::$post->original = self::getNodeLink('text', $node, self::NEWSLIST_LINK);
             self::$post->createDate = self::getNodeDate('text', $node, self::NEWSLIST_DATE);
-            self::$post->description = self::getNodeData('text', $node, self::NEWSLIST_DESC);
+            //self::$post->description = self::getNodeData('text', $node, self::NEWSLIST_DESC);
             self::$post->image = self::getNodeData('url', $node, self::NEWSLIST_IMAGE);
 
             $articleContent = self::getPage(self::$post->original);
+            $articleContent = str_replace("\n", ' ', $articleContent);
 
             if (!empty($articleContent)) {
 
                 $articleCrawler = new Crawler($articleContent);
-
-                self::$post->itemHeader = [self::getNodeData('text', $articleCrawler, self::ARTICLE_HEADER), 1];
 
                 self::parse($articleCrawler->filter(self::ARTICLE_TEXT));
             }
@@ -95,6 +99,14 @@ class RiatomskParser extends MediasferaNewsParser implements ParserInterface
     protected static function parseNode(Crawler $node, ?string $filter = null) : void
     {
         $node = static::filterNode($node, $filter);
+
+        if($node->nodeName() == 'p') {
+            $strong = $node->filter('strong');
+
+            if($strong->count() && strpos($strong->text(), '– РИА Томск')) {
+                $node->getNode(0)->removeChild($strong->getNode(0));
+            }
+        }
 
         $qouteClasses = [
             'quote',
