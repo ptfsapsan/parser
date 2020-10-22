@@ -28,33 +28,30 @@ class TvComParser extends AbstractBaseParser
         $previewNewsDTOList = [];
 
         $uriPreviewPage = UriResolver::resolve("/news/rss", $this->getSiteUrl());
+
         try {
             $previewNewsContent = $this->getPageContent($uriPreviewPage);
             $previewNewsCrawler = new Crawler($previewNewsContent);
-            dd($previewNewsCrawler->html());
         } catch (Throwable $exception) {
             if (count($previewNewsDTOList) < $minNewsCount) {
                 throw new RuntimeException('Не удалось получить достаточное кол-во новостей', null, $exception);
             }
         }
 
-        $previewNewsCrawler = $previewNewsCrawler->filterXPath('//item');
-
-        $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$previewList) {
-            $title = $newsPreview->filterXPath('//title')->text();
-            $uri = $newsPreview->filterXPath('//link')->text();
-
-            $publishedAtString = $newsPreview->filterXPath('//pubDate')->text();
-            $publishedAt = DateTimeImmutable::createFromFormat('D, d M Y H:i:s O', $publishedAtString);
+        $previewNewsCrawler = $previewNewsCrawler->filterXPath('//default:item');
+        $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$previewNewsDTOList, $maxNewsCount) {
+            if (count($previewNewsDTOList) >= $maxNewsCount) {
+                return;
+            }
+            $title = $newsPreview->filterXPath('//default:title')->text();
+            $uri = $this->encodeUri($newsPreview->filterXPath('//default:link')->text());
+            $publishedAtString = $newsPreview->filterXPath('//default:pubDate')->text();
+            $publishedAt = DateTimeImmutable::createFromFormat(DATE_RFC1123, $publishedAtString);
             $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
-
-            $description = null;
-
-            $previewList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $title, $description);
+            $previewNewsDTOList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $title, null, null);
         });
 
-        dd($previewNewsDTOList);
-        $previewNewsDTOList = array_slice($previewList, 0, $maxNewsCount);
+        $previewNewsDTOList = array_slice($previewNewsDTOList, 0, $maxNewsCount);
         return $previewNewsDTOList;
     }
 
@@ -67,29 +64,24 @@ class TvComParser extends AbstractBaseParser
         $newsPage = $this->getPageContent($uri);
 
         $newsPageCrawler = new Crawler($newsPage);
-        $newsPostCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"full-news")]');
+        $newsPostCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"main-content")]//div[@class="text-block"]');
 
-        $mainImageCrawler = $newsPageCrawler->filterXPath('//meta[@property="og:image"]')->first();
+        $mainImageCrawler = $newsPostCrawler->filterXPath('//img')->first();
         if ($this->crawlerHasNodes($mainImageCrawler)) {
-            $image = $mainImageCrawler->attr('content');
+            $image = $mainImageCrawler->attr('src');
+            $this->removeDomNodes($newsPostCrawler, '//img[1]');
         }
         if ($image !== null && $image !== '') {
             $image = UriResolver::resolve($image, $uri);
             $previewNewsDTO->setImage(Helper::encodeUrl($image));
         }
 
-        $description = null;
-        if($description && $description !== ''){
-            $previewNewsDTO->setDescription($description);
-        }
+        $previewNewsDTO->setDescription(null);
 
-        $contentCrawler = $newsPostCrawler->filterXPath('//div[@class="full-news-text"]');
 
-        $this->removeDomNodes($contentCrawler,'//div[contains(@class,"mobile-slider")]');
+        $contentCrawler = $newsPostCrawler;
+
         $this->removeDomNodes($contentCrawler, '//a[starts-with(@href, "javascript")]');
-        $this->removeDomNodes($contentCrawler, '//div[contains(@style,"text-align:center;")]/a');
-        $this->removeDomNodes($contentCrawler, '//div[@class="full-news-info"]');
-        $this->removeDomNodes($contentCrawler, '//div[@class="full-news-title"]');
         $this->removeDomNodes($contentCrawler, '//script | //video');
         $this->removeDomNodes($contentCrawler, '//table');
 
