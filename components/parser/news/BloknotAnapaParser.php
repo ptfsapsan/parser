@@ -43,6 +43,10 @@ class BloknotAnapaParser extends AbstractBaseParser
 
         $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$previewList) {
             $title = $newsPreview->filterXPath('//title')->text();
+            if(str_contains($title,'Заходи в справочник!')){
+                return;
+            }
+
             $uri = $newsPreview->filterXPath('//link')->text();
 
             $publishedAtString = $newsPreview->filterXPath('//pubDate')->text();
