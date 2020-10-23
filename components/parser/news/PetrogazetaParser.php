@@ -163,7 +163,12 @@ class PetrogazetaParser implements ParserInterface
 
             if ($node->matches("p") && $node->filter("img")->count() !== 0) {
                 $image = $node->filter("img");
-                $src = self::normalizeUrl(self::ROOT_SRC . $image->attr("src"));
+                if($image->attr("src")[0] === "/"){
+                    $src = self::ROOT_SRC . self::normalizeUrl($image->attr("src"));
+                }else{
+                    $src = self::normalizeUrl($image->attr("src"));
+                }
+
                 if($post->image === $url){
                     $post->image = $url;
                 }else{
