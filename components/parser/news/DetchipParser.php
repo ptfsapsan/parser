@@ -109,13 +109,14 @@ class DetchipParser implements ParserInterface
             $descriptionBlock->parentNode->removeChild($descriptionBlock);
         }
 
+        //pictures from source in base64 format, uncomment if needed
         //Get image if exists
         $picture = null;
-        $imageBlock = $crawler->filterXPath('//img[1]')->getNode(0);
-        if (! empty($imageBlock) === true) {
-            $picture = preg_replace('/' . preg_quote(static::IMAGE_BASE_URL, '/') . '/', '', $imageBlock->getAttribute('src'));
-            $imageBlock->parentNode->removeChild($imageBlock);
-        }
+        // $imageBlock = $crawler->filterXPath('//img[1]')->getNode(0);
+        // if (! empty($imageBlock) === true) {
+        //     $picture = preg_replace('/' . preg_quote(static::IMAGE_BASE_URL, '/') . '/', '', $imageBlock->getAttribute('src'));
+        //     $imageBlock->parentNode->removeChild($imageBlock);
+        // }
 
         /** @var NewsPost */
         $post = new NewsPost(static::class, $title, $description, $createdAt, $link, $picture);
@@ -147,19 +148,20 @@ class DetchipParser implements ParserInterface
             return;
         }
 
+        //pictures in source in base64 format, uncomment if needed
         //Get non-empty images from nodes
-        if (self::isImageType($node)) {
-            $imageLink = self::cleanUrl($node->getAttribute('src'));
+        // if (self::isImageType($node)) {
+        //     $imageLink = self::cleanUrl($node->getAttribute('src'));
 
-            if ($imageLink === '') {
-                return;
-            }
+        //     if ($imageLink === '') {
+        //         return;
+        //     }
 
-            $imageLink = UriResolver::resolve($imageLink, static::SITE_URL);
+        //     $imageLink = UriResolver::resolve($imageLink, static::SITE_URL);
 
-            $post->addItem(new NewsPostItem(NewsPostItem::TYPE_IMAGE, $node->getAttribute('alt'), $imageLink));
-            return;
-        }
+        //     $post->addItem(new NewsPostItem(NewsPostItem::TYPE_IMAGE, $node->getAttribute('alt'), $imageLink));
+        //     return;
+        // }
 
         //Get non-empty links from nodes
         if (self::isLinkType($node) && self::hasText($node)) {
