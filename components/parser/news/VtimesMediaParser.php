@@ -24,7 +24,7 @@ class VtimesMediaParser implements ParserInterface
 
     const FEED_SRC = "/wp-json/wp/v2/posts/";
     const LIMIT = 100;
-
+    const EMPTY_DESCRIPTION = "empty";
 
     /**
      * @return array
@@ -92,7 +92,7 @@ class VtimesMediaParser implements ParserInterface
         $original = $postData["link"];
         $imageUrl = null;
 
-        $description = $postData["excerpt"]["rendered"];
+        $description = self::EMPTY_DESCRIPTION;
 
 
         return new NewsPost(
@@ -115,7 +115,7 @@ class VtimesMediaParser implements ParserInterface
     private static function inflatePostContent(NewsPost $post, Curl $curl)
     {
         $url = $post->original;
-
+        $post->description = "";
         $pageData = $curl->get($url);
         if (empty($pageData)) {
             throw new Exception("Получен пустой ответ от страницы новости: " . $url);
@@ -140,19 +140,19 @@ class VtimesMediaParser implements ParserInterface
         foreach ($body->children() as $bodyNode) {
             $node = new Crawler($bodyNode);
             if ($node->matches("h3") && !empty(trim($node->text(), "\xC2\xA0"))) {
-                $cleanText = str_ireplace($post->description, "", $node->text());
-                if (!empty($cleanText)) {
-                    self::addHeader($post, $node->text(), 3);
+                if(empty($post->description)){
+                    $post->description = Helper::prepareString($node->text());
+                }else{
+                    self::addText($post, $node->text());
                 }
-
                 continue;
             }
             if ($node->matches("h2") && !empty(trim($node->text(), "\xC2\xA0"))) {
-                $cleanText = str_ireplace($post->description, "", $node->text());
-                if (!empty($cleanText)) {
-                    self::addHeader($post, $node->text(), 2);
+                if(empty($post->description)){
+                    $post->description = Helper::prepareString($node->text());
+                }else{
+                    self::addText($post, $node->text());
                 }
-
                 continue;
             }
 
@@ -175,9 +175,10 @@ class VtimesMediaParser implements ParserInterface
             }
 
             if ($node->matches("p") && !empty(trim($node->text(), "\xC2\xA0"))) {
-                $cleanText = str_ireplace($post->description, "", $node->text());
-                if (!empty($cleanText)) {
-                    self::addText($post, $cleanText);
+                if(empty($post->description)){
+                    $post->description = Helper::prepareString($node->text());
+                }else{
+                    self::addText($post, $node->text());
                 }
                 continue;
             }
