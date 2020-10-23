@@ -17,6 +17,9 @@ use app\components\mediasfera\NewsPostWrapper;
 use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
+/**
+ * @fullhtml
+ */
 class VorbcParser extends MediasferaNewsParser implements ParserInterface
 {
     public const USER_ID = 2;
@@ -27,9 +30,7 @@ class VorbcParser extends MediasferaNewsParser implements ParserInterface
     public const SITE_URL = 'https://vo.rbc.ru/';
     public const NEWSLIST_URL = 'https://vo.rbc.ru/vo/';
 
-//    public const TIMEZONE = null;
-//    public const DATEFORMAT = 'Y-m-d\TH:i:sP';
-    public const DATEFORMAT = 'c';
+    public const DATEFORMAT = 'Y-m-d\TH:i:sP';
 
     public const NEWSLIST_POST = '.g-overflow .l-row .item__wrap';
     public const NEWSLIST_TITLE = '.item__title';
@@ -37,16 +38,17 @@ class VorbcParser extends MediasferaNewsParser implements ParserInterface
     public const NEWSLIST_IMG = 'img.item__image';
 
     public const ARTICLE_DATE =   'span.article__header__date';
-    public const ARTICLE_HEADER = '.article .article__header__title h1';
     public const ARTICLE_DESC =  '.article .article__text .article__text__overview';
     public const ARTICLE_TEXT =   '.article .article__text';
 
     public const ARTICLE_BREAKPOINTS = [
         'class' => [
+            'article__text__overview' => false,
             'article__main-image__author' => false,
             'banner' => false,
             'pro-anons' => false,
             'article__authors' => true,
+            'article__tags' => true,
         ]
     ];
 
@@ -63,10 +65,10 @@ class VorbcParser extends MediasferaNewsParser implements ParserInterface
         $listCrawler->filter(self::NEWSLIST_POST)->slice(0, self::NEWS_LIMIT)->each(function (Crawler $node) use (&$posts) {
 
             self::$post = new NewsPostWrapper();
+            self::$post->isPrepareItems = false;
 
             self::$post->title = self::getNodeData('text', $node, self::NEWSLIST_TITLE);
             self::$post->original = self::getNodeData('href', $node, self::NEWSLIST_LINK);
-
             self::$post->image = self::getNodeImage('src', $node, self::NEWSLIST_IMG);
 
             $articleContent = self::getPage(self::$post->original);
@@ -76,9 +78,7 @@ class VorbcParser extends MediasferaNewsParser implements ParserInterface
                 $articleCrawler = new Crawler($articleContent);
 
                 self::$post->createDate = self::getNodeDate('content', $articleCrawler, self::ARTICLE_DATE);
-                self::$post->description = self::getNodeData('text', $node, self::ARTICLE_DESC);
-
-                self::$post->itemHeader = [self::getNodeData('text', $articleCrawler, self::ARTICLE_HEADER), 1];
+                self::$post->description = self::getNodeData('text', $articleCrawler, self::ARTICLE_DESC);
 
                 $articleCrawler->filter(self::ARTICLE_TEXT)->each(function ($node) {
                     self::parse($node);
