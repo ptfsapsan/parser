@@ -14,6 +14,7 @@ namespace app\components\parser\news;
 
 use app\components\mediasfera\MediasferaNewsParser;
 use app\components\mediasfera\NewsPostWrapper;
+use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
@@ -74,7 +75,18 @@ class RiavrnParser extends MediasferaNewsParser implements ParserInterface
 
             static::parse($articleCrawler);
 
-            $posts[] = self::$post->getNewsPost();
+            $newsPost = self::$post->getNewsPost();
+
+            /**
+             * Вырезается первая картинка по просьбе заказчика.
+             * Цитата: "Первый элементом каждой новости добавляется картинка, которая является заглавной, только с другим URL. Давайте просто не добавлять её"
+             * @see https://github.com/vihos-dev/parser/pull/480
+             */
+            if($newsPost->items[0]->type == NewsPostItem::TYPE_IMAGE){
+                unset($newsPost->items[0]);
+            }
+
+            $posts[] = $newsPost;
         });
 
         return $posts;
