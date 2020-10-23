@@ -18,8 +18,7 @@ use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
 /**
- * @city Уфа
- *
+ * @fullhtml
  */
 class KommersantRegions59Parser extends MediasferaNewsParser implements ParserInterface
 {
@@ -32,26 +31,28 @@ class KommersantRegions59Parser extends MediasferaNewsParser implements ParserIn
     //public const SITE_URL = 'https://www.kommersant.ru/regions/59';
     public const NEWSLIST_URL = 'https://www.kommersant.ru/regions/59';
 
-//    public const TIMEZONE = '+0300';
-    public const DATEFORMAT = 'c';
+    public const IS_CURRENT_TIME = true;
+    public const DATEFORMAT = 'Y-m-d\TH:i:sP';
+
+    public const ATTR_IMAGE = 'data-lazyimage-src';
 
     public const MAINPOST_TITLE = 'article.uho_main .uho_main__text h4.uho_main__name';
     public const MAINPOST_LINK =  'article.uho_main .uho_main__text h4.uho_main__name a';
-    public const MAINPOST_DESC =  'article.uho_main .uho_main__text h3.uho_main__subheader';
     public const MAINPOST_IMG =   'article.uho_main .uho_main__photo img';
 
     public const NEWSLIST_POST =  '.b-indetail .indetail__item .uho_norm';
     public const NEWSLIST_TITLE = '.uho__name.uho_norm__name';
     public const NEWSLIST_LINK =  '.uho__name.uho_norm__name a';
-    public const NEWSLIST_DESC =  '.uho__subheader.uho_norm__subheader';
     public const NEWSLIST_IMG =   '.uho__photo img';
 
     public const ARTICLE_DATE =  'article.b-article meta[itemprop="datePublished"]';
+    public const ARTICLE_DESC =  'article.b-article .article_text_wrapper .b-article__intro';
     public const ARTICLE_TEXT =  'article.b-article .article_text_wrapper';
 
 
     public const ARTICLE_BREAKPOINTS = [
         'class' => [
+            'b-article__intro' => false,
             'document_authors' => true,
         ]
     ];
@@ -68,10 +69,10 @@ class KommersantRegions59Parser extends MediasferaNewsParser implements ParserIn
 
         // Main post
         self::$post = new NewsPostWrapper();
+        self::$post->isPrepareItems = false;
 
         self::$post->title = self::getNodeData('text', $listCrawler, self::MAINPOST_TITLE);
         self::$post->original = self::getNodeLink('href', $listCrawler, self::MAINPOST_LINK);
-        self::$post->description = self::getNodeData('text', $listCrawler, self::MAINPOST_DESC);
         self::$post->image = self::getNodeImage('data-lazyimage-src', $listCrawler, self::MAINPOST_IMG);
 
         $articleContent = self::getPage(self::$post->original);
@@ -80,6 +81,7 @@ class KommersantRegions59Parser extends MediasferaNewsParser implements ParserIn
 
             $articleCrawler = new Crawler($articleContent);
 
+            self::$post->description = self::getNodeData('text', $articleCrawler, self::ARTICLE_DESC);
             self::$post->createDate = self::getNodeDate('content', $articleCrawler, self::ARTICLE_DATE);
 
             self::parse($articleCrawler->filter(self::ARTICLE_TEXT));
@@ -88,13 +90,15 @@ class KommersantRegions59Parser extends MediasferaNewsParser implements ParserIn
         $posts[] = self::$post->getNewsPost();
 
         // Posts list
-        $listCrawler->filter(self::NEWSLIST_POST)->slice(0, self::NEWS_LIMIT)->each(function (Crawler $node) use (&$posts) {
+        $limit = self::NEWS_LIMIT - 1;
+
+        $listCrawler->filter(self::NEWSLIST_POST)->slice(0, $limit)->each(function (Crawler $node) use (&$posts) {
 
             self::$post = new NewsPostWrapper();
+            self::$post->isPrepareItems = false;
 
             self::$post->title = self::getNodeData('text', $node, self::NEWSLIST_TITLE);
             self::$post->original = self::getNodeLink('href', $node, self::NEWSLIST_LINK);
-            self::$post->description = self::getNodeData('text', $node, self::NEWSLIST_DESC);
             self::$post->image = self::getNodeImage('data-lazyimage-src', $node, self::NEWSLIST_IMG);
 
             $articleContent = self::getPage(self::$post->original);
@@ -103,6 +107,7 @@ class KommersantRegions59Parser extends MediasferaNewsParser implements ParserIn
 
                 $articleCrawler = new Crawler($articleContent);
 
+                self::$post->description = self::getNodeData('text', $articleCrawler, self::ARTICLE_DESC);
                 self::$post->createDate = self::getNodeDate('content', $articleCrawler, self::ARTICLE_DATE);
 
                 self::parse($articleCrawler->filter(self::ARTICLE_TEXT));
