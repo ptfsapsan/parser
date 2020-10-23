@@ -136,6 +136,7 @@ abstract class AbstractBaseParser implements ParserInterface
 
         $newsPost = new NewsPost(static::class, $title, $description, $publishedAtFormatted, $uri, $image);
 
+        $duplicatedLinksHashMap = [];
         foreach ($newsPostItems as $newsPostItemDTO) {
             if ($newsPost->image === null && $newsPostItemDTO->isImage()) {
                 $newsPost->image = $newsPostItemDTO->getImage();
@@ -156,7 +157,8 @@ abstract class AbstractBaseParser implements ParserInterface
             $needGenerateDescription = ($autoDescLength < $descLength || !$autoDescriptionDone) && $descEmpty;
 
             if ($needGenerateDescription && $isDescriptionPart) {
-                if ($newsPostItemDTO->isLink()) {
+                if ($newsPostItemDTO->isLink() && !isset($duplicatedLinksHashMap[$newsPostItemDTO->getHash()])) {
+                    $duplicatedLinksHashMap[$newsPostItemDTO->getHash()] = true;
                     $newsPost->addItem($newsPostItemDTO->factoryNewsPostItem());
                 }
 
@@ -327,7 +329,8 @@ abstract class AbstractBaseParser implements ParserInterface
         }
 
         $linkText = null;
-        if ($this->hasText($node) && trim($node->textContent) !== $link) {
+
+        if ($this->hasText($node) && trim($node->textContent, " /\t\n\r\0\x0B") !== trim($link, " /\t\n\r\0\x0B")) {
             $linkText = $this->normalizeSpaces($node->textContent);
         }
 
