@@ -14,9 +14,14 @@ namespace app\components\parser\news;
 
 use app\components\mediasfera\MediasferaNewsParser;
 use app\components\mediasfera\NewsPostWrapper;
+use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
+
+/**
+ * @fullhtml
+ */
 class SmolnarodParser extends MediasferaNewsParser implements ParserInterface
 {
     public const USER_ID = 2;
@@ -31,13 +36,13 @@ class SmolnarodParser extends MediasferaNewsParser implements ParserInterface
     public const DATEFORMAT = 'd.m.Y H:i';
 
     public const NEWSLIST_POST = '#section_weekly_news_wrapper .section_russia_news_item';
-    public const NEWSLIST_TITLE = '.section_russia_news_item_title_link a';
     public const NEWSLIST_LINK = '.section_russia_news_item_title_link a';
     public const NEWSLIST_DATE = '.news___chrono__item__category_date_time span:last-child';
-    public const NEWSLIST_DESC = '.section_russia_news_item_excerpt';
-    public const NEWSLIST_IMG = '.img-fluid';
+
 
     public const ARTICLE_HEADER = '#single_article_wrapper_inner h1';
+    public const ARTICLE_DESC = '.single_article_content_wrapper .single_article_content_inner :first-child';
+    public const ARTICLE_IMAGE = '.single_article_content_title_photo_wrapper img';
     public const ARTICLE_TEXT = '.single_article_content_wrapper .single_article_content_inner';
 
     public const ARTICLE_BREAKPOINTS = [
@@ -74,11 +79,8 @@ class SmolnarodParser extends MediasferaNewsParser implements ParserInterface
 
             self::$post = new NewsPostWrapper();
 
-            self::$post->title = self::getNodeData('text', $node, self::NEWSLIST_TITLE);
             self::$post->original = self::getNodeLink('href', $node, self::NEWSLIST_LINK);
             self::$post->createDate = self::getNodeDate('text', $node, self::NEWSLIST_DATE);
-            self::$post->description = self::getNodeData('text', $node, self::NEWSLIST_DESC);
-            self::$post->image = self::getNodeImage('src', $node, self::NEWSLIST_IMG);
 
             $articleContent = self::getPage(self::$post->original);
 
@@ -86,7 +88,9 @@ class SmolnarodParser extends MediasferaNewsParser implements ParserInterface
 
                 $articleCrawler = new Crawler($articleContent);
 
-                self::$post->itemHeader = [self::getNodeData('text', $articleCrawler, self::ARTICLE_HEADER), 1];
+                self::$post->title = self::getNodeData('text', $articleCrawler, self::ARTICLE_HEADER);
+                self::$post->description = self::getNodeData('text', $articleCrawler, self::ARTICLE_DESC);
+                self::$post->image = self::getNodeImage('src', $articleCrawler, self::ARTICLE_IMAGE);
 
                 self::parse($articleCrawler->filter(self::ARTICLE_TEXT));
             }
