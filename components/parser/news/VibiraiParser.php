@@ -24,7 +24,7 @@ class VibiraiParser implements ParserInterface
     const ROOT_SRC = "https://vibirai.ru";
 
     const FEED_SRC = "/articles?category=новости";
-    const LIMIT = 100;
+    const LIMIT = 3;
     const NEWS_PER_PAGE = 16;
     const EMPTY_DESCRIPTION = "empty";
     const PREFIX = "https:";
@@ -97,7 +97,7 @@ class VibiraiParser implements ParserInterface
         if ($image->count() !== 0) {
             $imageUrl = self::PREFIX . self::normalizeUrl($image->attr("src"));
         }
-        $createDate = new DateTime($postData->filter("article time")->attr("datetime"));
+        $createDate = new DateTime($postData->filter("article time")->attr("datetime") . " +05:00");
         $createDate->setTimezone(new DateTimeZone("UTC"));
 
         $description = $postData->filter("p")->text();
