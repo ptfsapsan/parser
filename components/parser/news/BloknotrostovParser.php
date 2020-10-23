@@ -17,6 +17,10 @@ use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
+
+/**
+ * @rss_html
+ */
 class BloknotrostovParser extends MediasferaNewsParser implements ParserInterface
 {
     public const USER_ID = 2;
@@ -27,7 +31,6 @@ class BloknotrostovParser extends MediasferaNewsParser implements ParserInterfac
     public const SITE_URL = 'https://bloknot-rostov.ru/';
     public const NEWSLIST_URL = 'https://bloknot-rostov.ru/rss_news.php';
 
-//    public const TIMEZONE = '+0000';
     public const DATEFORMAT = 'D, d M Y H:i:s O';
 
     public const NEWSLIST_POST = '//rss/channel/item';
@@ -37,7 +40,7 @@ class BloknotrostovParser extends MediasferaNewsParser implements ParserInterfac
     public const NEWSLIST_DESC = '//description';
     public const NEWSLIST_IMG = '//enclosure';
 
-    public const ARTICLE_HEADER = '#news-detail article h1';
+    public const ARTICLE_DESC = '#news-detail article .news-text b:first-of-type';
     public const ARTICLE_TEXT = '#news-detail article .news-text';
 
     public const ARTICLE_BREAKPOINTS = [
@@ -78,7 +81,6 @@ class BloknotrostovParser extends MediasferaNewsParser implements ParserInterfac
             self::$post->title = self::getNodeData('text', $node, self::NEWSLIST_TITLE);
             self::$post->original = self::getNodeData('text', $node, self::NEWSLIST_LINK);
             self::$post->createDate = self::getNodeDate('text', $node, self::NEWSLIST_DATE);
-            self::$post->description = self::getNodeData('text', $node, self::NEWSLIST_DESC);
             self::$post->image = self::getNodeImage('url', $node, self::NEWSLIST_IMG);
 
             $articleContent = self::getPage(self::$post->original);
@@ -87,7 +89,8 @@ class BloknotrostovParser extends MediasferaNewsParser implements ParserInterfac
 
                 $articleCrawler = new Crawler($articleContent);
 
-                self::$post->itemHeader = [self::getNodeData('text', $articleCrawler, self::ARTICLE_HEADER), 1];
+                self::$post->description = self::getNodeData('text', $articleCrawler, self::ARTICLE_DESC);
+
                 self::parse($articleCrawler->filter(self::ARTICLE_TEXT));
             }
 
