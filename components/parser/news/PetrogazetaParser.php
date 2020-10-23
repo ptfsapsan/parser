@@ -91,10 +91,7 @@ class PetrogazetaParser implements ParserInterface
         $title = $postData->filter("h3")->text();
         $original = self::ROOT_SRC . self::normalizeUrl($postData->filter("h3 a")->attr("href"));
         $imageUrl = null;
-        $image = $postData->filter("div.field-type-image img");
-        if ($image->count() !== 0) {
-            $imageUrl = $image->attr("src");
-        }
+
         $description = $postData->filter("a.simple-link")->text();
         $dateString = $postData->filter("h3 a")->attr("href");
         $dateArr = explode("/", $dateString);
@@ -163,7 +160,12 @@ class PetrogazetaParser implements ParserInterface
 
             if ($node->matches("p") && $node->filter("img")->count() !== 0) {
                 $image = $node->filter("img");
-                self::addImage($post, self::ROOT_SRC . $image->attr("src"));
+                $src = self::normalizeUrl(self::ROOT_SRC . $image->attr("src"));
+                if($post->image === $url){
+                    $post->image = $url;
+                }else{
+                    self::addImage($post, $src);
+                }
             }
         }
     }
