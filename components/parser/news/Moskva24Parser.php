@@ -90,10 +90,6 @@ class Moskva24Parser implements ParserInterface
         $title = $postData->filter("p > a")->text();
         $original = self::ROOT_SRC . self::normalizeUrl($postData->filter("p > a")->attr("href"));
         $imageUrl = null;
-        $image = $postData->filter("p > a img");
-        if ($image->count() !== 0) {
-            $imageUrl = $image->attr("src");
-        }
 
         $dateString = $postData->filter("p > a")->attr("href");
         $dateArr = explode("/", $dateString);
@@ -149,7 +145,19 @@ class Moskva24Parser implements ParserInterface
         /** @var DOMNode $bodyNode */
         foreach ($body->children() as $bodyNode) {
             $node = new Crawler($bodyNode);
-
+            if ($node->matches("div") && $node->filter("img")->count() !== 0) {
+                $image = $node->filter("img");
+                $src = self::normalizeUrl($image->attr("src"));
+                if ($post->image === null) {
+                    $post->image = $src;
+                } else {
+                    self::addImage($post, $src);
+                }
+                $subText = $node->children("p");
+                if ($subText->count() != 0) {
+                    self::addText($post, $subText->text());
+                }
+            }
             if ($node->matches("p") && !empty(trim($node->text(), "\xC2\xA0"))) {
                 if ($post->description === self::EMPTY_DESCRIPTION) {
                     $post->description = Helper::prepareString($node->text());
