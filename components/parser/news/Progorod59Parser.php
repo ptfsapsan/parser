@@ -18,6 +18,9 @@ use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
+/**
+ * @fullrss
+ */
 class Progorod59Parser extends MediasferaNewsParser implements ParserInterface
 {
     public const USER_ID = 2;
@@ -28,7 +31,6 @@ class Progorod59Parser extends MediasferaNewsParser implements ParserInterface
     public const SITE_URL = 'https://progorod59.ru/';
     public const NEWSLIST_URL = 'https://progorod59.ru/rss';
 
-    //    public const TIMEZONE = '+0000';
     public const DATEFORMAT = 'D, d M Y H:i:s O';
 
     public const NEWSLIST_POST = '//rss/channel/item';
