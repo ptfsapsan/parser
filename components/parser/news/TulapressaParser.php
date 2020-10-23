@@ -64,7 +64,6 @@ class TulapressaParser extends MediasferaNewsParser implements ParserInterface
             self::$post->title = self::getNodeData('text', $node, self::NEWSLIST_TITLE);
             self::$post->original = self::getNodeLink('href', $node, self::NEWSLIST_LINK);
 
-
             $articleContent = self::getPage(self::$post->original);
 
             if (!empty($articleContent)) {
