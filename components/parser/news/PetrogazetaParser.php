@@ -23,7 +23,7 @@ class PetrogazetaParser implements ParserInterface
     const ROOT_SRC = "https://petrogazeta.ru";
 
     const FEED_SRC = "/news";
-    const LIMIT = 100;
+    const LIMIT = 5;
     const NEWS_PER_PAGE = 20;
 
     /**
@@ -137,7 +137,10 @@ class PetrogazetaParser implements ParserInterface
             $post->createDate = $createDate;
         }
 
-
+        $imgHolder = $crawler->filter("div#content-wrapper div.field-name-field-photo img");
+        if($imgHolder->count() !== 0){
+            $post->image = self::normalizeUrl($imgHolder->attr("src"));
+        }
         $body = $crawler->filter("div#content-wrapper article.node-material > div > div.field-name-body > div > div");
         if ($body->count() === 0) {
             throw new Exception("Не найден блок новости в полученой странице: " . $url);
