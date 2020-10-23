@@ -1,15 +1,19 @@
 <?php
 
-namespace app\components\helper\nai4rus;
+namespace app\components\parser\news;
 
 use app\components\Helper;
+use app\components\helper\nai4rus\DOMNodeRecursiveIterator;
+use app\components\helper\nai4rus\PreviewNewsDTO;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
+use DateInterval;
 use DateTimeImmutable;
+use DateTimeInterface;
+use DateTimeZone;
 use DOMElement;
 use DOMNode;
-use InvalidArgumentException;
 use linslin\yii2\curl\Curl;
 use RuntimeException;
 use SplObjectStorage;
@@ -17,39 +21,47 @@ use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\DomCrawler\UriResolver;
 use Throwable;
 
-abstract class AbstractBaseParser implements ParserInterface
+class MagarifukuParser implements ParserInterface
 {
+    public const USER_ID = 2;
+    public const FEED_ID = 2;
+    private const SITE_URL = 'http://magarif-uku.ru';
+    private const EMPTY_DESCRIPTION_KEY = 'EmptyDescription';
+
     private int $microsecondsDelay;
     private int $pageCountBetweenDelay;
     private SplObjectStorage $nodeStorage;
     private Curl $curl;
 
-    public function __construct(int $microsecondsDelay = 200000, int $pageCountBetweenDelay = 10)
+    public function __construct(int $microsecondsDelay = 1000000, int $pageCountBetweenDelay = 3)
     {
         $this->microsecondsDelay = $microsecondsDelay;
         $this->pageCountBetweenDelay = $pageCountBetweenDelay;
         $this->nodeStorage = new SplObjectStorage();
 
-        $this->curl = $this->factoryCurl();
+        $this->curl = Helper::getCurl();
+        $this->curl->setOption(CURLOPT_ENCODING, "gzip");
     }
+
 
     public static function run(): array
     {
-        $parser = new static();
+        $parser = new self(200000, 10);
 
         return $parser->parse(10, 50);
     }
 
-    public function parse(int $minNewsCount = 10, int $maxNewsCount = 50): array
+
+    public function parse(int $minNewsCount = 10, int $maxNewsCount = 100): array
     {
-        $previewList = $this->getPreviewNewsDTOList($minNewsCount, $maxNewsCount);
+        $previewList = $this->getPreviewList($minNewsCount, $maxNewsCount);
 
         $newsList = [];
 
-        /** @var PreviewNewsDTO $newsPostDTO */
-        foreach ($previewList as $key => $newsPostDTO) {
-            $newsList[] = $this->parseNewsPage($newsPostDTO);
-            $this->nodeStorage->removeAll($this->nodeStorage);
+        /** @var PreviewNewsDTO $previewNewsItem */
+        foreach ($previewList as $key => $previewNewsItem) {
+            $newsList[] = $this->parseNewsPage($previewNewsItem);
+            $this->nodeStorage = new SplObjectStorage();
 
             if ($key % $this->pageCountBetweenDelay === 0) {
                 usleep($this->microsecondsDelay);
@@ -60,144 +72,108 @@ abstract class AbstractBaseParser implements ParserInterface
         return $newsList;
     }
 
-    /**
-     * @return string
-     */
-    abstract protected function getSiteUrl(): string;
-
-    /**
-     * @param int $minNewsCount
-     * @param int $maxNewsCount
-     * @return NewsPostItemDTO[]
-     */
-    abstract protected function getPreviewNewsDTOList(int $minNewsCount = 10, int $maxNewsCount = 100): array;
-
-    /**
-     * @param PreviewNewsDTO $previewNewsItem
-     * @return NewsPost
-     */
-    abstract protected function parseNewsPage(PreviewNewsDTO $previewNewsItem): NewsPost;
-
-
-    protected function purifyNewsPostContent(Crawler $contentCrawler): void
+    private function getPreviewList(int $minNewsCount = 10, int $maxNewsCount = 100): array
     {
+        $previewList = [];
+        $url = "/ru/feed/";
+        $uriPreviewPage = UriResolver::resolve($url, $this->getSiteUri());
+
+        try {
+            $previewNewsContent = $this->getPageContent($uriPreviewPage);
+            $previewNewsCrawler = new Crawler($previewNewsContent);
+        } catch (Throwable $exception) {
+            if (count($previewList) < $minNewsCount) {
+                throw new RuntimeException('Не удалось получить достаточное кол-во новостей', null, $exception);
+            }
+        }
+
+        $previewNewsCrawler = $previewNewsCrawler->filterXPath('//item');
+
+        $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$previewList, $url) {
+            $title = $newsPreview->filterXPath('//title')->text();
+            $uri = $newsPreview->filterXPath('//link')->text();
+            $publishedAtString = $newsPreview->filterXPath('//pubDate')->text();
+            $preview = null;
+
+            $publishedAt = DateTimeImmutable::createFromFormat('D, d M Y H:i:s O', $publishedAtString);
+            $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
+
+            $previewList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $title, $preview);
+        });
+
+        $previewList = array_slice($previewList, 0, $maxNewsCount);
+
+        return $previewList;
+    }
+
+
+    private function parseNewsPage(PreviewNewsDTO $previewNewsItem): NewsPost
+    {
+        $uri = $previewNewsItem->getUri();
+        $title = $previewNewsItem->getTitle();
+        $publishedAtUTC = $previewNewsItem->getDateTime();
+        $description = $previewNewsItem->getPreview();
+        $image = null;
+
+        $newsPage = $this->getPageContent($uri);
+
+        $newsPageCrawler = new Crawler($newsPage);
+        $newsPostCrawler = $newsPageCrawler->filterXPath('//article');
+
+        $mainImageCrawler = $newsPageCrawler->filterXPath('//meta[@property="og:image"]')->first();
+        if ($this->crawlerHasNodes($mainImageCrawler)) {
+            $image = $mainImageCrawler->attr('content');
+        }
+
+        if ($image !== null) {
+            $image = UriResolver::resolve($image, $uri);
+            $image = $this->encodeUri($image);
+        }
+
+        $description = self::EMPTY_DESCRIPTION_KEY;
+
+        $contentCrawler = $newsPostCrawler->filterXPath('//div[contains(@class,"entry-content")]');
+
+        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"addtoany_share_save_container")]');
+
+        $publishedAtFormatted = $publishedAtUTC->format('Y-m-d H:i:s');
+        $newsPost = new NewsPost(self::class, $title, $description, $publishedAtFormatted, $uri, $image);
+
         $this->removeDomNodes($contentCrawler, '//a[starts-with(@href, "javascript")]');
         $this->removeDomNodes($contentCrawler, '//script | //video | //style | //form');
         $this->removeDomNodes($contentCrawler, '//table');
-    }
-
-    protected function parseNewsPostContent(Crawler $contentCrawler, PreviewNewsDTO $newsPostDTO): array
-    {
-        $newsPostItemDTOList = [];
 
         foreach ($contentCrawler as $item) {
             $nodeIterator = new DOMNodeRecursiveIterator($item->childNodes);
 
             foreach ($nodeIterator->getRecursiveIterator() as $k => $node) {
-                $newsPostItemDTO = $this->parseDOMNode($node, $newsPostDTO);
-                if (!$newsPostItemDTO) {
+                $newsPostItem = $this->parseDOMNode($node, $previewNewsItem);
+                if (!$newsPostItem) {
                     continue;
                 }
 
-                $newsPostItemDTOList[] = $newsPostItemDTO;
-            }
-        }
+                $isImage = $newsPostItem->type === NewsPostItem::TYPE_IMAGE;
+                $isText = $newsPostItem->type === NewsPostItem::TYPE_TEXT;
 
-        return $newsPostItemDTOList;
-    }
-
-    /**
-     * @param PreviewNewsDTO $newsPostDTO
-     * @param NewsPostItemDTO[] $newsPostItems
-     * @param int $descLength
-     * @return NewsPost
-     */
-    protected function factoryNewsPost(PreviewNewsDTO $newsPostDTO, array $newsPostItems, int $descLength = 200): NewsPost {
-        $uri = $newsPostDTO->getUri();
-        $image = $newsPostDTO->getImage();
-
-        $title = $newsPostDTO->getTitle();
-        if ($title === null) {
-            throw new InvalidArgumentException('Объект NewsPostDTO не содержит заголовка новости');
-        }
-
-        $publishedAt = $newsPostDTO->getPublishedAt() ?: new DateTimeImmutable();
-        $publishedAtFormatted = $publishedAt->format('Y-m-d H:i:s');
-
-        $emptyDescriptionKey = 'EmptyDescription';
-        $autoDescriptionDone = false;
-        $autoGeneratedDescription = '';
-        $description = $emptyDescriptionKey;
-        $descEmpty = true;
-        if ($newsPostDTO->getDescription() !== null) {
-            $description = $newsPostDTO->getDescription();
-            $descEmpty = false;
-        }
-
-        $newsPost = new NewsPost(static::class, $title, $description, $publishedAtFormatted, $uri, $image);
-
-        $duplicatedLinksHashMap = [];
-        foreach ($newsPostItems as $newsPostItemDTO) {
-            if ($newsPost->image === null && $newsPostItemDTO->isImage()) {
-                $newsPost->image = $newsPostItemDTO->getImage();
-                continue;
-            }
-
-            if ($newsPostItemDTO->isImage() && $newsPost->image === $newsPostItemDTO->getImage()) {
-                continue;
-            }
-
-            if ($newsPost->description !== $emptyDescriptionKey) {
-                $newsPost->addItem($newsPostItemDTO->factoryNewsPostItem());
-                continue;
-            }
-
-            $isDescriptionPart = !$newsPostItemDTO->isImage() && $newsPostItemDTO->getText() !== null;
-            $autoDescLength = mb_strlen($autoGeneratedDescription);
-            $needGenerateDescription = ($autoDescLength < $descLength || !$autoDescriptionDone) && $descEmpty;
-
-            if ($needGenerateDescription && $isDescriptionPart) {
-                if ($newsPostItemDTO->isLink() && !isset($duplicatedLinksHashMap[$newsPostItemDTO->getHash()])) {
-                    $duplicatedLinksHashMap[$newsPostItemDTO->getHash()] = true;
-                    $newsPost->addItem($newsPostItemDTO->factoryNewsPostItem());
-                }
-
-                $space = $autoGeneratedDescription === '' ? '' : ' ';
-                $newsPostText = $space . $newsPostItemDTO->getText();
-                $reqNumberCharacters = $descLength - $autoDescLength;
-                $reqNumberCharacters = $reqNumberCharacters < 0 ? 0 : $reqNumberCharacters;
-
-                $matchResult = preg_match("/^(.{{$reqNumberCharacters}})([^.]*\.+)?(.*)/u", $newsPostText, $matches);
-                if ($matchResult === 0 || $matchResult === false) {
-                    $autoGeneratedDescription .= $newsPostText;
+                if ($isText && $newsPost->description === self::EMPTY_DESCRIPTION_KEY) {
+                    $newsPost->description = $newsPostItem->text;
                     continue;
                 }
 
-                if ($matches[2] !== '') {
-                    $autoDescriptionDone = true;
-
-                    $autoGeneratedDescription .= $matches[1] . $matches[2];
-                    $residualText = $matches[3];
-
-                    if ($this->isAcceptableText($residualText) && !$newsPostItemDTO->isLink()) {
-                        $newsPostItemDTO->setText($residualText);
-                        $newsPost->addItem($newsPostItemDTO->factoryNewsPostItem());
-                    }
-                } else {
-                    $autoGeneratedDescription .= $matches[0];
+                if ($isImage && $newsPost->image === null) {
+                    $newsPost->image = $newsPostItem->image;
+                    continue;
                 }
-                continue;
-            }
 
-            $newsPost->addItem($newsPostItemDTO->factoryNewsPostItem());
+                if ($isImage && $newsPost->image === $newsPostItem->image) {
+                    continue;
+                }
+
+                $newsPost->addItem($newsPostItem);
+            }
         }
 
-        if ($descEmpty) {
-            if ($autoGeneratedDescription !== '') {
-                $newsPost->description = trim($this->normalizeSpaces($autoGeneratedDescription));
-                return $newsPost;
-            }
-
+        if ($newsPost->description === self::EMPTY_DESCRIPTION_KEY) {
             $newsPost->description = $newsPost->title;
         }
 
@@ -205,7 +181,7 @@ abstract class AbstractBaseParser implements ParserInterface
     }
 
 
-    protected function parseDOMNode(DOMNode $node, PreviewNewsDTO $newsPostDTO): ?NewsPostItemDTO
+    private function parseDOMNode(DOMNode $node, PreviewNewsDTO $previewNewsItem): ?NewsPostItem
     {
         try {
             $newsPostItem = $this->searchQuoteNewsItem($node);
@@ -218,7 +194,7 @@ abstract class AbstractBaseParser implements ParserInterface
                 return $newsPostItem;
             }
 
-            $newsPostItem = $this->searchLinkNewsItem($node, $newsPostDTO);
+            $newsPostItem = $this->searchLinkNewsItem($node, $previewNewsItem);
             if ($newsPostItem) {
                 return $newsPostItem;
             }
@@ -228,7 +204,7 @@ abstract class AbstractBaseParser implements ParserInterface
                 return $newsPostItem;
             }
 
-            $newsPostItem = $this->searchImageNewsItem($node, $newsPostDTO);
+            $newsPostItem = $this->searchImageNewsItem($node, $previewNewsItem);
             if ($newsPostItem) {
                 return $newsPostItem;
             }
@@ -249,7 +225,7 @@ abstract class AbstractBaseParser implements ParserInterface
         return null;
     }
 
-    protected function searchQuoteNewsItem(DOMNode $node): ?NewsPostItemDTO
+    private function searchQuoteNewsItem(DOMNode $node): ?NewsPostItem
     {
         if ($node->nodeName === '#text' || !$this->isQuoteType($node)) {
             $parentNode = $this->getRecursivelyParentNode($node, function (DOMNode $parentNode) {
@@ -266,7 +242,7 @@ abstract class AbstractBaseParser implements ParserInterface
             throw new RuntimeException('Тег уже сохранен');
         }
 
-        $newsPostItem = NewsPostItemDTO::createQuoteItem($this->normalizeText($node->textContent));
+        $newsPostItem = new NewsPostItem(NewsPostItem::TYPE_QUOTE, $this->normalizeSpaces($node->textContent));
 
         $this->nodeStorage->attach($node, $newsPostItem);
         $this->removeParentsFromStorage($node->parentNode);
@@ -274,7 +250,7 @@ abstract class AbstractBaseParser implements ParserInterface
         return $newsPostItem;
     }
 
-    protected function searchHeadingNewsItem(DOMNode $node): ?NewsPostItemDTO
+    private function searchHeadingNewsItem(DOMNode $node): ?NewsPostItem
     {
         if ($node->nodeName === '#text' || $this->getHeadingLevel($node) === null) {
             $parentNode = $this->getRecursivelyParentNode($node, function (DOMNode $parentNode) {
@@ -285,7 +261,7 @@ abstract class AbstractBaseParser implements ParserInterface
 
         $headingLevel = $this->getHeadingLevel($node);
 
-        if ($headingLevel === null || !$this->hasText($node)) {
+        if (!$headingLevel || !$this->hasText($node)) {
             return null;
         }
 
@@ -293,7 +269,13 @@ abstract class AbstractBaseParser implements ParserInterface
             throw new RuntimeException('Тег уже сохранен');
         }
 
-        $newsPostItem = NewsPostItemDTO::createHeaderItem($this->normalizeText($node->textContent), $headingLevel);
+        $newsPostItem = new NewsPostItem(
+            NewsPostItem::TYPE_HEADER,
+            $this->normalizeSpaces($node->textContent),
+            null,
+            null,
+            $headingLevel
+        );
 
         $this->nodeStorage->attach($node, $newsPostItem);
         $this->removeParentsFromStorage($node->parentNode);
@@ -301,7 +283,7 @@ abstract class AbstractBaseParser implements ParserInterface
         return $newsPostItem;
     }
 
-    protected function searchLinkNewsItem(DOMNode $node, PreviewNewsDTO $newsPostDTO): ?NewsPostItemDTO
+    private function searchLinkNewsItem(DOMNode $node, PreviewNewsDTO $previewNewsItem): ?NewsPostItem
     {
         if ($this->isImageType($node)) {
             return null;
@@ -319,7 +301,8 @@ abstract class AbstractBaseParser implements ParserInterface
             return null;
         }
 
-        $link = UriResolver::resolve($node->getAttribute('href'), $newsPostDTO->getUri());
+        $link = UriResolver::resolve($node->getAttribute('href'), $previewNewsItem->getUri());
+        $link = $this->encodeUri($link);
         if ($link === null) {
             return null;
         }
@@ -328,13 +311,8 @@ abstract class AbstractBaseParser implements ParserInterface
             throw new RuntimeException('Тег уже сохранен');
         }
 
-        $linkText = null;
-
-        if ($this->hasText($node) && trim($node->textContent, " /\t\n\r\0\x0B") !== trim($link, " /\t\n\r\0\x0B")) {
-            $linkText = $this->normalizeSpaces($node->textContent);
-        }
-
-        $newsPostItem = NewsPostItemDTO::createLinkItem($link, $linkText);
+        $linkText = $this->hasText($node) ? $this->normalizeSpaces($node->textContent) : null;
+        $newsPostItem = new NewsPostItem(NewsPostItem::TYPE_LINK, $linkText, null, $link);
 
         $this->nodeStorage->attach($node, $newsPostItem);
         $this->removeParentsFromStorage($node->parentNode);
@@ -342,7 +320,7 @@ abstract class AbstractBaseParser implements ParserInterface
         return $newsPostItem;
     }
 
-    protected function searchYoutubeVideoNewsItem(DOMNode $node): ?NewsPostItemDTO
+    private function searchYoutubeVideoNewsItem(DOMNode $node): ?NewsPostItem
     {
         if ($node->nodeName === '#text' || $node->nodeName !== 'iframe') {
             $parentNode = $this->getRecursivelyParentNode($node, function (DOMNode $parentNode) {
@@ -360,16 +338,16 @@ abstract class AbstractBaseParser implements ParserInterface
         }
 
         $youtubeVideoId = $this->getYoutubeVideoId($node->getAttribute('src'));
-        if ($youtubeVideoId === null) {
+        if (!$youtubeVideoId) {
             return null;
         }
-        $newsPostItem = NewsPostItemDTO::createVideoItem($youtubeVideoId);
+        $newsPostItem = new NewsPostItem(NewsPostItem::TYPE_VIDEO, null, null, null, null, $youtubeVideoId);
         $this->nodeStorage->attach($node, $newsPostItem);
 
         return $newsPostItem;
     }
 
-    protected function searchImageNewsItem(DOMNode $node, PreviewNewsDTO $newsPostDTO): ?NewsPostItemDTO
+    private function searchImageNewsItem(DOMNode $node, PreviewNewsDTO $previewNewsItem): ?NewsPostItem
     {
         $isPicture = $this->isPictureType($node);
 
@@ -396,7 +374,8 @@ abstract class AbstractBaseParser implements ParserInterface
             return null;
         }
 
-        $imageLink = UriResolver::resolve($imageLink, $newsPostDTO->getUri());
+        $imageLink = UriResolver::resolve($imageLink, $previewNewsItem->getUri());
+        $imageLink = $this->encodeUri($imageLink);
         if ($imageLink === null) {
             return null;
         }
@@ -404,7 +383,7 @@ abstract class AbstractBaseParser implements ParserInterface
         $alt = $node->getAttribute('alt');
         $alt = $alt !== '' ? $alt : null;
 
-        $newsPostItem = NewsPostItemDTO::createImageItem($imageLink, $alt);
+        $newsPostItem = new NewsPostItem(NewsPostItem::TYPE_IMAGE, $alt, $imageLink);
 
         if ($isPicture) {
             $this->nodeStorage->attach($node->parentNode, $newsPostItem);
@@ -414,9 +393,9 @@ abstract class AbstractBaseParser implements ParserInterface
     }
 
 
-    protected function searchTextNewsItem(DOMNode $node): ?NewsPostItemDTO
+    private function searchTextNewsItem(DOMNode $node): ?NewsPostItem
     {
-        if ($node->nodeName === '#comment') {
+        if ($node->nodeName === '#comment' || !$this->hasText($node)) {
             return null;
         }
 
@@ -437,18 +416,14 @@ abstract class AbstractBaseParser implements ParserInterface
         }
 
         if ($this->nodeStorage->contains($attachNode)) {
-            /** @var NewsPostItemDTO $parentNewsPostItem */
+            /** @var NewsPostItem $parentNewsPostItem */
             $parentNewsPostItem = $this->nodeStorage->offsetGet($attachNode);
-            $parentNewsPostItem->addText($this->normalizeText($node->textContent));
+            $parentNewsPostItem->text .= $this->normalizeSpaces($node->textContent);
 
-            throw new RuntimeException('Контент добавлен к существующему объекту NewsPostItemDTO');
+            throw new RuntimeException('Контент добавлен к существующему объекту NewsPostItem');
         }
 
-        if (!$this->hasText($node)) {
-            return null;
-        }
-
-        $newsPostItem = NewsPostItemDTO::createTextItem($this->normalizeText($node->textContent));
+        $newsPostItem = new NewsPostItem(NewsPostItem::TYPE_TEXT, $this->normalizeSpaces($node->textContent));
 
         $this->nodeStorage->attach($attachNode, $newsPostItem);
 
@@ -456,7 +431,7 @@ abstract class AbstractBaseParser implements ParserInterface
     }
 
 
-    protected function removeParentsFromStorage(
+    private function removeParentsFromStorage(
         DOMNode $node,
         int $maxLevel = 5,
         array $exceptNewsPostItemTypes = null
@@ -470,10 +445,10 @@ abstract class AbstractBaseParser implements ParserInterface
         }
 
         if ($this->nodeStorage->contains($node)) {
-            /** @var NewsPostItemDTO $newsPostItem */
+            /** @var NewsPostItem $newsPostItem */
             $newsPostItem = $this->nodeStorage->offsetGet($node);
 
-            if (in_array($newsPostItem->getType(), $exceptNewsPostItemTypes, true)) {
+            if (in_array($newsPostItem->type, $exceptNewsPostItemTypes, true)) {
                 return;
             }
 
@@ -486,7 +461,7 @@ abstract class AbstractBaseParser implements ParserInterface
         $this->removeParentsFromStorage($node->parentNode, $maxLevel);
     }
 
-    protected function getRecursivelyParentNode(DOMNode $node, callable $callback, int $maxLevel = 5): ?DOMNode
+    private function getRecursivelyParentNode(DOMNode $node, callable $callback, int $maxLevel = 5): ?DOMNode
     {
         if ($callback($node)) {
             return $node;
@@ -501,7 +476,36 @@ abstract class AbstractBaseParser implements ParserInterface
         return $this->getRecursivelyParentNode($node->parentNode, $callback, $maxLevel);
     }
 
-    protected function getJsonContent(string $uri): array
+    private function parseHumanDateTime(string $dateTime, DateTimeZone $timeZone): DateTimeInterface
+    {
+        $formattedDateTime = mb_strtolower(trim($dateTime));
+        $now = new DateTimeImmutable('now', $timeZone);
+
+        if ($formattedDateTime === 'только что') {
+            return $now;
+        }
+
+        if (str_contains($formattedDateTime, 'час') && str_contains($formattedDateTime, 'назад')) {
+            $numericTime = preg_replace('/\bчас\b/u', '1', $formattedDateTime);
+            $hours = preg_replace('/[^0-9]/u', '', $numericTime);
+            return $now->sub(new DateInterval("PT{$hours}H"));
+        }
+
+        if (str_contains($formattedDateTime, 'вчера')) {
+            $time = preg_replace('/[^0-9:]/u', '', $formattedDateTime);
+            return DateTimeImmutable::createFromFormat('H:i', $time, $timeZone)->sub(new DateInterval("P1D"));
+        }
+
+        if (str_contains($formattedDateTime, 'сегодня')) {
+            $time = preg_replace('/[^0-9:]/u', '', $formattedDateTime);
+            return DateTimeImmutable::createFromFormat('H:i', $time, $timeZone);
+        }
+
+        throw new RuntimeException("Не удалось распознать дату: {$dateTime}");
+    }
+
+
+    private function getJsonContent(string $uri): array
     {
         $encodedUri = Helper::encodeUrl($uri);
         $result = $this->curl->get($encodedUri, false);
@@ -511,7 +515,7 @@ abstract class AbstractBaseParser implements ParserInterface
     }
 
 
-    protected function getPageContent(string $uri): string
+    private function getPageContent(string $uri): string
     {
         $encodedUri = Helper::encodeUrl($uri);
         $content = $this->curl->get($encodedUri);
@@ -520,7 +524,7 @@ abstract class AbstractBaseParser implements ParserInterface
         return $this->decodeGZip($content);
     }
 
-    protected function decodeGZip(string $string)
+    private function decodeGZip(string $string)
     {
         if (0 !== mb_strpos($string, "\x1f\x8b\x08")) {
             return $string;
@@ -530,7 +534,7 @@ abstract class AbstractBaseParser implements ParserInterface
     }
 
 
-    protected function checkResponseCode(Curl $curl): void
+    private function checkResponseCode(Curl $curl): void
     {
         $responseInfo = $curl->getInfo();
 
@@ -543,19 +547,19 @@ abstract class AbstractBaseParser implements ParserInterface
     }
 
 
-    protected function isPictureType(DOMNode $node): bool
+    private function isPictureType(DOMNode $node): bool
     {
         return $node->parentNode->nodeName === 'picture';
     }
 
 
-    protected function isImageType(DOMNode $node): bool
+    private function isImageType(DOMNode $node): bool
     {
-        return $node->nodeName === 'img' || $node->nodeName === 'amp-img';
+        return $node->nodeName === 'img';
     }
 
 
-    protected function isLink(DOMNode $node): bool
+    private function isLink(DOMNode $node): bool
     {
         if (!$node instanceof DOMElement || $node->nodeName !== 'a') {
             return false;
@@ -571,7 +575,7 @@ abstract class AbstractBaseParser implements ParserInterface
         return $link !== '';
     }
 
-    protected function isFormattingTag(DOMNode $node): bool
+    private function isFormattingTag(DOMNode $node): bool
     {
         $formattingTags = [
             'strong' => true,
@@ -586,25 +590,13 @@ abstract class AbstractBaseParser implements ParserInterface
         return isset($formattingTags[$node->nodeName]);
     }
 
-    protected function hasText(DOMNode $node): bool
+    private function hasText(DOMNode $node): bool
     {
-        return $this->isAcceptableText($node->textContent);
+        return trim($node->textContent, "⠀ \t\n\r\0\x0B\xC2\xA0") !== '';
     }
 
-    protected function isAcceptableText(string $text): bool
-    {
-        $stringWithoutSpaces = preg_replace('/[\pZ\pC\t\r\n⠀]/u', '', $text);
 
-        if (mb_strlen($stringWithoutSpaces) > 5) {
-            return true;
-        }
-
-        $stringWithoutPunctuationSymbols = preg_replace('/(\p{P})/u', '', $stringWithoutSpaces);
-
-        return $stringWithoutPunctuationSymbols !== '';
-    }
-
-    protected function isQuoteType(DOMNode $node): bool
+    private function isQuoteType(DOMNode $node): bool
     {
         $quoteTags = ['q' => true, 'blockquote' => true];
 
@@ -612,14 +604,14 @@ abstract class AbstractBaseParser implements ParserInterface
     }
 
 
-    protected function getHeadingLevel(DOMNode $node): ?int
+    private function getHeadingLevel(DOMNode $node): ?int
     {
         $headingTags = ['h1' => 1, 'h2' => 2, 'h3' => 3, 'h4' => 4, 'h5' => 5, 'h6' => 6];
 
         return $headingTags[$node->nodeName] ?? null;
     }
 
-    protected function removeDomNodes(Crawler $crawler, string $xpath): void
+    private function removeDomNodes(Crawler $crawler, string $xpath): void
     {
         $crawler->filterXPath($xpath)->each(function (Crawler $crawler) {
             $domNode = $crawler->getNode(0);
@@ -629,12 +621,35 @@ abstract class AbstractBaseParser implements ParserInterface
         });
     }
 
-    protected function crawlerHasNodes(Crawler $crawler): bool
+    private function crawlerHasNodes(Crawler $crawler): bool
     {
         return $crawler->count() >= 1;
     }
 
-    protected function encodeUri(string $uri)
+    private function translateDateToEng(string $date)
+    {
+        $date = mb_strtolower($date);
+        $monthRegex = [
+            '/янв[\S.]*/iu' => 'January',
+            '/фев[\S.]*/iu' => 'February',
+            '/мар[\S.]*/iu' => 'March',
+            '/апр[\S.]*/iu' => 'April',
+            '/май[\S.]*/iu' => 'May',
+            '/июн[\S.]*/iu' => 'June',
+            '/июл[\S.]*/iu' => 'July',
+            '/авг[\S.]*/iu' => 'August',
+            '/сен[\S.]*/iu' => 'September',
+            '/окт[\S.]*/iu' => 'October',
+            '/ноя[\S.]*/iu' => 'November',
+            '/дек[\S.]*/iu' => 'December'
+        ];
+        foreach ($monthRegex as $regex => $enMonth) {
+            $date = preg_replace($regex, $enMonth, $date);
+        }
+        return $date;
+    }
+
+    private function encodeUri(string $uri)
     {
         try {
             $encodedUri = Helper::encodeUrl($uri);
@@ -642,14 +657,14 @@ abstract class AbstractBaseParser implements ParserInterface
             return null;
         }
 
-        if ($encodedUri === '' || !filter_var($encodedUri, FILTER_VALIDATE_URL)) {
+        if (!$encodedUri || $encodedUri === '' || !filter_var($encodedUri, FILTER_VALIDATE_URL)) {
             return null;
         }
 
         return $encodedUri;
     }
 
-    protected function getYoutubeVideoId(string $link): ?string
+    private function getYoutubeVideoId(string $link): ?string
     {
         $youtubeRegex = '/(youtu\.be\/|youtube\.com\/(watch\?(.*&)?v=|(embed|v)\/))([\w-]{11})/iu';
         preg_match($youtubeRegex, $link, $matches);
@@ -657,42 +672,13 @@ abstract class AbstractBaseParser implements ParserInterface
         return $matches[5] ?? null;
     }
 
-    protected function normalizeText(string $string): string
+    private function normalizeSpaces(string $string): string
     {
-        $string = preg_replace('/[\r\n\pC]/u', '', $string);
-        return $this->normalizeSpaces($string);
+        return preg_replace('/\s+/u', ' ', $string);
     }
 
-    protected function normalizeSpaces(string $string): string
+    private function getSiteUri(): string
     {
-        return preg_replace('/(\s+|⠀+)/u', ' ', $string);
-    }
-
-    protected function factoryCurl(): Curl
-    {
-        $curl = Helper::getCurl();
-        $curl->setOption(CURLOPT_ENCODING, "gzip");
-
-        return $curl;
-    }
-
-    protected function getCurl(): Curl
-    {
-        return $this->curl;
-    }
-
-    protected function getNodeStorage(): SplObjectStorage
-    {
-        return $this->nodeStorage;
-    }
-
-    protected function getMicrosecondsDelay(): int
-    {
-        return $this->microsecondsDelay;
-    }
-
-    protected function getPageCountBetweenDelay(): int
-    {
-        return $this->pageCountBetweenDelay;
+        return self::SITE_URL;
     }
 }
