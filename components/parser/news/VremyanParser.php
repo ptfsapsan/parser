@@ -18,6 +18,10 @@ use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
+
+/**
+ * @rss_html
+ */
 class VremyanParser extends MediasferaNewsParser implements ParserInterface
 {
     public const USER_ID = 2;
@@ -28,20 +32,24 @@ class VremyanParser extends MediasferaNewsParser implements ParserInterface
     public const SITE_URL = 'http://www.vremyan.ru/';
     public const NEWSLIST_URL = 'http://www.vremyan.ru/rss/news.rss';
 
-    //    public const TIMEZONE = '+0000';
     public const DATEFORMAT = 'D, d M Y H:i:s O';
 
     public const NEWSLIST_POST = '//rss/channel/item';
     public const NEWSLIST_TITLE = '//title';
     public const NEWSLIST_LINK = '//link';
     public const NEWSLIST_DATE = '//pubDate';
-    public const NEWSLIST_DESC = '//description';
     public const NEWSLIST_IMG = '//enclosure';
 
-    public const ARTICLE_TEXT =   '.content article';
+    public const ARTICLE_DESC = '.content article .lead';
+    public const ARTICLE_IMAGE = '.content article .picture img';
+    public const ARTICLE_VIDEO = '.content article .content-video';
+    public const ARTICLE_TEXT = '.content article';
 
     public const ARTICLE_BREAKPOINTS = [
         'class' => [
+            'ro-1' => false,
+            'lead' => false,
+            'picture' => false,
             'labels-wrap' => false,
             'desc' => false,
             'aside' => false,
@@ -63,11 +71,11 @@ class VremyanParser extends MediasferaNewsParser implements ParserInterface
         $listCrawler->filterXPath(self::NEWSLIST_POST)->slice(0, self::NEWS_LIMIT)->each(function (Crawler $node) use (&$posts) {
 
             self::$post = new NewsPostWrapper();
+            self::$post->isPrepareItems = false;
 
             self::$post->title = self::getNodeData('text', $node, self::NEWSLIST_TITLE);
             self::$post->original = self::getNodeData('text', $node, self::NEWSLIST_LINK);
             self::$post->createDate = self::getNodeDate('text', $node, self::NEWSLIST_DATE);
-            self::$post->description = self::getNodeData('text', $node, self::NEWSLIST_DESC);
             self::$post->image = self::getNodeImage('url', $node, self::NEWSLIST_IMG);
 
             $articleContent = self::getPage(self::$post->original);
@@ -76,44 +84,71 @@ class VremyanParser extends MediasferaNewsParser implements ParserInterface
 
                 $articleCrawler = new Crawler($articleContent);
 
+                self::$post->description = self::getNodeData('text', $articleCrawler, self::ARTICLE_DESC);
+                self::$post->image = self::getNodeImage('src', $articleCrawler, self::ARTICLE_IMAGE);
+
+                self::getArticleVideo($articleCrawler->filter(self::ARTICLE_VIDEO));
+
                 self::parse($articleCrawler->filter(self::ARTICLE_TEXT));
-            }
 
-            $newsPost = self::$post->getNewsPost();
+                $newsPost = self::$post->getNewsPost();
 
-            $removeNext = false;
+                $removeNext = false;
 
-            foreach ($newsPost->items as $key => $item) {
-                if($removeNext) {
-                    unset($newsPost->items[$key]);
-                    continue;
+                foreach ($newsPost->items as $key => $item) {
+                    if($removeNext) {
+                        unset($newsPost->items[$key]);
+                        continue;
+                    }
+
+                    $text = trim($item->text);
+                    if($item->type == NewsPostItem::TYPE_TEXT) {
+                        if(strpos($text, 'Ранее сообщалось') === 0) {
+                            unset($newsPost->items[$key]);
+                            $removeNext = true;
+                        }
+                        if(strpos($text, 'Также сообщалось') === 0) {
+                            unset($newsPost->items[$key]);
+                            $removeNext = true;
+                        }
+                    }
                 }
 
-                $text = trim($item->text);
-                if($item->type == NewsPostItem::TYPE_TEXT) {
-                    if(strpos($text, 'Ранее сообщалось') === 0) {
-                        unset($newsPost->items[$key]);
-                        $removeNext = true;
-                    }
-                    if(strpos($text, 'Также сообщалось') === 0) {
-                        unset($newsPost->items[$key]);
-                        $removeNext = true;
-                    }
-                }
+                $posts[] = $newsPost;
             }
-
-            $posts[] = $newsPost;
         });
 
         return $posts;
     }
 
 
-    protected static function parseNode(Crawler $node, ?string $filter = null) : void
+    protected static function getArticleVideo(Crawler $node, $filter = null): void
     {
         $node = static::filterNode($node, $filter);
 
-        $nodeName = $node->nodeName();
+        if(!$node->count()) {
+            return;
+        }
+
+        $node->filter('script')->each(function (Crawler $script) {
+            $code = $script->text();
+
+            if(!$code) {
+                return;
+            }
+
+            $videoID = static::getNodeVideoId($code);
+
+            if($videoID) {
+                static::$post->itemVideo = $videoID;
+            }
+        });
+    }
+
+
+    protected static function parseNode(Crawler $node, ?string $filter = null) : void
+    {
+        $node = static::filterNode($node, $filter);
 
         $qouteClasses = [
             'quote'
