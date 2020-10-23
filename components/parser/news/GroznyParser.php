@@ -5,7 +5,9 @@ namespace app\components\parser\news;
 use app\components\helper\nai4rus\AbstractBaseParser;
 use app\components\helper\nai4rus\PreviewNewsDTO;
 use app\components\parser\NewsPost;
+use DateInterval;
 use DateTimeImmutable;
+use DateTimeInterface;
 use DateTimeZone;
 use RuntimeException;
 use Symfony\Component\DomCrawler\Crawler;
@@ -50,9 +52,11 @@ class GroznyParser extends AbstractBaseParser
 
                 $timezone = new DateTimeZone('Europe/Moscow');
                 $publishedAtString = $newsPreview->filterXPath('//li[contains(@class,"meta-news__date")]')->text();
-                $publishedAtString = $this->translateDateToEng($publishedAtString);
 
-                $publishedAt = DateTimeImmutable::createFromFormat('d F Y H:i', $publishedAtString, $timezone);
+                $publishedAt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $publishedAtString, $timezone);
+                if($publishedAt === false){
+                    $publishedAt = $this->parseHumanDateTime($publishedAtString, $timezone);
+                }
                 $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
                 $preview = null;
 
@@ -121,5 +125,33 @@ class GroznyParser extends AbstractBaseParser
             $date = preg_replace($regex, $enMonth, $date);
         }
         return $date;
+    }
+
+    private function parseHumanDateTime(string $dateTime, DateTimeZone $timeZone): DateTimeInterface
+    {
+        $formattedDateTime = mb_strtolower(trim($dateTime));
+        $now = new DateTimeImmutable('now', $timeZone);
+
+        if ($formattedDateTime === 'только что') {
+            return $now;
+        }
+
+        if (str_contains($formattedDateTime, 'час') && str_contains($formattedDateTime, 'назад')) {
+            $numericTime = preg_replace('/\bчас\b/u', '1', $formattedDateTime);
+            $hours = preg_replace('/[^0-9]/u', '', $numericTime);
+            return $now->sub(new DateInterval("PT{$hours}H"));
+        }
+
+        if (str_contains($formattedDateTime, 'вчера')) {
+            $time = preg_replace('/[^0-9:]/u', '', $formattedDateTime);
+            return DateTimeImmutable::createFromFormat('H:i', $time, $timeZone)->sub(new DateInterval("P1D"));
+        }
+
+        if (str_contains($formattedDateTime, 'сегодня')) {
+            $time = preg_replace('/[^0-9:]/u', '', $formattedDateTime);
+            return DateTimeImmutable::createFromFormat('H:i', $time, $timeZone);
+        }
+
+        throw new RuntimeException("Не удалось распознать дату: {$dateTime}");
     }
 }
