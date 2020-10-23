@@ -14,6 +14,7 @@ namespace app\components\parser\news;
 
 use app\components\mediasfera\MediasferaNewsParser;
 use app\components\mediasfera\NewsPostWrapper;
+use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
@@ -104,6 +105,10 @@ class MallsParser extends MediasferaNewsParser implements ParserInterface
             $removeNext = false;
 
             foreach ($newsPost->items as $key => $item) {
+                if($item->type == NewsPostItem::TYPE_IMAGE && basename($item->image) == basename(self::$post->image)){
+                    unset($newsPost->items[$key]);
+                }
+
                 if($removeNext) {
                     unset($newsPost->items[$key]);
                     continue;
