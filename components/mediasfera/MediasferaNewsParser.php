@@ -26,7 +26,7 @@ use Symfony\Component\DomCrawler\UriResolver;
 
 class MediasferaNewsParser
 {
-    public const DEBUG = true;
+    public const DEBUG = false;
 
     const PAGE_TRY_COUNT = 2;
     const PAGE_TRY_INTERVAL = [0.5, 1]; //Random interval in seconds
@@ -35,7 +35,7 @@ class MediasferaNewsParser
      * @see https://www.php.net/manual/ru/datetimezone.construct.php
      *
      * */
-    public const TIMEZONE = false;
+    public const TIMEZONE = null;
 
     /**
      * @see https://www.php.net/manual/ru/datetime.format.php
