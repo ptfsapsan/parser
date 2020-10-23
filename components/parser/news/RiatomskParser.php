@@ -76,7 +76,6 @@ class RiatomskParser extends MediasferaNewsParser implements ParserInterface
             self::$post->title = self::getNodeData('text', $node, self::NEWSLIST_TITLE);
             self::$post->original = self::getNodeLink('text', $node, self::NEWSLIST_LINK);
             self::$post->createDate = self::getNodeDate('text', $node, self::NEWSLIST_DATE);
-            //self::$post->description = self::getNodeData('text', $node, self::NEWSLIST_DESC);
             self::$post->image = self::getNodeData('url', $node, self::NEWSLIST_IMAGE);
 
             $articleContent = self::getPage(self::$post->original);
