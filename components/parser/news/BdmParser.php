@@ -67,24 +67,21 @@ class BdmParser extends AbstractBaseParser
         $newsPage = $this->getPageContent($uri);
 
         $newsPageCrawler = new Crawler($newsPage);
-        $newsPostCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"article-wrap")]');
+        $newsPostCrawler = $newsPageCrawler->filterXPath('//article[@class="post-view"]');
 
-        $mainImageCrawler = $newsPageCrawler->filterXPath('//meta[@property="og:image"]')->first();
+        $mainImageCrawler = $newsPostCrawler->filterXPath('//img')->first();
         if ($this->crawlerHasNodes($mainImageCrawler)) {
-            $image = $mainImageCrawler->attr('content');
+            $image = $mainImageCrawler->attr('src');
+            $this->removeDomNodes($newsPostCrawler,'//img[1]');
         }
         if ($image !== null && $image !== '') {
             $image = UriResolver::resolve($image, $uri);
             $previewNewsDTO->setImage($this->encodeUri($image));
         }
 
-        $description = $newsPostCrawler->filterXPath('//h2[contains(@class,"subtitle-wrap")]')->text();
-        if($description && $description !== ''){
-            $previewNewsDTO->setDescription($description);
-        }
+        $previewNewsDTO->setDescription(null);
 
-        $contentCrawler = $newsPostCrawler->filterXPath('//div[contains(@class,"inner-wrap")]')->first();
-        $this->removeDomNodes($contentCrawler,'//div[contains(@class,"mobile-slider")]');
+        $contentCrawler = $newsPostCrawler->filterXPath('//div[@class="content"]')->first();
 
         $this->purifyNewsPostContent($contentCrawler);
 
