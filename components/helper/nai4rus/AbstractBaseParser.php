@@ -659,12 +659,12 @@ abstract class AbstractBaseParser implements ParserInterface
 
     protected function normalizeText(string $string): string
     {
+        $string = preg_replace('/[\r\n\pC]/u', '', $string);
         return $this->normalizeSpaces($string);
     }
 
     protected function normalizeSpaces(string $string): string
     {
-        $string = preg_replace('/[\r\n]/u', '', $string);
         return preg_replace('/(\s+|⠀+)/u', ' ', $string);
     }
 
