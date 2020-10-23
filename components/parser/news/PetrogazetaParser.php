@@ -23,7 +23,7 @@ class PetrogazetaParser implements ParserInterface
     const ROOT_SRC = "https://petrogazeta.ru";
 
     const FEED_SRC = "/news";
-    const LIMIT = 5;
+    const LIMIT = 100;
     const NEWS_PER_PAGE = 20;
 
     /**
