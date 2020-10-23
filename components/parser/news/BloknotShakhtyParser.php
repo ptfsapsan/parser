@@ -17,13 +17,6 @@ class BloknotShakhtyParser extends AbstractBaseParser
     public const USER_ID = 2;
     public const FEED_ID = 2;
 
-    public static function run(): array
-    {
-        $parser = new static();
-
-        return $parser->parse(5, 50);
-    }
-
     protected function getSiteUrl(): string
     {
         return 'http://bloknot-shakhty.ru';
@@ -32,34 +25,50 @@ class BloknotShakhtyParser extends AbstractBaseParser
     protected function getPreviewNewsDTOList(int $minNewsCount = 10, int $maxNewsCount = 100): array
     {
         $previewList = [];
+        $categories = [
+            '/news/society/',
+            '/news/incident/',
+            '/news/policy/',
+            '/news/sport/',
+            '/news/economy/',
+            '/news/i_want_to_say/',
+            '/news/letter_to_the_editor/',
+            '/news/officials_of_the_city/',
+            '/news/culture/',
+            '/news/museum/',
+        ];
 
-        $uriPreviewPage = UriResolver::resolve("/rss_news.php", $this->getSiteUrl());
+        foreach ($categories as $urn) {
+            $uriPreviewPage = UriResolver::resolve($urn, $this->getSiteUrl());
 
-        try {
-            $previewNewsContent = $this->getPageContent($uriPreviewPage);
-            $previewNewsCrawler = new Crawler($previewNewsContent);
-        } catch (Throwable $exception) {
-            throw new RuntimeException('Не удалось получить достаточное кол-во новостей', null, $exception);
+            try {
+                $previewNewsContent = $this->getPageContent($uriPreviewPage);
+                $previewNewsCrawler = new Crawler($previewNewsContent);
+            } catch (Throwable $exception) {
+                throw new RuntimeException('Не удалось получить достаточное кол-во новостей', null, $exception);
+            }
+
+            $previewNewsCrawler = $previewNewsCrawler->filterXPath('//div[@class="catitem"]');
+            if ($previewNewsCrawler->count() < $minNewsCount) {
+                throw new RuntimeException('Не удалось получить достаточное кол-во новостей');
+            }
+
+            $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$previewList) {
+                $titleCrawler = $newsPreview->filterXPath('//a[contains(@class,"linksys")]');
+                $title = $titleCrawler->text();
+                $uri = UriResolver::resolve($titleCrawler->attr('href'),$this->getSiteUrl());
+
+                $timezone = new DateTimeZone('Europe/Moscow');
+                $publishedAtString = $newsPreview->filterXPath('//span[contains(@class,"botinfo")]')->text();
+                $publishedAt = DateTimeImmutable::createFromFormat('d.m.Y H:i', trim($publishedAtString), $timezone);
+                $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
+
+                $preview = null;
+
+                $previewList[] = new PreviewNewsDTO($this->encodeUri($uri), $publishedAtUTC, $title, $preview);
+            });
         }
 
-        $previewNewsCrawler = $previewNewsCrawler->filterXPath('//item');
-        if ($previewNewsCrawler->count() < $minNewsCount) {
-            throw new RuntimeException('Не удалось получить достаточное кол-во новостей');
-        }
-
-        $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$previewList) {
-            $title = $newsPreview->filterXPath('//title')->text();
-
-            $uri = $newsPreview->filterXPath('//link')->text();
-
-            $publishedAtString = $newsPreview->filterXPath('//pubDate')->text();
-            $publishedAt = DateTimeImmutable::createFromFormat('D, d M Y H:i:s O', $publishedAtString);
-            $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
-
-            $preview = null;
-
-            $previewList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $title, $preview);
-        });
 
         if (count($previewList) < $minNewsCount) {
             throw new RuntimeException('Не удалось получить достаточное кол-во новостей');
