@@ -6,6 +6,7 @@ use app\components\helper\metallizzer\Text;
 use app\components\helper\nai4rus\AbstractBaseParser;
 use app\components\helper\nai4rus\PreviewNewsDTO;
 use app\components\parser\NewsPost;
+use DOMNode;
 use RuntimeException;
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\DomCrawler\UriResolver;
@@ -98,5 +99,21 @@ class ViamWorksRuParser extends AbstractBaseParser
         $newsPostItemDTOList = $this->parseNewsPostContent($contentCrawler, $previewNewsDTO);
 
         return $this->factoryNewsPost($previewNewsDTO, $newsPostItemDTOList);
+    }
+
+    protected function isFormattingTag(DOMNode $node): bool
+    {
+        $formattingTags = [
+            'strong' => true,
+            'b' => true,
+            'span' => true,
+            's' => true,
+            'i' => true,
+            'a' => true,
+            'em' => true,
+            'sup' => true,
+        ];
+
+        return isset($formattingTags[$node->nodeName]);
     }
 }
