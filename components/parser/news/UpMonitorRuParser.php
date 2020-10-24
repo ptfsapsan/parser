@@ -15,6 +15,7 @@ use Symfony\Component\DomCrawler\Crawler;
  */
 class UpMonitorRuParser implements ParserInterface
 {
+    /*run*/
     const USER_ID = 2;
     const FEED_ID = 2;
     const SITE_URL = 'http://www.upmonitor.ru';

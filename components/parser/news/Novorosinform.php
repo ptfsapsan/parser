@@ -18,6 +18,7 @@ use Symfony\Component\DomCrawler\Crawler;
  */
 class Novorosinform extends Aleks007smolBaseParser implements ParserInterface
 {
+    /*run*/
     const USER_ID = 2;
     const FEED_ID = 2;
 

@@ -23,6 +23,7 @@ use Throwable;
 
 class MtvOnlineParser implements ParserInterface
 {
+    /*run*/
     public const USER_ID = 2;
     public const FEED_ID = 2;
     private const SITE_URL = 'https://xn--b1ats.xn--80asehdb';

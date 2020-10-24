@@ -17,6 +17,7 @@ use Symfony\Component\DomCrawler\Crawler;
  */
 class OmskPress extends TyRunBaseParser implements ParserInterface
 {
+    /*run*/
     const USER_ID = 2;
     const FEED_ID = 2;
 

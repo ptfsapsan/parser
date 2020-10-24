@@ -22,6 +22,7 @@ use Throwable;
 
 class Vesti35Parser implements ParserInterface
 {
+    /*run*/
     public const USER_ID = 2;
     public const FEED_ID = 2;
     public const SITE_URL = 'https://xn--35-dlcmp7ch.xn--p1ai/';

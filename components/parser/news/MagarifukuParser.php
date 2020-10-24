@@ -23,6 +23,7 @@ use Throwable;
 
 class MagarifukuParser implements ParserInterface
 {
+//    todo run
     public const USER_ID = 2;
     public const FEED_ID = 2;
     private const SITE_URL = 'http://magarif-uku.ru';

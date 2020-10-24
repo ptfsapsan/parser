@@ -23,6 +23,7 @@ use Symfony\Component\DomCrawler\Crawler;
  */
 class BloknotvolgogradParser extends MediasferaNewsParser implements ParserInterface
 {
+    /*run*/
     public const USER_ID = 2;
     public const FEED_ID = 2;
 

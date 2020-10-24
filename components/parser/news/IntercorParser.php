@@ -17,6 +17,7 @@ use Symfony\Component\DomCrawler\Crawler;
 
 class IntercorParser implements ParserInterface
 {
+    /*run*/
     const USER_ID = 2;
     const FEED_ID = 2;
 
@@ -163,8 +164,8 @@ class IntercorParser implements ParserInterface
 
     /**
      * @param NewsPost $post
-     * @param string   $content
-     * @param int      $level
+     * @param string $content
+     * @param int $level
      */
     protected static function addHeader(NewsPost $post, string $content, int $level): void
     {
@@ -181,7 +182,7 @@ class IntercorParser implements ParserInterface
 
     /**
      * @param NewsPost $post
-     * @param string   $content
+     * @param string $content
      */
     protected static function addImage(NewsPost $post, string $content): void
     {
@@ -199,7 +200,7 @@ class IntercorParser implements ParserInterface
 
     /**
      * @param NewsPost $post
-     * @param string   $content
+     * @param string $content
      */
     protected static function addText(NewsPost $post, string $content): void
     {
@@ -216,7 +217,7 @@ class IntercorParser implements ParserInterface
 
     /**
      * @param NewsPost $post
-     * @param string   $content
+     * @param string $content
      */
     protected static function addQuote(NewsPost $post, string $content): void
     {

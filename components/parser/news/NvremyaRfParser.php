@@ -22,6 +22,7 @@ use Throwable;
 
 class NvremyaRfParser implements ParserInterface
 {
+    /*run*/
     public const USER_ID = 2;
     public const FEED_ID = 2;
     private const SITE_URL = 'http://xn--b1agvbq6g.xn--p1ai';

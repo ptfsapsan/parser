@@ -15,6 +15,7 @@ use Symfony\Component\DomCrawler\Crawler;
  */
 class MozhgatvRuParser implements ParserInterface
 {
+    /*run*/
     const USER_ID = 2;
     const FEED_ID = 2;
     const SITE_URL = 'https://mozhgatv.ru';

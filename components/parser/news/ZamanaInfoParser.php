@@ -16,6 +16,7 @@ class ZamanaInfoParser implements ParserInterface
 {
     use \app\components\helper\metallizzer\Cacheable;
 
+    /*run*/
     const USER_ID  = 2;
     const FEED_ID  = 2;
     const SITE_URL = 'https://zamana.info/';

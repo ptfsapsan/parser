@@ -18,6 +18,7 @@ class UldeloRuParser extends AbstractBaseParser
     public const USER_ID = 2;
     public const FEED_ID = 2;
 
+    /*run*/
     protected function getSiteUrl(): string
     {
         return 'https://uldelo.ru';

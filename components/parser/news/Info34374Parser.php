@@ -23,6 +23,7 @@ use Throwable;
 
 class Info34374Parser implements ParserInterface
 {
+    /*run*/
     public const USER_ID = 2;
     public const FEED_ID = 2;
     private const SITE_URL = 'http://34374.info/';

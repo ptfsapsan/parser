@@ -23,6 +23,7 @@ use Throwable;
 
 class GoretsMediaParser implements ParserInterface
 {
+//    todo run
     public const USER_ID = 2;
     public const FEED_ID = 2;
     private const SITE_URL = 'https://gorets-media.ru/';

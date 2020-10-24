@@ -24,6 +24,7 @@ use Throwable;
 
 class PrimerruParser implements ParserInterface
 {
+    /*run*/
     public const USER_ID = 2;
     public const FEED_ID = 2;
     public const SITE_URL = 'https://primeru.net/';
@@ -121,7 +122,7 @@ class PrimerruParser implements ParserInterface
         $descriptionCrawler = $newsPostCrawler->filterXPath('//p[@class="card-text"]//following-sibling::div[1]')->text();
         $description = $descriptionCrawler;
 
-        if($this->crawlerHasNodes($mainImageCrawler)) {
+        if ($this->crawlerHasNodes($mainImageCrawler)) {
             $image = $mainImageCrawler->attr('content');
             if ($image === '' || empty($image)) {
                 $image = null;
@@ -397,7 +398,8 @@ class PrimerruParser implements ParserInterface
         DOMNode $node,
         int $maxLevel = 5,
         array $exceptNewsPostItemTypes = null
-    ): void {
+    ): void
+    {
         if ($maxLevel <= 0 || !$node->parentNode) {
             return;
         }

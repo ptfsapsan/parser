@@ -19,6 +19,7 @@ use lanfix\parser\src\Element;
  */
 class Mayak33Parser implements ParserInterface
 {
+    /*run*/
     use DataCleaner;
 
     public const USER_ID = 2;

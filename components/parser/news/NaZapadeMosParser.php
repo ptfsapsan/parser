@@ -23,6 +23,7 @@ use Throwable;
 
 class NaZapadeMosParser implements ParserInterface
 {
+    /*run*/
     public const USER_ID = 2;
     public const FEED_ID = 2;
     public const SITE_URL = 'https://na-zapade-mos.ru/';
