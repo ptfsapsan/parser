@@ -20,7 +20,7 @@ class KlopsParser implements ParserInterface
     const USER_ID = 2;
     const FEED_ID = 2;
 
-    const ROOT_SRC = "https://klops.ru/rss";
+    const ROOT_SRC = "https://klops.ru";
 
     const FEED_SRC = "https://rss.klops.ru/rss";
     const LIMIT = 100;
@@ -152,7 +152,10 @@ class KlopsParser implements ParserInterface
 
             if ($bodyContainer->matches("figure") && $bodyContainer->filter("img")->count() !== 0) {
                 $image = $bodyContainer->filter("img");
-                self::addImage($post, $image->attr("src"));
+                $src = $image->attr("src");
+                if($post->image !== $src) {
+                    self::addImage($post, $image->attr("src"));
+                }
             }
             if ($bodyContainer->matches("div.text")) {
                 /** @var DOMNode $bodyNode */
