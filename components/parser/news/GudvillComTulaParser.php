@@ -90,7 +90,7 @@ class GudvillComTulaParser extends AbstractBaseParser
         }
 
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"the_champ_sharing_container")]');
-        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"gudvi-after-content_3")]');
+        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"gudvi-after-content")]');
 
         $descriptionCrawler = $contentCrawler->filterXPath('//p[1]/strong');
         if ($this->crawlerHasNodes($descriptionCrawler)) {
