@@ -13,9 +13,14 @@ namespace app\components\parser\news;
 
 use app\components\mediasfera\MediasferaNewsParser;
 use app\components\mediasfera\NewsPostWrapper;
+use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
+
+/**
+ * @fullrss
+ */
 class VostokmediaParser extends MediasferaNewsParser implements ParserInterface
 {
     public const USER_ID = 2;
@@ -26,7 +31,6 @@ class VostokmediaParser extends MediasferaNewsParser implements ParserInterface
     public const SITE_URL = 'https://vostokmedia.com/';
     public const NEWSLIST_URL = 'https://vostokmedia.com/rss';
 
-//    public const TIMEZONE = '+0500';
     public const DATEFORMAT = 'D, d M Y H:i:s O';
 
     public const NEWSLIST_POST = '//rss/channel/item';
@@ -35,9 +39,27 @@ class VostokmediaParser extends MediasferaNewsParser implements ParserInterface
     public const NEWSLIST_DATE = '//pubDate';
     public const NEWSLIST_DESC = '//description';
     public const NEWSLIST_IMG = '//enclosure';
-//    public const NEWSLIST_CONTENT = '//turbo:content';
 
-    public const ARTICLE_BREAKPOINTS = [];
+    public const ARTICLE_BREAKPOINTS = [
+        'name' => [
+            'menu' => false,
+        ],
+        'text' => [
+            'Новости' => false,
+            'Аналитика' => false,
+            'Интервью' => false,
+            'Мнения' => false,
+            'Карточки' => false,
+            'Рейтинги' => false,
+            'Персоны' => false,
+            'Видео' => false,
+            'Эксклюзив' => false,
+        ],
+        'data-block' => [
+            'share' => false,
+        ],
+
+    ];
 
     protected static NewsPostWrapper $post;
 
@@ -61,14 +83,22 @@ class VostokmediaParser extends MediasferaNewsParser implements ParserInterface
 
             $contentNode = ($node->attr('turbo') == 'true') ? '//turbo:content' : '//yandex:full-text';
 
-
             $html = html_entity_decode(static::filterNode($node, $contentNode)->html());
 
             $articleCrawler = new Crawler('<body><div>'.$html.'</div></body>');
 
             static::parse($articleCrawler);
 
-            $posts[] = self::$post->getNewsPost();
+            $newsPost = self::$post->getNewsPost();
+
+            foreach ($newsPost->items as $key => $item) {
+                if($item->type == NewsPostItem::TYPE_IMAGE && $item->image && basename($item->image) == basename($newsPost->image)) {
+                    unset($newsPost->items[$key]);
+                    break;
+                }
+            }
+
+            $posts[] = $newsPost;
         });
 
         return $posts;
