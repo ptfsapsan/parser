@@ -16,6 +16,9 @@ use app\components\mediasfera\NewsPostWrapper;
 use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
+/**
+ * @rss_html
+ */
 class Bk55Parser extends MediasferaNewsParser implements ParserInterface
 {
     public const USER_ID = 2;
@@ -26,7 +29,6 @@ class Bk55Parser extends MediasferaNewsParser implements ParserInterface
     public const SITE_URL = 'https://bk55.ru/';
     public const NEWSLIST_URL = 'https://bk55.ru/news.rss';
 
-//    public const TIMEZONE = '+0500';
     public const DATEFORMAT = 'D, d M Y H:i:s O';
 
     public const NEWSLIST_POST = '//rss/channel/item';
@@ -36,11 +38,16 @@ class Bk55Parser extends MediasferaNewsParser implements ParserInterface
     public const NEWSLIST_DESC = '//description';
     public const NEWSLIST_IMG = '//enclosure';
 
-    public const ARTICLE_BREAKPOINTS = [];
-
-    public const ARTICLE_HEADER = '.content_main h1';
-    public const ARTICLE_IMAGE = '#divcontnews .article_img img';
     public const ARTICLE_TEXT = '#divcontnews .article-content';
+
+    public const ARTICLE_BREAKPOINTS = [
+        'class' => [
+            'lead-from-p-first' => false,
+            'bigBannerInText-cont' => false,
+            'yandex-rek-150' => false,
+            'yandex-rek-300' => false,
+        ]
+    ];
 
     protected static NewsPostWrapper $post;
 
@@ -67,8 +74,6 @@ class Bk55Parser extends MediasferaNewsParser implements ParserInterface
             if (!empty($articleContent)) {
 
                 $articleCrawler = new Crawler($articleContent);
-
-                self::$post->itemHeader = [self::getNodeData('text', $articleCrawler, self::ARTICLE_HEADER), 1];
 
                 self::parse($articleCrawler->filter(self::ARTICLE_TEXT));
             }
