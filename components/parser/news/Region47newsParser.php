@@ -16,6 +16,10 @@ use app\components\mediasfera\NewsPostWrapper;
 use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
+
+/**
+ * @rss_html
+ */
 class Region47newsParser extends MediasferaNewsParser implements ParserInterface
 {
     public const USER_ID = 2;
@@ -26,7 +30,6 @@ class Region47newsParser extends MediasferaNewsParser implements ParserInterface
     public const SITE_URL = 'https://47news.ru/';
     public const NEWSLIST_URL = 'https://47news.ru/rss';
 
-//    public const TIMEZONE = '+0500';
     public const DATEFORMAT = 'D, d M Y H:i:s O';
 
     public const NEWSLIST_POST = '//rss/channel/item';
@@ -36,7 +39,6 @@ class Region47newsParser extends MediasferaNewsParser implements ParserInterface
     public const NEWSLIST_DESC = '//description';
     public const NEWSLIST_IMG = '//enclosure';
 
-    public const ARTICLE_HEADER = '.article-full .article-head h1';
     public const ARTICLE_IMAGE = '.article-full photo img';
     public const ARTICLE_TEXT = '.article-full .article-text';
 
@@ -59,6 +61,7 @@ class Region47newsParser extends MediasferaNewsParser implements ParserInterface
         $listCrawler->filterXPath(self::NEWSLIST_POST)->slice(0, self::NEWS_LIMIT)->each(function (Crawler $node) use (&$posts) {
 
             self::$post = new NewsPostWrapper();
+            self::$post->isPrepareItems = false;
 
             self::$post->title = self::getNodeData('text', $node, self::NEWSLIST_TITLE);
             self::$post->original = self::getNodeData('text', $node, self::NEWSLIST_LINK);
@@ -71,8 +74,6 @@ class Region47newsParser extends MediasferaNewsParser implements ParserInterface
             if (!empty($articleContent)) {
 
                 $articleCrawler = new Crawler($articleContent);
-
-                self::$post->itemHeader = [self::getNodeData('text', $articleCrawler, self::ARTICLE_HEADER), 1];
 
                 self::parse($articleCrawler->filter(self::ARTICLE_TEXT));
             }
