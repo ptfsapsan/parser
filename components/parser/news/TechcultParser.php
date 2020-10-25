@@ -16,6 +16,10 @@ use app\components\mediasfera\NewsPostWrapper;
 use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
+
+/**
+ * @rss_html
+ */
 class TechcultParser extends MediasferaNewsParser implements ParserInterface
 {
     public const USER_ID = 2;
@@ -26,7 +30,6 @@ class TechcultParser extends MediasferaNewsParser implements ParserInterface
     public const SITE_URL = 'https://www.techcult.ru/';
     public const NEWSLIST_URL = 'https://www.techcult.ru/rss';
 
-//    public const TIMEZONE = '+0500';
     public const DATEFORMAT = 'D, d M Y H:i:s O';
 
     public const NEWSLIST_POST = '//rss/channel/item';
@@ -34,15 +37,16 @@ class TechcultParser extends MediasferaNewsParser implements ParserInterface
     public const NEWSLIST_LINK = '//link';
     public const NEWSLIST_DATE = '//pubDate';
     public const NEWSLIST_DESC = '//description';
-//    public const NEWSLIST_IMG = '//enclosure';
 
-    public const ARTICLE_HEADER = 'div[itemtype="http://schema.org/Article"] .title h1';
     public const ARTICLE_IMAGE = 'div[itemtype="http://schema.org/Article"] div[itemprop="text"] .img_cont img';
     public const ARTICLE_TEXT = 'div[itemtype="http://schema.org/Article"] div[itemprop="text"]';
 
     public const ARTICLE_BREAKPOINTS = [
         'name' => [
             'ins' => false,
+        ],
+        'itemprop' => [
+            'description' => false,
         ],
         'src' => [
             '/favicon.ico' => false,
@@ -74,7 +78,7 @@ class TechcultParser extends MediasferaNewsParser implements ParserInterface
 
                 $articleCrawler = new Crawler($articleContent);
 
-                self::$post->itemHeader = [self::getNodeData('text', $articleCrawler, self::ARTICLE_HEADER), 1];
+                self::$post->image = self::getNodeImage('src', $articleCrawler, self::ARTICLE_IMAGE);
 
                 self::parse($articleCrawler->filter(self::ARTICLE_TEXT));
             }
@@ -83,5 +87,21 @@ class TechcultParser extends MediasferaNewsParser implements ParserInterface
         });
 
         return $posts;
+    }
+
+
+    protected static function parseNode(Crawler $node, ?string $filter = null): void
+    {
+        $node = static::filterNode($node, $filter);
+
+        if($node->nodeName() == 'div' && $node->attr('class') == 'video') {
+            $code = $node->filter('div[data-code]')->attr('data-code');
+            if($code) {
+                static::$post->itemVideo = $code;
+                return;
+            }
+        }
+
+        parent::parseNode($node);
     }
 }
