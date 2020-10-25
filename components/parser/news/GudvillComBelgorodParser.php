@@ -9,6 +9,6 @@ class GudvillComBelgorodParser extends GudvillComTulaParser
 
     protected function getSiteUrl(): string
     {
-        return 'https://gudvill.com/belgorod';
+        return 'https://gudvill.com/belgorod/';
     }
 }
