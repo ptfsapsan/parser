@@ -14,7 +14,7 @@
 
 namespace app\components\parser\news;
 
-use app\components\mediasfera\ParserCore;
+use fingli\ParserCore\ParserCore;
 use app\components\parser\ParserInterface;
 
 // CORE_XXX_Parser -> необходимо заменить на актуальное название парсера (так как называется ваш файл)
