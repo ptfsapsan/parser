@@ -17,6 +17,10 @@ use app\components\mediasfera\NewsPostWrapper;
 use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
+
+/**
+ * @fullrss
+ */
 class Pg12Parser extends MediasferaNewsParser implements ParserInterface
 {
     public const USER_ID = 2;
@@ -27,7 +31,6 @@ class Pg12Parser extends MediasferaNewsParser implements ParserInterface
     public const SITE_URL = 'https://pg12.ru';
     public const NEWSLIST_URL = 'https://pg12.ru/rss';
 
-    //    public const TIMEZONE = '+0000';
     public const DATEFORMAT = 'D, d M Y H:i:s O';
 
     public const NEWSLIST_POST = '//rss/channel/item';
@@ -36,6 +39,42 @@ class Pg12Parser extends MediasferaNewsParser implements ParserInterface
     public const NEWSLIST_DATE = '//pubDate';
     public const NEWSLIST_DESC = '//description';
     public const NEWSLIST_IMG = '//enclosure';
+
+    public const ARTICLE_BREAKPOINTS = [
+        'name' => [
+            'Ext24smiWidget' => false,
+            'menu' => false,
+        ],
+        'href' => [
+            '/news' => false,
+            '/auto' => false,
+            '/afisha' => false,
+            '/cityfaces' => false,
+            '/peoplecontrol' => false,
+            '/sendnews' => false,
+            'http://pg12.ru/news' => false,
+            'http://pg12.ru/auto' => false,
+            'http://pg12.ru/afisha' => false,
+            'http://pg12.ru/cityfaces' => false,
+            'http://pg12.ru/peoplecontrol' => false,
+            'http://pg12.ru/sendnews' => false,
+        ],
+        'class' => [
+            'article__insert' => true,
+            'adsbygoogle' => false,
+        ],
+        'id' => [
+            'adv' => false,
+        ],
+        'data-turbo-ad-id' => [
+            'ad_place' => false,
+            'ad_place_context' => false,
+            'ad_place_smi24' => false,
+        ],
+        'data-block' => [
+            'share' => true,
+        ],
+    ];
 
     protected static NewsPostWrapper $post;
 
@@ -55,11 +94,9 @@ class Pg12Parser extends MediasferaNewsParser implements ParserInterface
             self::$post->original = self::getNodeData('text', $node, self::NEWSLIST_LINK);
             self::$post->createDate = self::getNodeDate('text', $node, self::NEWSLIST_DATE);
             self::$post->description = self::getNodeData('text', $node, self::NEWSLIST_DESC);
-
             self::$post->image = self::getNodeData('url', $node, self::NEWSLIST_IMG);
 
             $contentNode = ($node->attr('turbo') == 'true') ? '//turbo:content' : '//yandex:full-text';
-
 
             $html = html_entity_decode(static::filterNode($node, $contentNode)->html());
 
