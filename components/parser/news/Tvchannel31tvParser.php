@@ -17,6 +17,9 @@ use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
+/**
+ * @fullrss
+ */
 class Tvchannel31tvParser extends MediasferaNewsParser implements ParserInterface
 {
     public const USER_ID = 2;
@@ -27,14 +30,12 @@ class Tvchannel31tvParser extends MediasferaNewsParser implements ParserInterfac
     public const SITE_URL = 'https://31tv.ru/';
     public const NEWSLIST_URL = 'https://31tv.ru/feed/';
 
-//    public const TIMEZONE = '+0500';
     public const DATEFORMAT = 'D, d M Y H:i:s O';
 
     public const NEWSLIST_POST = '//rss/channel/item';
     public const NEWSLIST_TITLE = '//title';
     public const NEWSLIST_LINK = '//link';
     public const NEWSLIST_DATE = '//pubDate';
-    public const NEWSLIST_DESC = '//description';
     public const NEWSLIST_CONTENT = '//content:encoded';
 
     public const ARTICLE_BREAKPOINTS = [
@@ -69,7 +70,6 @@ class Tvchannel31tvParser extends MediasferaNewsParser implements ParserInterfac
             self::$post->title = self::getNodeData('text', $node, self::NEWSLIST_TITLE);
             self::$post->original = self::getNodeData('text', $node, self::NEWSLIST_LINK);
             self::$post->createDate = self::getNodeDate('text', $node, self::NEWSLIST_DATE);
-            self::$post->description = self::getNodeData('text', $node, self::NEWSLIST_DESC);
 
             $html = html_entity_decode(static::filterNode($node, self::NEWSLIST_CONTENT)->html());
 
@@ -99,5 +99,20 @@ class Tvchannel31tvParser extends MediasferaNewsParser implements ParserInterfac
         });
 
         return $posts;
+    }
+
+
+    protected static function parseNode(Crawler $node, ?string $filter = null) : void
+    {
+        $node = static::filterNode($node, $filter);
+
+        if (strpos($node->text(), 'Сообщение') === 0 && strpos($node->text(), 'появились сначала на')) {
+            return;
+        }
+        elseif (strpos($node->text(), 'Фото:') === 0) {
+            return;
+        }
+
+        parent::parseNode($node);
     }
 }
