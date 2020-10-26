@@ -3,6 +3,8 @@
 namespace app\components\parser\news;
 
 use app\components\helper\metallizzer\Parser;
+use app\components\helper\metallizzer\Text;
+use app\components\helper\metallizzer\Url;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
@@ -59,18 +61,15 @@ class GazetaMmRuParser implements ParserInterface
         $post = new NewsPost(
             self::class,
             html_entity_decode($crawler->filter('title')->first()->text()),
-            html_entity_decode($crawler->filter('meta[name="description"]')->first()->attr('content')),
+            '~',
             $dt->setTimezone(new DateTimeZone('UTC'))->format('c'),
-            $url,
-            $data['image'][0] ?? ''
+            Url::encode($url),
+            Url::encode($data['image'][0] ?? '')
         );
 
-        $items = (new Parser())->parseMany($crawler->filterXpath('//div[@class="itemFullText"]/node()'));
-
-        foreach ($items as $item) {
-            $post->addItem(new NewsPostItem(...array_values($item)));
-        }
-
-        self::$posts[] = $post;
+        self::$posts[] = (new Parser)->fill(
+            $post, 
+            $crawler->filterXpath('//div[@class="itemFullText"]/node()')
+        );
     }
 }
