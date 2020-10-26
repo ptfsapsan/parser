@@ -57,7 +57,6 @@ class VesIskitimRuParser implements ParserInterface
             if ($imgSrc->getNode(0)) {
                 $image = $this->getHeadUrl($imgSrc->attr('src'));
             }
-
             $description = $content->filterXPath("//div[@class='article__subtitle']")->text();
 
             $post = new NewsPost(
