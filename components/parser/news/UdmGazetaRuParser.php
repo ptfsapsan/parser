@@ -7,6 +7,9 @@ use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
+use DateInterval;
+use DateTime;
+use DateTimeZone;
 use RuntimeException;
 use Symfony\Component\DomCrawler\Crawler;
 use yii\helpers\ArrayHelper;
@@ -59,8 +62,7 @@ class UdmGazetaRuParser implements ParserInterface
                 $image
             );
             $newContentCrawler = (new Crawler($itemCrawler->filterXPath("//div[@class='big-coll news-full']")->html()))->filterXPath('//body')->children();
-
-            $description = '';
+            
             foreach ($newContentCrawler as $item => $content) {
                 if($item < 3) {
                     continue;
@@ -84,14 +86,16 @@ class UdmGazetaRuParser implements ParserInterface
                         $this->addItemPost($post, NewsPostItem::TYPE_LINK, $nodeValue, null, $childNode->getAttribute('href'));
 
                     } elseif ($nodeValue) {
-                        $this->addItemPost($post, NewsPostItem::TYPE_TEXT, $nodeValue);
-                    }
-                    $description = $description . ' ' . $nodeValue;
-                }
-            }
 
-            if (trim($description) && $post->description != $description) {
-                $post->description = $description;
+                        if ($post->description == $post->title) {
+                            $post->description = $nodeValue;
+                            continue;
+                        }
+
+                        $this->addItemPost($post, NewsPostItem::TYPE_TEXT, $nodeValue);
+
+                    }
+                }
             }
 
             $posts[] = $post;
@@ -131,16 +135,20 @@ class UdmGazetaRuParser implements ParserInterface
      */
     protected function getDate(string $date): string
     {
-        $now = new \DateTime();
+        $now = new DateTime();
+        $time = $now->setTimezone(new DateTimeZone("UTC"))->format("H:i:s");
         $today = $now->format('Y-m-d');
         $date = mb_strtolower($date);
         $str = explode(':', $date);
-        $yesterday = $now->sub(new \DateInterval('P1D'))->format('Y-m-d');
+        $yesterday = $now->sub(new DateInterval('P1D'))->format('Y-m-d');
         $ruMonths = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря', 'сегодня', 'вчера'];
         $enMonths = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december', $today, $yesterday];
-        $newDate = ArrayHelper::getValue($str, 1) ? str_ireplace($ruMonths, $enMonths, $str[1]) : '';
-        $newDate = new \DateTime($newDate);
-        $newDate->setTimezone(new \DateTimeZone("UTC"));
+        $newDate = ArrayHelper::getValue($str, 1) ? $time . ' '. $str[1] : '';
+        if ($newDate) {
+            $newDate = str_ireplace($ruMonths, $enMonths, $newDate);
+        }
+        $newDate = new DateTime($newDate);
+        $newDate->setTimezone(new DateTimeZone("UTC"));
         return $newDate->format("Y-m-d H:i:s");
     }
 
