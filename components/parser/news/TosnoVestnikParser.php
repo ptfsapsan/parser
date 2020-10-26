@@ -132,7 +132,21 @@ class TosnoVestnikParser implements ParserInterface
 
         $crawler = new Crawler($pageData);
 
-        $body = $crawler->filter("article.post div.td-post-content");
+
+        $image = $crawler->filter("article.post div.td-post-content div.td-post-featured-image img");
+        if($image->count() !== 0) {
+            $src = self::normalizeUrl($image->attr("data-lazy-src"));
+            if ($post->image === null) {
+                $post->image = $src;
+            } else {
+                self::addImage($post, $src);
+            }
+        }
+
+        $body = $crawler->filter("article.post div.td-post-content article");
+        if($body->count() === 0){
+            $body = $crawler->filter("article.post div.td-post-content");
+        }
 
         if ($body->count() === 0) {
             throw new Exception("Не найден блок новости в полученой странице: " . $url);
@@ -142,15 +156,6 @@ class TosnoVestnikParser implements ParserInterface
         foreach ($body->children() as $bodyNode) {
             $node = new Crawler($bodyNode);
 
-            if ($node->matches("div") && $node->filter("img")->count() !== 0) {
-                $image = $node->filter("img");
-                $src = self::normalizeUrl($image->attr("data-lazy-src"));
-                if ($post->image === null) {
-                    $post->image = $src;
-                } else {
-                    self::addImage($post, $src);
-                }
-            }
             if ($node->matches("figure") && $node->filter("img")->count() !== 0) {
                 $image = $node->filter("img");
                 $src = self::normalizeUrl($image->attr("data-lazy-src"));
@@ -178,7 +183,11 @@ class TosnoVestnikParser implements ParserInterface
                 continue;
             }
 
-            if ($node->matches("figure") && $node->filter("blockquote")->count() !== 0 && !empty(trim($node->text(), "\xC2\xA0"))) {
+            if (
+                    $node->matches("figure")
+                    && $node->filter("blockquote")->count() !== 0
+                    && !empty(trim($node->text(), "\xC2\xA0"))
+            ) {
                 self::addQuote($post, $node->text());
                 continue;
             }
