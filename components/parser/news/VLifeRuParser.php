@@ -7,6 +7,8 @@ use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
+use DateTime;
+use DateTimeZone;
 use RuntimeException;
 use Symfony\Component\DomCrawler\Crawler;
 use yii\helpers\ArrayHelper;
@@ -58,7 +60,6 @@ class VLifeRuParser implements ParserInterface
                 $image
             );
 
-            $description = '';
             $table = $itemCrawler->filterXPath("//*[@id='view_line']")->siblings()->children();
             foreach ($table as $key => $item) {
                 if ($key <= 2 || strpos($item->nodeValue, 'function') !== false) {
@@ -84,14 +85,14 @@ class VLifeRuParser implements ParserInterface
 
                 } elseif ($nodeValue) {
 
+                    if ($post->description == $post->title) {
+                        $post->description = $nodeValue;
+                        continue;
+                    }
+
                     $this->addItemPost($post, NewsPostItem::TYPE_TEXT, $nodeValue);
 
                 }
-                $description = $description . ' ' . $nodeValue;
-            }
-
-            if (trim($description) && $post->description != $description) {
-                $post->description = $description;
             }
 
             $posts[] = $post;
@@ -132,8 +133,9 @@ class VLifeRuParser implements ParserInterface
     protected function getDate(string $date): string
     {
         $str = explode(':', $date);
-        $newDate = new \DateTime(ArrayHelper::getValue($str, 1, ''));
-        $newDate->setTimezone(new \DateTimeZone("UTC"));
+        $time = (new DateTime())->setTimezone(new DateTimeZone("UTC"))->format("H:i:s");
+        $newDate = ArrayHelper::getValue($str, 1, '') ? new DateTime($time . ' '. $str[1]) : '';
+        $newDate->setTimezone(new DateTimeZone("UTC"));
         return $newDate->format("Y-m-d H:i:s");
     }
 
