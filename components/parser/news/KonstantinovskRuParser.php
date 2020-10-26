@@ -7,6 +7,9 @@ use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
+use DateInterval;
+use DateTime;
+use DateTimeZone;
 use RuntimeException;
 use Symfony\Component\DomCrawler\Crawler;
 
@@ -59,7 +62,7 @@ class KonstantinovskRuParser implements ParserInterface
             );
 
             $newContentCrawler = $content->filterXPath("//div[@class='node']/table/*/td");
-            $description = '';
+
             foreach ($newContentCrawler as $content) {
                 foreach ($content->childNodes as $key => $childNode) {
                     if ($key < 6) {
@@ -69,7 +72,7 @@ class KonstantinovskRuParser implements ParserInterface
                         continue;
                     }
 
-                    $nodeValue = trim($childNode->nodeValue);
+                    $nodeValue = $this->clearText($childNode->nodeValue);
                     if (in_array($childNode->nodeName, ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']) && $childNode->nodeValue != $title) {
 
                         $this->addItemPost($post, NewsPostItem::TYPE_HEADER, $nodeValue, null, null, (int) substr($childNode->nodeName, 1));
@@ -79,14 +82,15 @@ class KonstantinovskRuParser implements ParserInterface
                         $this->addItemPost($post, NewsPostItem::TYPE_LINK, $nodeValue, null, $childNode->getAttribute('href'));
 
                     } elseif ($nodeValue) {
-                        $this->addItemPost($post, NewsPostItem::TYPE_TEXT, $nodeValue);
-                    }
-                    $description = $description . ' ' . $nodeValue;
-                }
-            }
+                        if ($post->description == $post->title) {
+                            $post->description = $nodeValue;
+                            continue;
+                        }
 
-            if (trim($description) && $post->description != $description) {
-                $post->description = $description;
+                        $this->addItemPost($post, NewsPostItem::TYPE_TEXT, $nodeValue);
+
+                    }
+                }
             }
 
             $posts[] = $post;
@@ -126,15 +130,15 @@ class KonstantinovskRuParser implements ParserInterface
      */
     protected function getDate(string $date): string
     {
-        $now = new \DateTime();
+        $now = new DateTime();
         $today = $now->format('Y-m-d');
         $date = mb_strtolower($date);
-        $yesterday = $now->sub(new \DateInterval('P1D'))->format('Y-m-d');
+        $yesterday = $now->sub(new DateInterval('P1D'))->format('Y-m-d');
         $ruMonths = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря', 'сегодня', 'вчера'];
         $enMonths = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december', $today, $yesterday];
         $newDate = $date ? str_ireplace($ruMonths, $enMonths, $date) : '';
-        $newDate = new \DateTime($newDate);
-        $newDate->setTimezone(new \DateTimeZone("UTC"));
+        $newDate = new DateTime($newDate);
+        $newDate->setTimezone(new DateTimeZone("UTC"));
         return $newDate->format("Y-m-d H:i:s");
     }
 
@@ -197,15 +201,18 @@ class KonstantinovskRuParser implements ParserInterface
     /**
      *
      * @param string $text
+     * @param array $search
      *
      * @return string
      */
-    protected function clearText(string $text): string
+    protected function clearText(string $text, array $search = []): string
     {
-        $text = trim($text);
-        $text = htmlentities($text);
-        $text = str_replace("&nbsp;",' ',$text);
         $text = html_entity_decode($text);
-        return $text;
+        $text = strip_tags($text);
+        $text = htmlentities($text);
+        $search = array_merge(["&nbsp;"], $search);
+        $text = str_replace($search, ' ', $text);
+        $text = html_entity_decode($text);
+        return trim($text);
     }
 }
