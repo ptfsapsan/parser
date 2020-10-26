@@ -80,7 +80,7 @@ class RusorelInfoParser extends AbstractBaseParser
         $contentCrawler = $newsPageCrawler->filter('.entry-content .entry-the-content');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"ya-share2")]');
         $this->removeDomNodes($contentCrawler, '//h3[contains(text(),"Поделиться ссылкой")]');
-        $this->removeDomNodes($contentCrawler, '//p[last()][contains(text(),"Фото:")]');
+        $this->removeDomNodes($contentCrawler, '//p[last()]/em[contains(text(),"Фото:")]');
 
         $image = null;
 
