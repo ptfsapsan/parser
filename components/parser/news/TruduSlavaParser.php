@@ -7,6 +7,8 @@ use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
+use DateTime;
+use DateTimeZone;
 use RuntimeException;
 use Symfony\Component\DomCrawler\Crawler;
 use yii\helpers\ArrayHelper;
@@ -55,12 +57,18 @@ class TruduSlavaParser implements ParserInterface
 
             $description = '';
             $p = [];
-
             $paragraph = $itemCrawler->filterXPath("//*[@id='page']/p");
             foreach ($paragraph as $key => $item) {
                 $text = $this->clearText($item->nodeValue);
-                if ($key >= 2 && $text) {
-                    $description = $description . ' ' . $text;
+                if (!$text) {
+                    continue;
+                }
+                if (strpos($text, '№') !== false) {
+                    continue;
+                }
+                if (!$description) {
+                    $description = $text;
+                } else {
                     $p[] = $text;
                 }
             }
@@ -129,8 +137,8 @@ class TruduSlavaParser implements ParserInterface
     protected function getDate(string $date): string
     {
         $str = explode(' ', $date);
-        $date = new \DateTime(ArrayHelper::getValue($str, 1, ''));
-        $date->setTimezone(new \DateTimeZone("UTC"));
+        $date = new DateTime(ArrayHelper::getValue($str, 1, ''));
+        $date->setTimezone(new DateTimeZone("UTC"));
         return $date->format("Y-m-d H:i:s");
     }
 
