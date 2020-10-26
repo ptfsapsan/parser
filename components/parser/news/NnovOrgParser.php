@@ -6,7 +6,6 @@ use app\components\helper\metallizzer\Parser;
 use app\components\helper\metallizzer\Text;
 use app\components\helper\metallizzer\Url;
 use app\components\parser\NewsPost;
-use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use DateTime;
 use DateTimeZone;
@@ -52,34 +51,21 @@ class NnovOrgParser implements ParserInterface
         $crawler = new Crawler($html, $url);
 
         $tz = new DateTimeZone('Europe/Moscow');
-        $dt = new DateTime(self::parseDate($crawler->filter('.fulltime')->text()));
+        $dt = new DateTime(self::parseDate($crawler->filter('.fulltime')->text()), $tz);
 
         $post = new NewsPost(
             self::class,
             $node->filter('h3 a')->first()->text(),
-            $node->filter('.lead')->first()->text(),
+            '~',
             $dt->setTimezone(new DateTimeZone('UTC'))->format('c'),
             $url,
             null
         );
 
-        $items = (new Parser())->parseMany($crawler->filterXpath('//div[@class="txt"]/node()'));
-
-        foreach ($items as $item) {
-            if (!$post->image && $item['type'] === NewsPostItem::TYPE_IMAGE) {
-                $post->image = $item['image'];
-
-                continue;
-            }
-
-            if ($item['type'] === NewsPostItem::TYPE_TEXT && $item['text'] == $post->description) {
-                continue;
-            }
-
-            $post->addItem(new NewsPostItem(...array_values($item)));
-        }
-
-        self::$posts[] = $post;
+        self::$posts[] = (new Parser())->fill(
+            $post,
+            $crawler->filterXpath('//div[@class="txt"]/node()')
+        );
     }
 
     protected static function parseDate($string)
