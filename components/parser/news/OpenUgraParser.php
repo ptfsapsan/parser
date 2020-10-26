@@ -67,18 +67,23 @@ class OpenUgraParser extends AbstractBaseParser
 
         $newsPageCrawler = new Crawler(mb_convert_encoding($newsPage, "utf-8", "windows-1251"));
         $newsPostCrawler = $newsPageCrawler->filterXPath(
-            '//section[contains(@class,"detail-news sec-border")]//div[contains(@class,"detail-text")]'
+            '//section[contains(@class,"detail-news")]'
         );
 
-        $mainImageCrawler = $newsPageCrawler->filterXPath(
-            '//section[contains(@class,"detail-news-prev no-bt-pd aos-init aos-animate")]//img[1]'
-        )->first();
+        $mainImageCrawler = $newsPostCrawler->filterXPath(
+            '//img[1]'
+        );
         if ($this->crawlerHasNodes($mainImageCrawler)) {
             $image = $mainImageCrawler->attr('src');
         }
         if ($image !== null && $image !== '') {
             $image = UriResolver::resolve($image, $uri);
             $previewNewsDTO->setImage($this->encodeUri($image));
+        }
+
+        $description = null;
+        if($description && $description !== ''){
+            $previewNewsDTO->setDescription($description);
         }
 
         $publishedAtString = $newsPageCrawler->filterXPath('//div[@class="detail-news-info-cart"]//p[1]')->text();
@@ -92,8 +97,9 @@ class OpenUgraParser extends AbstractBaseParser
         $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
         $previewNewsDTO->setPublishedAt($publishedAtUTC);
 
-        $contentCrawler = $newsPostCrawler;
-        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"col-12 detail-text")]//p[1]');
+        $contentCrawler = $newsPostCrawler->filterXPath('//div[contains(@class,"detail-text")]');
+        $this->removeDomNodes($newsPageCrawler, '//section[contains(@class,"detail-news")][last()]');
+        $this->removeDomNodes($contentCrawler, '//div[@class="comment-tags"]');
 
         $this->purifyNewsPostContent($contentCrawler);
         $newsPostItemDTOList = $this->parseNewsPostContent($contentCrawler, $previewNewsDTO);
