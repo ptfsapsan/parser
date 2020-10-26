@@ -7,6 +7,8 @@ use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
+use DateTime;
+use DateTimeZone;
 use RuntimeException;
 use Symfony\Component\DomCrawler\Crawler;
 
@@ -48,7 +50,7 @@ class UshaykaRuParser implements ParserInterface
             if ($imgSrc->getNode(0)) {
                 $image = $this->getHeadUrl($imgSrc->attr('src'));
             }
-            $description = $itemCrawler->filterXPath('//div[@class="td-post-content tagdiv-type"]')->text();
+            $description = $itemCrawler->filterXPath('//div[@class="td-post-content tagdiv-type"]/p[1]')->text();
             $description = str_replace($title, '', $description);
 
             $post = new NewsPost(
@@ -63,7 +65,7 @@ class UshaykaRuParser implements ParserInterface
             $newContentCrawler = $itemCrawler->filterXPath('//div[@class="td-post-content tagdiv-type"]')->children();
             foreach ($newContentCrawler as $content) {
                 foreach ($content->childNodes as $key => $childNode) {
-                    $nodeValue = $this->clearText($childNode->nodeValue);
+                    $nodeValue = $this->clearText($childNode->nodeValue, [$post->description]);
                     if (in_array($childNode->nodeName, ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']) && $childNode->nodeValue != $title) {
 
                         $this->addItemPost($post, NewsPostItem::TYPE_HEADER, $nodeValue, null, null, (int) substr($childNode->nodeName, 1));
@@ -86,7 +88,7 @@ class UshaykaRuParser implements ParserInterface
 
                         $this->addItemPost($post, NewsPostItem::TYPE_IMAGE, null, $childNode->getAttribute('src'));
 
-                    } elseif ($nodeValue) {
+                    } elseif ($nodeValue && $nodeValue != $post->description) {
 
                         $this->addItemPost($post, NewsPostItem::TYPE_TEXT, $nodeValue);
 
@@ -131,8 +133,8 @@ class UshaykaRuParser implements ParserInterface
      */
     protected function getDate(string $date): string
     {
-        $newDate = new \DateTime($date);
-        $newDate->setTimezone(new \DateTimeZone("UTC"));
+        $newDate = new DateTime($date);
+        $newDate->setTimezone(new DateTimeZone("UTC"));
         return $newDate->format("Y-m-d H:i:s");
     }
 
@@ -220,13 +222,17 @@ class UshaykaRuParser implements ParserInterface
     /**
      *
      * @param string $text
+     * @param array $search
      *
      * @return string
      */
-    protected function clearText(string $text): string
+    protected function clearText(string $text, array $search = []): string
     {
+        $text = html_entity_decode($text);
+        $text = strip_tags($text);
         $text = htmlentities($text);
-        $text = str_replace("&nbsp;",' ',$text);
+        $search = array_merge(["&nbsp;"], $search);
+        $text = str_replace($search, ' ', $text);
         $text = html_entity_decode($text);
         return trim($text);
     }
