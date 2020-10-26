@@ -7,6 +7,8 @@ use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
+use DateTime;
+use DateTimeZone;
 use RuntimeException;
 use Symfony\Component\DomCrawler\Crawler;
 use yii\helpers\ArrayHelper;
@@ -44,11 +46,7 @@ class KurantyNewRuParser implements ParserInterface
             $title = $itemCrawler->filterXPath("//h1[@class='post-title']")->text();
             $date = $this->getDate($itemCrawler->filterXPath("//p[@class='post-byline']")->text());
             $image = $this->getHeadUrl($itemCrawler->filterXPath("//div[@class='entry-inner']/p/img")->attr('src'));
-            $description = $this->getDescription($itemCrawler->filterXPath("//div[@class='entry share']")->children()->text());
-
-            if (!trim($description)) {
-                $description = $title;
-            }
+            $description = $title;
 
             $post = new NewsPost(
                 self::class,
@@ -60,7 +58,6 @@ class KurantyNewRuParser implements ParserInterface
             );
 
             $newContentCrawler = (new Crawler($itemCrawler->filterXPath("//div[@class='entry-inner']")->html()))->filterXPath('//body')->children();
-            $descriptionNew = '';
             foreach ($newContentCrawler as $content) {
                 if ($content->nodeName == 'script') {
                     continue;
@@ -82,15 +79,15 @@ class KurantyNewRuParser implements ParserInterface
                     }
                     elseif ($nodeValue) {
 
+                        if ($post->description == $post->title) {
+                            $post->description = $nodeValue;
+                            continue;
+                        }
+
                         $this->addItemPost($post, NewsPostItem::TYPE_TEXT, $nodeValue);
 
                     }
-                    $descriptionNew = $descriptionNew . ' ' . $nodeValue;
                 }
-            }
-
-            if ($description && trim($descriptionNew) && $description != $descriptionNew) {
-                $post->description = $descriptionNew;
             }
 
             $posts[] = $post;
@@ -145,8 +142,8 @@ class KurantyNewRuParser implements ParserInterface
     {
         $str = explode('·', $date);
         $newDate = trim(ArrayHelper::getValue($str, 1, ''));
-        $newDate = new \DateTime($newDate);
-        $newDate->setTimezone(new \DateTimeZone("UTC"));
+        $newDate = new DateTime($newDate);
+        $newDate->setTimezone(new DateTimeZone("UTC"));
         return $newDate->format("Y-m-d H:i:s");
     }
 
@@ -197,16 +194,19 @@ class KurantyNewRuParser implements ParserInterface
     /**
      *
      * @param string $text
+     * @param array $search
      *
      * @return string
      */
-    protected function clearText(string $text): string
+    protected function clearText(string $text, array $search = []): string
     {
-        $text = trim($text);
-        $text = htmlentities($text);
-        $text = str_replace("&nbsp;",'',$text);
         $text = html_entity_decode($text);
-        return $text;
+        $text = strip_tags($text);
+        $text = htmlentities($text);
+        $search = array_merge(["&nbsp;"], $search);
+        $text = str_replace($search, ' ', $text);
+        $text = html_entity_decode($text);
+        return trim($text);
     }
 
     /**
