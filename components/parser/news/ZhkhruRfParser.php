@@ -31,6 +31,7 @@ class ZhkhruRfParser extends AbstractBaseParser
 
         try {
             $previewNewsContent = $this->getPageContent($uriPreviewPage);
+            $previewNewsContent = str_replace(['<dt class="date">', '</dd>'], ['<div class="custom-item"><dt class="date">', '</dd></div>'], $previewNewsContent);
             $previewNewsCrawler = new Crawler($previewNewsContent);
         } catch (Throwable $exception) {
             if (count($previewList) < $minNewsCount) {
@@ -38,14 +39,19 @@ class ZhkhruRfParser extends AbstractBaseParser
             }
         }
 
-        $previewNewsCrawler = $previewNewsCrawler->filter('.content dl dd a');
+        $previewNewsCrawler = $previewNewsCrawler->filter('.content .custom-item');
 
-        $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$previewList) {
-            $title = Text::trim($this->normalizeSpaces($newsPreview->filter('.vidmattd-2 a.vidmattit')->text()));
-            $uri = UriResolver::resolve($newsPreview->filter('.vidmattd-2 a.vidmattit')->attr('href'), $this->getSiteUrl());
+        $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$previewList, $uriPreviewPage) {
             $publishedAt = $this->getPublishedAt($newsPreview);
+            $linkCrawler = $newsPreview->filterXPath('//a[1]');
+            if ($this->crawlerHasNodes($linkCrawler)) {
+                $uri = UriResolver::resolve($linkCrawler->attr('href'), $this->getSiteUrl());
+            } else {
+                $title = Text::trim($this->normalizeSpaces($newsPreview->filter('dd')->text()));
+                $uri = UriResolver::resolve('#' . md5($title), $uriPreviewPage);
+            }
 
-            $previewList[] = new PreviewNewsDTO($uri, $publishedAt, $title);
+            $previewList[] = new PreviewNewsDTO($uri, $publishedAt, $title ?? null, $title ?? null);
         });
 
         $previewList = array_slice($previewList, 0, $maxNewsCount);
@@ -57,29 +63,23 @@ class ZhkhruRfParser extends AbstractBaseParser
     {
         $description = $previewNewsDTO->getDescription();
         $uri = $previewNewsDTO->getUri();
+        $title = $previewNewsDTO->getTitle();
+        $publishedAt = $previewNewsDTO->getPublishedAt();
+
+        if ($title && $description) {
+            return new NewsPost(static::class, $title, $description, $publishedAt->format('Y-m-d H:i:s'), $uri, null);
+        }
 
         $newsPage = $this->getPageContent($uri);
 
         $newsPageCrawler = new Crawler($newsPage);
 
-        $contentCrawler = $newsPageCrawler->filter('#content .eText');
-
-        $image = null;
-
-        $mainImageCrawler = $contentCrawler->filterXPath('//img[1]');
-        if ($this->crawlerHasNodes($mainImageCrawler)) {
-            $image = $mainImageCrawler->attr('src');
-            if ($contentCrawler->filterXPath('//img[1]/parent::a[contains(@class,"ulightbox")]')->count()) {
-                $this->removeDomNodes($contentCrawler, '//img[1]/parent::a[contains(@class,"ulightbox")]');
-            } else {
-                $this->removeDomNodes($contentCrawler, '//img[1]');
-            }
-        }
-
-        if ($image !== null && $image !== '') {
-            $image = $this->encodeUri(UriResolver::resolve($image, $this->getSiteUrl()));
-            $previewNewsDTO->setImage($image);
-        }
+        $contentCrawler = $newsPageCrawler->filter('.gkh-content .content');
+        $title = Text::trim($this->normalizeSpaces($newsPageCrawler->filter('title')->text()));
+        $previewNewsDTO->setTitle($title);
+        $this->removeDomNodes($contentCrawler, '//h1[1]');
+        $this->removeDomNodes($contentCrawler, '//div[starts-with(@class,"ban")][last()]/following-sibling::*');
+        $this->removeDomNodes($contentCrawler, '//div[starts-with(@class,"ban")]');
 
         if ($description && $description !== '') {
             $previewNewsDTO->setDescription($description);
@@ -94,16 +94,10 @@ class ZhkhruRfParser extends AbstractBaseParser
 
     private function getPublishedAt(Crawler $crawler): DateTimeImmutable
     {
-        $publishedAtString = mb_strtolower(Text::trim($crawler->filter('.datebbmat-2')->text()));
-        if (in_array($publishedAtString, ['сегодня', 'вчера'], true)) {
-            $publishedAt = new DateTimeImmutable('now', new DateTimeZone('UTC'));
-            if ($publishedAtString === 'вчера') {
-                $publishedAt = $publishedAt->modify('-1day');
-            }
-        } else {
-            $publishedAt = DateTimeImmutable::createFromFormat('d.m.Y', $publishedAtString, new DateTimeZone('Asia/Yekaterinburg'));
-        }
+        $publishedAtString = Text::trim($crawler->filter('.date')->text());
+        $publishedAt = DateTimeImmutable::createFromFormat('d.m.Y', $publishedAtString, new DateTimeZone('Europe/Moscow'));
+        $publishedAt = $publishedAt->setTime(0, 0, 0);
 
-        return $publishedAt->setTime(0, 0, 0);
+        return $publishedAt->setTimezone(new DateTimeZone('UTC'));
     }
 }
