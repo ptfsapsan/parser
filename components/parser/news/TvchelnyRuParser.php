@@ -30,7 +30,7 @@ class TvchelnyRuParser extends AbstractBaseParser
     {
         $previewNewsDTOList = [];
 
-        $uriPreviewPage = UriResolver::resolve('/feed', $this->getSiteUrl());
+        $uriPreviewPage = UriResolver::resolve('/rss/news.rss', $this->getSiteUrl());
 
         try {
             $previewNewsContent = $this->getPageContent($uriPreviewPage);
@@ -41,18 +41,19 @@ class TvchelnyRuParser extends AbstractBaseParser
             }
         }
 
-        $previewNewsCrawler = $previewNewsCrawler->filterXPath('//item');
+        $previewNewsCrawler = $previewNewsCrawler->filterXPath('//entry');
 
         $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$previewNewsDTOList, $maxNewsCount) {
             if (count($previewNewsDTOList) >= $maxNewsCount) {
                 return;
             }
 
-            $title = $newsPreview->filterXPath('//title')->text();
-            $uri = $newsPreview->filterXPath('//link')->text();
+            $title = Text::trim($this->normalizeSpaces(html_entity_decode($newsPreview->filterXPath('//title')->text())));
+            $title = str_replace('&nbsp;', ' ', $title);
+            $uri = $newsPreview->filterXPath('//link')->attr('href');
 
-            $publishedAtString = $newsPreview->filterXPath('//pubDate')->text();
-            $publishedAt = DateTimeImmutable::createFromFormat(DATE_RFC1123, $publishedAtString);
+            $publishedAtString = $newsPreview->filterXPath('//updated')->text();
+            $publishedAt = DateTimeImmutable::createFromFormat(DATE_ATOM, $publishedAtString);
             $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
 
             $previewNewsDTOList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $title);
@@ -72,14 +73,13 @@ class TvchelnyRuParser extends AbstractBaseParser
 
         $newsPageCrawler = new Crawler($newsPage);
 
-        $contentCrawler = $newsPageCrawler->filter('article.post .entry');
+        $contentCrawler = $newsPageCrawler->filter('.panel__body .page-main');
 
         $image = null;
-        $mainImageCrawler = $contentCrawler->filterXPath('//img[1]');
+        $mainImageCrawler = $newsPageCrawler->filter('meta[property="og:image"]');
 
         if ($this->crawlerHasNodes($mainImageCrawler)) {
             $image = $mainImageCrawler->attr('content');
-            $this->removeDomNodes($contentCrawler, '//img[1]');
         }
 
         if ($image !== null && $image !== '') {
@@ -87,11 +87,13 @@ class TvchelnyRuParser extends AbstractBaseParser
             $previewNewsDTO->setImage($this->encodeUri($image));
         }
 
-        $descriptionCrawler = $contentCrawler->filterXPath('//h3[1]');
+        $descriptionCrawler = $contentCrawler->filterXPath('//p[contains(@class,"page-main__lead")]');
         if ($this->crawlerHasNodes($descriptionCrawler)) {
             $description = Text::trim($this->normalizeSpaces($descriptionCrawler->text()));
-            $this->removeDomNodes($contentCrawler, '//h3[1]');
+            $this->removeDomNodes($contentCrawler, '//p[contains(@class,"page-main__lead")]');
         }
+
+        $contentCrawler = $contentCrawler->filter('.page-main__text');
 
         if ($description && $description !== '') {
             $previewNewsDTO->setDescription($description);
@@ -102,53 +104,5 @@ class TvchelnyRuParser extends AbstractBaseParser
         $newsPostItemDTOList = $this->parseNewsPostContent($contentCrawler, $previewNewsDTO);
 
         return $this->factoryNewsPost($previewNewsDTO, $newsPostItemDTOList);
-    }
-
-    protected function getPageContent(string $uri): string
-    {
-        $content = $this->getCurl()->get($uri);
-        $this->checkResponseCode($this->getCurl());
-
-        return $this->decodeGZip($content);
-    }
-
-    protected function searchLinkNewsItem(DOMNode $node, PreviewNewsDTO $newsPostDTO): ?NewsPostItemDTO
-    {
-        if ($this->isImageType($node)) {
-            return null;
-        }
-
-        if ($node->nodeName === '#text' || !$this->isLink($node)) {
-            $parentNode = $this->getRecursivelyParentNode($node, function (DOMNode $parentNode) {
-                return $this->isLink($parentNode);
-            });
-            $node = $parentNode ?: $node;
-        }
-
-
-        if (!$node instanceof DOMElement || !$this->isLink($node)) {
-            return null;
-        }
-
-        $link = UriResolver::resolve($node->getAttribute('href'), $newsPostDTO->getUri());
-        $link = $this->encodeUri($link);
-        if ($link === null) {
-            return null;
-        }
-
-        if ($this->getNodeStorage()->contains($node)) {
-            throw new RuntimeException('Тег уже сохранен');
-        }
-
-        $linkText = $this->hasText($node) ? $this->normalizeText($node->textContent) : null;
-        if ($link && $link === $linkText) {
-            $linkText = null;
-        }
-        $newsPostItem = NewsPostItemDTO::createLinkItem($link, $linkText);
-
-        $this->getNodeStorage()->attach($node, $newsPostItem);
-        $this->removeParentsFromStorage($node->parentNode);
-
-        return $newsPostItem;
     }
 }
