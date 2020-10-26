@@ -7,6 +7,8 @@ use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
+use DateTime;
+use DateTimeZone;
 use RuntimeException;
 use Symfony\Component\DomCrawler\Crawler;
 
@@ -50,7 +52,10 @@ class VperedKrRuParser implements ParserInterface
                 $image = $this->getHeadUrl($imgSrc->attr('src'));
             }
 
-            $description = $article->filterXPath('//div[@itemprop="articleBody"]')->text();
+            $description = $this->clearText($article->filterXPath('//div[@itemprop="articleBody"]')->text());
+            if (!$description) {
+                $description = $title;
+            }
 
             if (strpos($description, 'document.getElementById') !== false) {
                 continue;
@@ -65,22 +70,25 @@ class VperedKrRuParser implements ParserInterface
                 $image
             );
 
-            $newContentCrawler = $itemCrawler->filterXPath('//div[@class="media-block media-text __full"]')->children();
-            foreach ($newContentCrawler as $content) {
-                foreach ($content->childNodes as $childNode) {
-                    $nodeValue = $this->clearText($childNode->nodeValue);
-                    if (in_array($childNode->nodeName, ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']) && $childNode->nodeValue != $title) {
+            $newContentCrawler = $itemCrawler->filterXPath('//div[@class="media-block media-text __full"]');
+            if ($newContentCrawler->getNode(0)) {
+                $newContentCrawler = $newContentCrawler->children();
+                foreach ($newContentCrawler as $content) {
+                    foreach ($content->childNodes as $childNode) {
+                        $nodeValue = $this->clearText($childNode->nodeValue, [$post->description]);
+                        if (in_array($childNode->nodeName, ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']) && $childNode->nodeValue != $title) {
 
-                        $this->addItemPost($post, NewsPostItem::TYPE_HEADER, $nodeValue, null, null, (int)substr($childNode->nodeName, 1));
+                            $this->addItemPost($post, NewsPostItem::TYPE_HEADER, $nodeValue, null, null, (int)substr($childNode->nodeName, 1));
 
-                    } elseif ($childNode->nodeName == 'a' && strpos($childNode->getAttribute('href'), 'http') !== false) {
+                        } elseif ($childNode->nodeName == 'a' && strpos($childNode->getAttribute('href'), 'http') !== false) {
 
-                        $this->addItemPost($post, NewsPostItem::TYPE_LINK, $nodeValue, null, $childNode->getAttribute('href'));
+                            $this->addItemPost($post, NewsPostItem::TYPE_LINK, $nodeValue, null, $childNode->getAttribute('href'));
 
-                    } elseif ($nodeValue) {
+                        } elseif ($nodeValue && $nodeValue != $post->description) {
 
-                        $this->addItemPost($post, NewsPostItem::TYPE_TEXT, $nodeValue);
+                            $this->addItemPost($post, NewsPostItem::TYPE_TEXT, $nodeValue);
 
+                        }
                     }
                 }
             }
@@ -131,8 +139,8 @@ class VperedKrRuParser implements ParserInterface
      */
     protected function getDate(string $date): string
     {
-        $newDate = new \DateTime($date);
-        $newDate->setTimezone(new \DateTimeZone("UTC"));
+        $newDate = new DateTime($date);
+        $newDate->setTimezone(new DateTimeZone("UTC"));
         return $newDate->format("Y-m-d H:i:s");
     }
 
@@ -220,13 +228,17 @@ class VperedKrRuParser implements ParserInterface
     /**
      *
      * @param string $text
+     * @param array $search
      *
      * @return string
      */
-    protected function clearText(string $text): string
+    protected function clearText(string $text, array $search = []): string
     {
+        $text = html_entity_decode($text);
+        $text = strip_tags($text);
         $text = htmlentities($text);
-        $text = str_replace("&nbsp;",' ',$text);
+        $search = array_merge(["&nbsp;"], $search);
+        $text = str_replace($search, ' ', $text);
         $text = html_entity_decode($text);
         return trim($text);
     }
