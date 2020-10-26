@@ -3,8 +3,8 @@
 namespace app\components\parser\news;
 
 use app\components\helper\metallizzer\Parser;
+use app\components\helper\metallizzer\Url;
 use app\components\parser\NewsPost;
-use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use DateTime;
 use DateTimeZone;
@@ -52,36 +52,15 @@ class JournalRuParser implements ParserInterface
         $post = new NewsPost(
             self::class,
             html_entity_decode($crawler->filterXpath('//meta[@property="og:title"]/@content')->text()),
-            html_entity_decode($crawler->filterXpath('//meta[@property="og:description"]/@content')->text()),
+            '~',
             $dt->setTimezone(new DateTimeZone('UTC'))->format('c'),
             $url,
-            $image->count() ? $image->image()->getUri() : null
+            $image->count() ? Url::encode($image->image()->getUri()) : null
         );
 
-        $items = (new Parser())->parseMany($crawler->filterXpath('(//div[@class="lead-text"]/p/strong|//div[@class="lead-text"]/p)[1]/node()'));
-
-        foreach ($items as $item) {
-            if (!$post->image && $item['type'] === NewsPostItem::TYPE_IMAGE) {
-                $post->image = $item['image'];
-
-                continue;
-            }
-
-            $post->addItem(new NewsPostItem(...array_values($item)));
-        }
-
-        $items = (new Parser())->parseMany($crawler->filterXpath('//div[contains(@class, "article__body text")]/node()[not(@class="lead-text")]'));
-
-        foreach ($items as $item) {
-            if (!$post->image && $item['type'] === NewsPostItem::TYPE_IMAGE) {
-                $post->image = $item['image'];
-
-                continue;
-            }
-
-            $post->addItem(new NewsPostItem(...array_values($item)));
-        }
-
-        self::$posts[] = $post;
+        self::$posts[] = (new Parser())->fill(
+            $post,
+            $crawler->filterXpath('//div[contains(@class, "article__body text")]/node()')
+        );
     }
 }
