@@ -3,8 +3,8 @@
 namespace app\components\parser\news;
 
 use app\components\helper\metallizzer\Parser;
+use app\components\helper\metallizzer\Url;
 use app\components\parser\NewsPost;
-use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use DateTime;
 use DateTimeZone;
@@ -55,25 +55,16 @@ class InzaraiskRuParser implements ParserInterface
         $post = new NewsPost(
             self::class,
             html_entity_decode($crawler->filter('title')->first()->text()),
-            html_entity_decode($crawler->filter('meta[name="description"]')->first()->attr('content')),
+            $crawler->filter('.b-page__start')->first()->text() ?: '~',
             $dt->setTimezone(new DateTimeZone('UTC'))->format('c'),
-            $url,
-            $image->count() ? $image->image()->getUri() : null,
+            Url::encode($url),
+            $image->count() ? Url::encode($image->image()->getUri()) : null,
         );
 
-        $items = (new Parser())->parseMany($crawler->filterXpath('//div[@class="b-page__content"]/node()'));
-
-        foreach ($items as $item) {
-            if (!$post->image && $item['type'] === NewsPostItem::TYPE_IMAGE) {
-                $post->image = $item['image'];
-
-                continue;
-            }
-
-            $post->addItem(new NewsPostItem(...array_values($item)));
-        }
-
-        self::$posts[] = $post;
+        self::$posts[] = (new Parser())->fill(
+            $post,
+            $crawler->filterXpath('//div[@class="b-page__content"]/node()[not(@class = "print")]')
+        );
     }
 
     protected static function parseDate($string)
