@@ -7,6 +7,8 @@ use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
+use DateTime;
+use DateTimeZone;
 use RuntimeException;
 use Symfony\Component\DomCrawler\Crawler;
 
@@ -47,7 +49,11 @@ class GazetaSlovoRuParser implements ParserInterface
             if ($imgSrc->getNode(0)) {
                 $image = $this->getHeadUrl($imgSrc->attr('src'));
             }
-            $description = $article->filterXPath('//div[@itemprop="articleBody"]')->children()->text();
+            $description = $article->filterXPath('//div[@itemprop="articleBody"]/div/div[1]');
+            if (!$description->getNode(0)) {
+                $description = $article->filterXPath('//div[@itemprop="articleBody"]/div[1]');
+            }
+            $description = $this->clearText($description->text());
 
             $post = new NewsPost(
                 self::class,
@@ -60,8 +66,11 @@ class GazetaSlovoRuParser implements ParserInterface
 
             $newContentCrawler = $article->filterXPath('//div[@itemprop="articleBody"]')->children();
             foreach ($newContentCrawler as $content) {
-                foreach ($content->childNodes as $key => $childNode) {
-                    $nodeValue = $this->clearText($childNode->nodeValue);
+                foreach ($content->childNodes as $childNode) {
+                    $nodeValue = $this->clearText($childNode->nodeValue, [$post->description]);
+                    if (!$nodeValue) {
+                        continue;
+                    }
                     if (in_array($childNode->nodeName, ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']) && $childNode->nodeValue != $title) {
 
                         $this->addItemPost($post, NewsPostItem::TYPE_HEADER, $nodeValue, null, null, (int) substr($childNode->nodeName, 1));
@@ -70,8 +79,10 @@ class GazetaSlovoRuParser implements ParserInterface
 
                         $this->addItemPost($post, NewsPostItem::TYPE_LINK, $nodeValue, null, $childNode->getAttribute('href'));
 
-                    } elseif ($nodeValue) {
+                    } elseif ($nodeValue != $post->description) {
+
                         $this->addItemPost($post, NewsPostItem::TYPE_TEXT, $nodeValue);
+
                     }
                 }
             }
@@ -113,8 +124,8 @@ class GazetaSlovoRuParser implements ParserInterface
      */
     protected function getDate(string $date): string
     {
-        $newDate = new \DateTime($date);
-        $newDate->setTimezone(new \DateTimeZone("UTC"));
+        $newDate = new DateTime($date);
+        $newDate->setTimezone(new DateTimeZone("UTC"));
         return $newDate->format("Y-m-d H:i:s");
     }
 
@@ -202,13 +213,17 @@ class GazetaSlovoRuParser implements ParserInterface
     /**
      *
      * @param string $text
+     * @param array $search
      *
      * @return string
      */
-    protected function clearText(string $text): string
+    protected function clearText(string $text, array $search = []): string
     {
+        $text = html_entity_decode($text);
+        $text = strip_tags($text);
         $text = htmlentities($text);
-        $text = str_replace("&nbsp;",' ',$text);
+        $search = array_merge(["&nbsp;"], $search);
+        $text = str_replace($search, ' ', $text);
         $text = html_entity_decode($text);
         return trim($text);
     }
