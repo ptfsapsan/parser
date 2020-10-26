@@ -7,6 +7,8 @@ use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
+use DateTime;
+use DateTimeZone;
 use RuntimeException;
 use Symfony\Component\DomCrawler\Crawler;
 
@@ -37,7 +39,7 @@ class NaryanMarRuParser implements ParserInterface
             $itemCrawler = new Crawler($newsItem);
             $title = $itemCrawler->filterXPath('//title')->text();
             $date = $this->getDate($itemCrawler->filterXPath('//pubDate')->text());
-            $description = $itemCrawler->filterXPath('//turbo:content')->text();
+            $description = $this->clearText($itemCrawler->filterXPath('//description')->text());
             $url = $itemCrawler->filterXPath('//link')->text();
 
             $post = new NewsPost(
@@ -65,13 +67,13 @@ class NaryanMarRuParser implements ParserInterface
             }
 
             $newContentCrawler = $content->children();
+            foreach ($newContentCrawler as $contentNew) {
+                foreach ($contentNew->childNodes as $childNode) {
+                    if ($childNode->nodeName == 'script' || $childNode->nodeName == '#comment') {
+                        continue;
+                    }
 
-            foreach ($newContentCrawler as $content) {
-                if ($content->nodeName == 'h' || $content->nodeName == 'div') {
-                    continue;
-                }
-                foreach ($content->childNodes as $childNode) {
-                    $nodeValue = $this->clearText($childNode->nodeValue);
+                    $nodeValue = $this->clearText($childNode->nodeValue, [$post->description]);
                     if ($childNode->nodeName == 'a' && strpos($childNode->getAttribute('href'), 'http') !== false) {
 
                         $this->addItemPost($post, NewsPostItem::TYPE_LINK, $nodeValue, null, $childNode->getAttribute('href'));
@@ -80,7 +82,7 @@ class NaryanMarRuParser implements ParserInterface
 
                         $this->addItemPost($post, NewsPostItem::TYPE_IMAGE, null, $this->getHeadUrl($childNode->getAttribute('src')));
 
-                    } elseif ($nodeValue) {
+                    } elseif ($nodeValue && $nodeValue != $post->description) {
                         $this->addItemPost($post, NewsPostItem::TYPE_TEXT, $nodeValue);
                     }
                 }
@@ -123,8 +125,8 @@ class NaryanMarRuParser implements ParserInterface
      */
     protected function getDate(string $date): string
     {
-        $newDate = new \DateTime($date);
-        $newDate->setTimezone(new \DateTimeZone("UTC"));
+        $newDate = new DateTime($date);
+        $newDate->setTimezone(new DateTimeZone("UTC"));
         return $newDate->format("Y-m-d H:i:s");
     }
 
@@ -212,13 +214,17 @@ class NaryanMarRuParser implements ParserInterface
     /**
      *
      * @param string $text
+     * @param array $search
      *
      * @return string
      */
-    protected function clearText(string $text): string
+    protected function clearText(string $text, array $search = []): string
     {
+        $text = html_entity_decode($text);
+        $text = strip_tags($text);
         $text = htmlentities($text);
-        $text = str_replace("&nbsp;",' ',$text);
+        $search = array_merge(["&nbsp;"], $search);
+        $text = str_replace($search, ' ', $text);
         $text = html_entity_decode($text);
         return trim($text);
     }
