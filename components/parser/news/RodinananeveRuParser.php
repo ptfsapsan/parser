@@ -2,6 +2,7 @@
 
 namespace app\components\parser\news;
 
+use app\components\helper\metallizzer\Text;
 use app\components\helper\nai4rus\AbstractBaseParser;
 use app\components\helper\nai4rus\NewsPostItemDTO;
 use app\components\helper\nai4rus\PreviewNewsDTO;
@@ -86,6 +87,15 @@ class RodinananeveRuParser extends AbstractBaseParser
         $contentCrawler = $newsPageCrawler->filter('.content-limiter .formatter .entry-content');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"post-hatom-fix")]');
         $this->removeDomNodes($contentCrawler, '//*[starts-with(text(),"Поделиться ссылкой:")]');
+
+        $descriptionCrawler = $contentCrawler->filterXPath('//p[1]/strong');
+        if ($this->crawlerHasNodes($descriptionCrawler)) {
+            $descriptionText = Text::trim($this->normalizeSpaces($descriptionCrawler->text()));
+            if ($descriptionText) {
+                $description = $descriptionText;
+                $this->removeDomNodes($contentCrawler, '//p[1]/strong');
+            }
+        }
 
         if ($description && $description !== '') {
             $previewNewsDTO->setDescription($description);
