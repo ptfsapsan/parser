@@ -7,7 +7,8 @@ use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
-use linslin\yii2\curl\Curl;
+use DateTime;
+use DateTimeZone;
 use RuntimeException;
 use Symfony\Component\DomCrawler\Crawler;
 
@@ -38,7 +39,7 @@ class RyazanNewsRuParser implements ParserInterface
             $itemCrawler = new Crawler($newsItem);
             $title = $itemCrawler->filterXPath('//title')->text();
             $date = $this->getDate($itemCrawler->filterXPath('//pubDate')->text());
-            $description = $itemCrawler->filterXPath('//description')->text();
+            $description = $this->clearText($itemCrawler->filterXPath('//description')->text());
             $url = $itemCrawler->filterXPath('//link')->text();
 
             $post = new NewsPost(
@@ -58,31 +59,36 @@ class RyazanNewsRuParser implements ParserInterface
             $newsCrawler = new Crawler(null, $url);
             $newsCrawler->addHtmlContent($contentPage, 'UTF-8');
 
-            $header = $newsCrawler->filterXPath('//h1[@class="post-title"]');
-            if ($header->getNode(0)) {
-                $this->addItemPost($post, NewsPostItem::TYPE_HEADER, $header->text(), null, null, 1);
-            }
             $img = $newsCrawler->filterXPath('//img[@class="img-responsive post-image"]');
             if ($img->getNode(0)) {
                 $post->image = $img->attr('src');
             }
 
-            $newContentCrawler = (new Crawler($newsCrawler->filterXPath("//div[@class='post-content']")->html()))->filterXPath('//body')->children();
+            $newContentCrawler = $newsCrawler->filterXPath("//div[@class='post-content']")->children();
 
             foreach ($newContentCrawler as $content) {
                 foreach ($content->childNodes as $childNode) {
-                     $nodeValue = $this->clearText($childNode->nodeValue);
-                     if ($childNode->nodeName == 'a' && strpos($childNode->getAttribute('href'), 'http') !== false) {
+                     $nodeValue = $this->clearText($childNode->nodeValue, [$post->description]);
+                     if ($childNode->nodeName == 'a' && strpos($href = $this->getHeadUrl($childNode->getAttribute('href')), 'http') !== false) {
 
-                         $this->addItemPost($post, NewsPostItem::TYPE_LINK, $nodeValue, null, $childNode->getAttribute('href'));
+                         $this->addItemPost($post, NewsPostItem::TYPE_LINK, $nodeValue, null, $href);
 
-                     } elseif ($childNode->nodeName == 'img' && $post->image != $childNode->getAttribute('src')) {
+                     } elseif ($childNode->nodeName == 'img' && $post->image != ($src = $this->getHeadUrl($childNode->getAttribute('src')))) {
 
-                         $this->addItemPost($post, NewsPostItem::TYPE_IMAGE, null, $childNode->getAttribute('src'));
+                         $this->addItemPost($post, NewsPostItem::TYPE_IMAGE, null, $src);
 
                     } elseif ($nodeValue) {
                         $this->addItemPost($post, NewsPostItem::TYPE_TEXT, $nodeValue);
                     }
+                }
+            }
+
+            $imageContentCrawler = $newsCrawler->filterXPath("//a[@data-lightbox='image-set']");
+            foreach ($imageContentCrawler as $imageContent) {
+                if ($href = $this->getHeadUrl($imageContent->getAttribute('href'))) {
+
+                    $this->addItemPost($post, NewsPostItem::TYPE_IMAGE, null, $href);
+
                 }
             }
 
@@ -142,16 +148,19 @@ class RyazanNewsRuParser implements ParserInterface
     /**
      *
      * @param string $text
+     * @param array $search
      *
      * @return string
      */
-    protected function clearText(string $text): string
+    protected function clearText(string $text, array $search = []): string
     {
-        $text = trim($text);
-        $text = htmlentities($text);
-        $text = str_replace("&nbsp;",'',$text);
         $text = html_entity_decode($text);
-        return $text;
+        $text = strip_tags($text);
+        $text = htmlentities($text);
+        $search = array_merge(["&nbsp;"], $search);
+        $text = str_replace($search, ' ', $text);
+        $text = html_entity_decode($text);
+        return trim($text);
     }
 
     /**
@@ -162,8 +171,52 @@ class RyazanNewsRuParser implements ParserInterface
      */
     protected function getDate(string $date): string
     {
-        $date = new \DateTime($date);
-        $date->setTimezone(new \DateTimeZone("UTC"));
+        $date = new DateTime($date);
+        $date->setTimezone(new DateTimeZone("UTC"));
         return $date->format("Y-m-d H:i:s");
+    }
+
+    /**
+     *
+     * @param string $url
+     * @param string $det
+     *
+     * @return string
+     */
+    protected function getHeadUrl($url, $det = ''): string
+    {
+        $url = strpos($url, 'http') === false || strpos($url, 'http') > 0
+            ? self::SITE_URL . $det . $url
+            : $url;
+        return $this->encodeUrl($url);
+    }
+
+    /**
+     * Русские буквы в ссылке
+     *
+     * @param string $url
+     *
+     * @return string
+     */
+    protected function encodeUrl(string $url): string
+    {
+        $partsUrl = parse_url($url);
+        if (preg_match('/[А-Яа-яЁё]/iu', $partsUrl['host'])) {
+            $host = idn_to_ascii($partsUrl['host']);
+            $url = str_replace($partsUrl['host'], $host, $url);
+        }
+        if (preg_match('/[А-Яа-яЁё]/iu', $url)) {
+            preg_match_all('/[А-Яа-яЁё]/iu', $url, $result);
+            $search = [];
+            $replace = [];
+            foreach ($result as $item) {
+                foreach ($item as $key=>$value) {
+                    $search[$key] = $value;
+                    $replace[$key] = urlencode($value);
+                }
+            }
+            $url = str_replace($search, $replace, $url);
+        }
+        return $url;
     }
 }
