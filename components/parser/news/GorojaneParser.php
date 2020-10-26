@@ -23,7 +23,7 @@ class GorojaneParser implements ParserInterface
     const ROOT_SRC = "http://gazetagorojane.ru";
 
     const FEED_SRC = "/index.php/ru/v-gorode";
-    const LIMIT = 12;
+    const LIMIT = 100;
     const EMPTY_DESCRIPTION = "empty";
     const NEWS_PER_PAGE = 10;
 
