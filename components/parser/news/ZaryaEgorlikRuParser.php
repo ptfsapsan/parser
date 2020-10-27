@@ -26,7 +26,7 @@ class ZaryaEgorlikRuParser extends MediasferaNewsParser implements ParserInterfa
     public const USER_ID = 2;
     public const FEED_ID = 2;
 
-    public const NEWS_LIMIT = 10;
+    public const NEWS_LIMIT = 100;
 
     public const SITE_URL = 'https://zarya-egorlik.ru/';
     public const NEWSLIST_URL = 'https://zarya-egorlik.ru/feed';
