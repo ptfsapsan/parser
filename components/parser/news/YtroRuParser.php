@@ -30,7 +30,6 @@ class YtroRuParser extends MediasferaNewsParser implements ParserInterface
     public const SITE_URL = 'https://ytro.ru/';
     public const NEWSLIST_URL = 'https://ytro.ru/news/';
 
-    public const IS_CURRENT_TIME = true;
     public const DATEFORMAT = 'H:i, d.m.Y';
 
     public const NEWSLIST_POST =  '.news-listing > li';
