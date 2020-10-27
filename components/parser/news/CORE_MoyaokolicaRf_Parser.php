@@ -72,37 +72,6 @@ class CORE_MoyaokolicaRf_Parser extends ParserCore implements ParserInterface
                 //                'date_format_rss' => 'D, d M Y H:i:s O',
             ],
 
-            // настройки витрины (режим RSS)
-            'rss'     => [
-                // относительный URL где находится RSS
-                // (обязательный)
-                'url'                 => '',
-
-                // css селектор для элемента витрины (желательно от корня)
-                // (обязательный)
-                'element'             => '',
-
-                // css селектор для названия элемента (относительно элемента)
-                // (обязательный)
-                'element-title'       => '',
-
-                // css селектор для ссылки (относительно элемента)
-                // (обязательный)
-                'element-link'        => '',
-
-                // css селектор для описания элемента (относительно элемента)
-                // (заполняется только, если отсутствует в карточке)
-                'element-description' => '',
-
-                // css селектор для картинки элемента (относительно элемента)
-                // (заполняется только, если отсутствует в карточке)
-                'element-image'       => '',
-
-                // css селектор для даты элемента (относительно элемента)
-                // (заполняется только, если отсутствует в карточке)
-                'element-date'        => '',
-            ],
-
             // настройки витрины (режим HTML)
             'list'    => [
                 // URL где находится витрина
@@ -123,7 +92,7 @@ class CORE_MoyaokolicaRf_Parser extends ParserCore implements ParserInterface
 
                 // css селектор для названия элемента (относительно элемента)
                 // (заполняется только, если отсутствует в карточке)
-                'element-title'       => '[itemprop=headline], .mb-2',
+                'element-title'       => '.post-item-content h3',
 
                 // css селектор для описания элемента (относительно элемента)
                 // (заполняется только, если отсутствует в карточке)
@@ -131,7 +100,7 @@ class CORE_MoyaokolicaRf_Parser extends ParserCore implements ParserInterface
 
                 // css селектор !должен содержать конечный аттрибут src! для картинки элемента (относительно элемента)
                 // (заполняется только, если отсутствует в карточке)
-                'element-image'       => '.post-item-thumb [src]',
+                'element-image'       => '.post-item-thumb[style]',
 
                 // css селектор для даты элемента (относительно элемента)
                 // (заполняется только, если отсутствует в карточке)
@@ -168,7 +137,7 @@ class CORE_MoyaokolicaRf_Parser extends ParserCore implements ParserInterface
                 // css-селектор для цитаты
                 // (если не заполнено, то по умолчанию берутся теги: blockquote и q)
                 // (опционально)
-                'element-quote'       => '',
+                'element-quote'       => '.wp-block-quote',
 
                 // игнорируемые css-селекторы
                 // (можно через запятую)
