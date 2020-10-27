@@ -1,0 +1,53 @@
+name: Fingli workflow
+
+on: [push, pull_request]
+
+jobs:
+  fingli-validator:
+    if: ${{ github.repository == 'fingligroup/parser' }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+      
+    - name: Validate composer.json and composer.lock
+      run: composer validate
+
+    - name: Cache Composer packages
+      id: composer-cache
+      uses: actions/cache@v2
+      with:
+        path: vendor
+        key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-php-
+
+    - name: Install dependencies
+      if: steps.composer-cache.outputs.cache-hit != 'true'
+      run: composer install --prefer-dist --no-progress --no-suggest
+
+
+
+    - id: files
+      uses: jitterbit/get-changed-files@v1
+    
+    - name: Validate new and changed parsers 
+      if: ${{ contains(join(steps.files.outputs.all, ','), '.php') }}   
+      run:  |
+        for changed_file in ${{ steps.files.outputs.all }}; do
+          classScript=$( printf '$s = "%s"; $exploded = explode("/", $s); if (strpos(end($exploded), ".php") !== false) {echo (str_replace(".php", "", end($exploded)));} else echo "Fail" ;' $changed_file )
+          class=$( php -r "$classScript");
+
+          if [ $class != "Fail" ]; then
+            echo "//////////"
+            php yii parser/news "$class"
+            echo "//////////"
+          fi
+        done
+      
+    # Add a test script to composer.json, for instance: "test": "vendor/bin/phpunit"
+    # Docs: https://getcomposer.org/doc/articles/scripts.md
+
+    # - name: Run test suite
+    #   run: composer run-script test
