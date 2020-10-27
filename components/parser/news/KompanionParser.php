@@ -23,7 +23,7 @@ class KompanionParser implements ParserInterface
 
     const FEED_SRC = "/rss.xml";
     const LIMIT = 100;
-
+    const EMPTY_DESCRIPTION = "empty";
 
     /**
      * @return array
@@ -85,7 +85,7 @@ class KompanionParser implements ParserInterface
      */
     private static function inflatePost(Crawler $postData): NewsPost
     {
-        $title = $postData->filter("title")->text();
+        $title = html_entity_decode($postData->filter("title")->html());
         $createDate = new DateTime($postData->filterXPath("item/pubDate")->text());
         $createDate->setTimezone(new DateTimeZone("UTC"));
         $original = $postData->filter("link")->text();
@@ -97,13 +97,7 @@ class KompanionParser implements ParserInterface
             $imageUrl = $image->attr("url");
         }
 
-        $description = $postData->filter("description")->text();
-        if (empty($description)) {
-            $text = $postData->filterXPath("item/yandex:full-text");
-
-            $sentences = preg_split('/(?<=[.?!])\s+(?=[а-я])/i', $text->text());
-            $description = implode(" ", array_slice($sentences, 0, 3));
-        }
+        $description = self::EMPTY_DESCRIPTION;
 
         return new NewsPost(
             self::class,
@@ -125,10 +119,12 @@ class KompanionParser implements ParserInterface
     private static function inflatePostContent(NewsPost $post, Curl $curl)
     {
         $url = $post->original;
-
+        if($post->description === self::EMPTY_DESCRIPTION){
+            $post->description = "";
+        }
         $pageData = $curl->get($url);
-        if ($pageData === false) {
-            throw new Exception("Url is wrong? nothing received: " . $url);
+        if (empty($pageData)) {
+            throw new Exception("Получен пустой ответ от страницы новости: " . $url);
         }
 
         $crawler = new Crawler($pageData);
@@ -156,7 +152,11 @@ class KompanionParser implements ParserInterface
             }
 
             if ($node->matches("p") && !empty(trim($node->text(), "\xC2\xA0"))) {
-                self::addText($post, $node->text());
+                if(empty($post->description)){
+                    $post->description = Helper::prepareString($node->text());
+                }else{
+                    self::addText($post, $node->text());
+                }
                 continue;
             }
         }
