@@ -68,7 +68,7 @@ class GpvnParser extends AbstractBaseParser
         $newsPageCrawler = new Crawler($newsPage);
         $newsPostCrawler = $newsPageCrawler->filterXPath('//div[@class="entry-content"][1]');
 
-        $mainImageCrawler = $newsPageCrawler->filterXPath('//img[1]');
+        $mainImageCrawler = $newsPostCrawler->filterXPath('//img[1]');
         if ($this->crawlerHasNodes($mainImageCrawler)) {
             $image = $mainImageCrawler->attr('src');
         }
@@ -81,10 +81,7 @@ class GpvnParser extends AbstractBaseParser
 
         $contentCrawler = $newsPostCrawler;
 
-        $this->removeDomNodes($contentCrawler, '//a[starts-with(@href, "javascript")]');
         $this->removeDomNodes($contentCrawler, '//div[@class="post-ratings"]');
-        $this->removeDomNodes($contentCrawler, '//script | //video');
-        $this->removeDomNodes($contentCrawler, '//table');
 
         $this->purifyNewsPostContent($contentCrawler);
 
