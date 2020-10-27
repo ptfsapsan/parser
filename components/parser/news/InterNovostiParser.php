@@ -23,7 +23,7 @@ class InterNovostiParser implements ParserInterface
     const ROOT_SRC = "http://www.internovosti.ru";
     const FEED_SRC = "/xmlnews.asp";
     const LIMIT = 100;
-
+    const EMPTY_DESCRIPTION = "empty";
 
     /**
      * @return array
@@ -87,7 +87,7 @@ class InterNovostiParser implements ParserInterface
     {
         $title = $entityData->filter("title")->text();
 
-        $description = $entityData->filter("description")->text();
+        $description = self::EMPTY_DESCRIPTION;
         $original = $entityData->filter("link")->text();
         $createDate = new DateTime($entityData->filterXPath("item/pubDate")->text());
 
@@ -113,7 +113,9 @@ class InterNovostiParser implements ParserInterface
     private static function inflatePostContent(NewsPost $post, Curl $curl)
     {
         $url = $post->original;
-
+        if($post->description === self::EMPTY_DESCRIPTION){
+            $post->description = "";
+        }
         $pageData = iconv('Windows-1251', 'UTF-8', $curl->get($url));
         if (empty($pageData)) {
             throw new Exception("Получен пустой ответ от страницы новости: " . $url);
@@ -149,7 +151,11 @@ class InterNovostiParser implements ParserInterface
                 $text .= " " . trim($node->textContent) . " ";
             }
             if ($node->nodeName === "br" && !empty($text)) {
-                self::addText($post, $text);
+                if(empty($post->description)){
+                    $post->description = Helper::prepareString($text);
+                }else{
+                    self::addText($post, $text);
+                }
                 $text = "";
             }
         }
