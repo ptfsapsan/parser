@@ -58,7 +58,6 @@ class Trk27RuParser extends AbstractBaseParser
 
                 $publishedAt = Text::trim($newsPreview->filterXPath('//div[contains(@class,"date-block")]/i[contains(@class,"fa-clock-o")]/following-sibling::text()')->text());
                 $publishedAt = DateTimeImmutable::createFromFormat('d.m.Y', $publishedAt, new DateTimeZone('UTC'));
-                $publishedAt = $publishedAt->setTime(0, 0, 0);
 
                 $previewList[] = new PreviewNewsDTO($uri, $publishedAt, $title);
             });
@@ -69,7 +68,6 @@ class Trk27RuParser extends AbstractBaseParser
 
                 $publishedAt = Text::trim($newsPreview->filterXPath('//div[contains(@class,"date-content")]/i[contains(@class,"fa-clock-o")]/following-sibling::text()[1]')->text());
                 $publishedAt = DateTimeImmutable::createFromFormat('d.m.Y', $publishedAt, new DateTimeZone('UTC'));
-                $publishedAt = $publishedAt->setTime(0, 0, 0);
 
                 $previewList[] = new PreviewNewsDTO($uri, $publishedAt, $title);
             });
