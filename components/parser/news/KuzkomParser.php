@@ -71,7 +71,7 @@ class KuzkomParser extends AbstractBaseParser
         $newsPageCrawler = new Crawler($newsPage);
         $newsPostCrawler = $newsPageCrawler->filterXPath('//div[@id="post-full"]');
 
-        $mainImageCrawler = $newsPageCrawler->filterXPath('//img')->first();
+        $mainImageCrawler = $newsPostCrawler->filterXPath('//img')->first();
         if ($this->crawlerHasNodes($mainImageCrawler)) {
             $image = $mainImageCrawler->attr('src');
             $this->removeDomNodes($newsPostCrawler, '//img[1]');
