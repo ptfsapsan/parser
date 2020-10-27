@@ -25,7 +25,7 @@ class ShapsiguiaParser implements ParserInterface
 
     const FEED_SRC = "/index.php?mod=rss";
     const LIMIT = 100;
-
+    const EMPTY_DESCRIPTION = "empty";
 
     /**
      * @return array
@@ -100,13 +100,7 @@ class ShapsiguiaParser implements ParserInterface
             $imageUrl = str_replace("https://slotsgame.top", self::ROOT_SRC, $imageUrl);
         }
 
-        $description = $postData->filter("description")->text();
-        if (empty($description)) {
-            $text = $postData->filterXPath("item/yandex:full-text");
-
-            $sentences = preg_split('/(?<=[.?!])\s+(?=[а-я])/i', $text->text());
-            $description = implode(" ", array_slice($sentences, 0, 3));
-        }
+        $description = self::EMPTY_DESCRIPTION;
 
         return new NewsPost(
             self::class,
@@ -128,7 +122,9 @@ class ShapsiguiaParser implements ParserInterface
     private static function inflatePostContent(NewsPost $post, Curl $curl)
     {
         $url = $post->original;
-
+        if($post->description === self::EMPTY_DESCRIPTION){
+            $post->description = "";
+        }
         $pageData = $curl->get($url);
         if ($pageData === false) {
             throw new Exception("Url is wrong? nothing received: " . $url);
@@ -147,11 +143,19 @@ class ShapsiguiaParser implements ParserInterface
             $node = new Crawler($bodyNode);
 
             if ($bodyNode->nodeName === "#text" && !empty(trim($node->text(), "\xC2\xA0"))) {
-                self::addText($post, $node->text());
+                if(empty($post->description)){
+                    $post->description = Helper::prepareString($node->text());
+                }else{
+                    self::addText($post, $node->text());
+                }
                 continue;
             }
             if ($bodyNode->nodeName === "p" && !empty(trim($node->text(), "\xC2\xA0"))) {
-                self::addText($post, $node->text());
+                if(empty($post->description)){
+                    $post->description = Helper::prepareString($node->text());
+                }else{
+                    self::addText($post, $node->text());
+                }
                 continue;
             }
 
