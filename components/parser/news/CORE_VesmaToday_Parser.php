@@ -114,11 +114,11 @@ class CORE_VesmaToday_Parser extends ParserCore implements ParserInterface
 
                         // css селектор !должен содержать конечный аттрибут src! для картинки элемента
                         // (опционально)
-                        'element-image'       => '',
+                        'element-image'       => '.news__list1_picture_pic[style]',
 
                         // css селектор для даты элемента
                         // (опционально)
-                        'element-date'        => '.news__list1_date i',
+                        'element-date'        => '.news__list1_date[datetime]',
             ],
 
             // настройка карточки элемента
@@ -153,7 +153,7 @@ class CORE_VesmaToday_Parser extends ParserCore implements ParserInterface
                     // css-селектор для цитаты
                     // (если не заполнено, то по умолчанию берутся теги: blockquote и q)
                     // (опционально)
-                    'element-quote'       => 'em',
+                    'element-quote'       => 'h3 em',
 
                 // игнорируемые css-селекторы (будут вырезаться из результата)
                 // (можно несколько через запятую)
