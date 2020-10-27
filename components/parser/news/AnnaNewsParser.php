@@ -58,17 +58,20 @@ class AnnaNewsParser implements ParserInterface
         while (self::$parsedCount < $limit) {
             /** Get RSS news list */
             $curl = Helper::getCurl();
-            $newsList = $curl->get(static::SITE_URL . "/feed?paged=$pageNum");
-            if (! $newsList) {
-                throw new Exception('Can not get news data');
-            }
+            do {
+                $newsList = $curl->get(static::SITE_URL . "/feed?paged=$pageNum");
+            } while (is_bool($newsList));
 
             /** Parse news from RSS */
             $newsListCrawler = new Crawler($newsList);
             $news = $newsListCrawler->filterXPath('//item');
 
             foreach ($news as $item) {
-                $post = self::getPostDetail($item);
+                try {
+                    $post = self::getPostDetail($item);
+                } catch (Exception $e) {
+                    continue;
+                }
 
                 $posts[] = $post;
                 self::$parsedCount++;
@@ -141,10 +144,6 @@ class AnnaNewsParser implements ParserInterface
             ')->getNode(0);
             $description = self::cleanText($descriptionBlock->textContent);
             $descriptionBlock->parentNode->removeChild($descriptionBlock);
-        }
-
-        if (empty($description) === true) {
-            print_r($link); die();
         }
 
         /** @var NewsPost */
