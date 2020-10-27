@@ -456,7 +456,7 @@ abstract class AbstractBaseParser implements ParserInterface
             $parentNode = $this->getRecursivelyParentNode($node, function (DOMNode $parentNode) {
                 $isFormattingTag = $this->isFormattingTag($parentNode);
 
-                if ($this->rootContentNodeStorage->contains($parentNode) && !$isFormattingTag) {
+                if ($this->rootContentNodeStorage->contains($parentNode)) {
                     return null;
                 }
 
