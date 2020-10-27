@@ -39,6 +39,7 @@ class ZapolearniiVestnikParser implements ParserInterface
         "ноя" => "11",
         "дек" => "12",
     ];
+    const EMPTY_DESCRIPTION = "empty";
 
     /**
      * @return array
@@ -104,7 +105,7 @@ class ZapolearniiVestnikParser implements ParserInterface
         $title = $postData->filter("b")->text();
         $original = self::ROOT_SRC . "/" . self::normalizeUrl($postData->filter("b a")->attr("href"));
         $imageUrl = null;
-        $description = $postData->filter("a span")->text();
+        $description = self::EMPTY_DESCRIPTION;
 
         $dateSrc = $postData->text();
 
@@ -142,7 +143,9 @@ class ZapolearniiVestnikParser implements ParserInterface
     private static function inflatePostContent(NewsPost $post, Curl $curl)
     {
         $url = $post->original;
-
+        if($post->description === self::EMPTY_DESCRIPTION){
+            $post->description = "";
+        }
         $pageData = $curl->get($url);
         if (empty($pageData)) {
             throw new Exception("Получен пустой ответ от страницы новости: " . $url);
@@ -186,7 +189,11 @@ class ZapolearniiVestnikParser implements ParserInterface
             }
 
             if (!empty(trim($node->text(), "\xC2\xA0"))) {
-                self::addText($post, $node->text());
+                if(empty($post->description)){
+                    $post->description = Helper::prepareString($node->text());
+                }else{
+                    self::addText($post, $node->text());
+                }
                 continue;
             }
         }
