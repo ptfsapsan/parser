@@ -142,7 +142,8 @@ class RodKray31Parser implements ParserInterface
         }
 
         $title = $entityData["title"];
-        $createDate = new DateTime($entityData["created_at"]);
+        $dateStr = str_ireplace("Z", " +03:00", $entityData["created_at"]);
+        $createDate = new DateTime($dateStr);
         $createDate->setTimezone(new DateTimeZone("UTC"));
         $description = $entityData["lead"];
         $original = $entityData["detail_url"];
