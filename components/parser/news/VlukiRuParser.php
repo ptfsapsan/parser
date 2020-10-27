@@ -125,7 +125,7 @@ class VlukiRuParser implements ParserInterface
 
             $this->addItemPost($post, NewsPostItem::TYPE_HEADER, $nodeValue, null, null, (int)substr($node->nodeName, 1));
 
-        } elseif ($node->nodeName == 'a' && strpos($href = $this->getHeadUrl($node->getAttribute('href')), 'http') !== false) {
+        } elseif ($node->nodeName == 'a' && strpos($href = $this->getHeadUrl($node->getAttribute('href')), 'http') !== false && $href != self::SITE_URL) {
 
             $this->addItemPost($post, NewsPostItem::TYPE_LINK, $nodeValue, null, $href);
 
