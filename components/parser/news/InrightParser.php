@@ -23,7 +23,7 @@ class InrightParser implements ParserInterface
     const FEED_SRC = "/export/yandex.xml";
 
     const LIMIT = 100;
-
+    const EMPTY_DESCRIPTION = "empty";
     /**
      * @return array
      * @throws Exception
@@ -85,7 +85,7 @@ class InrightParser implements ParserInterface
     private static function inflatePost(Crawler $entityData): NewsPost
     {
         $title = $entityData->filter("title")->text();
-        $description = $entityData->filter("description")->text();
+        $description = self::EMPTY_DESCRIPTION;
         $original = $entityData->filter("link")->text();
         $imageUrl = null;
         $image = $entityData->filter("enclosure");
@@ -114,7 +114,9 @@ class InrightParser implements ParserInterface
     private static function inflatePostContent(NewsPost $post, $curl)
     {
         $url = $post->original;
-
+        if($post->description === self::EMPTY_DESCRIPTION){
+            $post->description = "";
+        }
         $pageData = $curl->get($url);
         if (empty($pageData)) {
             throw new Exception("Получен пустой ответ от страницы новости: " . $url);
@@ -137,7 +139,11 @@ class InrightParser implements ParserInterface
             }
 
             if ($node->matches("p") && !empty(trim($node->text(), "\xC2\xA0"))) {
-                self::addText($post, $node->text());
+                if(empty($post->description)){
+                    $post->description = Helper::prepareString($node->text());
+                }else{
+                    self::addText($post, $node->text());
+                }
                 continue;
             }
         }
