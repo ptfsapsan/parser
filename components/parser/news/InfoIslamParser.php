@@ -70,7 +70,7 @@ class InfoIslamParser extends AbstractBaseParser
 
         $mainImageCrawler = $newsPostCrawler->filterXPath('//img[1]');
         if ($this->crawlerHasNodes($mainImageCrawler)) {
-            $image = $mainImageCrawler->attr('content');
+            $image = $mainImageCrawler->attr('src');
             $this->removeDomNodes($newsPostCrawler,'//img[1]');
         }
         if ($image !== null && $image !== '') {
