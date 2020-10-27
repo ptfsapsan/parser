@@ -41,11 +41,15 @@ class OpenUgraParser extends AbstractBaseParser
             $previewNewsCrawler = $previewNewsCrawler->filterXPath($previewNewsXPath);
 
             $previewNewsCrawler->each(
-                function (Crawler $newsPreview) use (&$previewNewsDTOList, $pageNumber) {
+                function (Crawler $newsPreview) use (&$previewNewsDTOList) {
                     $titleCrawler = $newsPreview->filterXPath('//a[@class="h5"][1]');
                     $title = $titleCrawler->text();
                     $uri = UriResolver::resolve($titleCrawler->attr('href'), $this->getSiteUrl());
-                    $previewNewsDTOList[] = new PreviewNewsDTO($this->encodeUri($uri), null, $title, null);
+
+                    //Передаю в description и удаляю ниже из description
+                    $dateWithTime = $newsPreview->filterXPath('//div[@class="date"]')->text();
+
+                    $previewNewsDTOList[] = new PreviewNewsDTO($this->encodeUri($uri), null, $title, $dateWithTime);
                 }
             );
         }
@@ -58,11 +62,11 @@ class OpenUgraParser extends AbstractBaseParser
         return 'https://myopenugra.ru/';
     }
 
+
     protected function parseNewsPage(PreviewNewsDTO $previewNewsDTO): NewsPost
     {
         $uri = $previewNewsDTO->getUri();
         $image = null;
-
         $newsPage = $this->getPageContent($uri);
 
         $newsPageCrawler = new Crawler(mb_convert_encoding($newsPage, "utf-8", "windows-1251"));
@@ -81,21 +85,25 @@ class OpenUgraParser extends AbstractBaseParser
             $previewNewsDTO->setImage($this->encodeUri($image));
         }
 
+        $publishedAtString = $newsPageCrawler->filterXPath('//div[@class="detail-news-info-cart"]//p[1]')->text();
+        $publishedAtString = explode(' ', $publishedAtString);
+        $publishedAtStringTime = $previewNewsDTO->getDescription();
+        //Очищаем description
+        $previewNewsDTO->setDescription(null);
+        $publishedAtStringTime = explode(' ', $publishedAtStringTime);
+        $publishedAtString[1] = $this->convertStringMonthToNumber($publishedAtString[1]);
+        //[1] - day // [2] - month // [3] - year // Time
+        $publishedAtString = $publishedAtString[0].' '.$publishedAtString[1].' '.$publishedAtString[2].' '.$publishedAtStringTime[2];
+        unset($publishedAtStringTime);
+        $timezone = new DateTimeZone('Europe/Moscow');
+        $publishedAt = DateTimeImmutable::createFromFormat('d m Y H:i', $publishedAtString, $timezone);
+        $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
+        $previewNewsDTO->setPublishedAt($publishedAtUTC);
+
         $description = null;
         if($description && $description !== ''){
             $previewNewsDTO->setDescription($description);
         }
-
-        $publishedAtString = $newsPageCrawler->filterXPath('//div[@class="detail-news-info-cart"]//p[1]')->text();
-        $publishedAtString = explode(' ', $publishedAtString);
-        $this->convertStringMonthToNumber($publishedAtString[1]);
-        $publishedAtString[1] = $this->convertStringMonthToNumber($publishedAtString[1]);
-        //[1] - day // [2] - month // [3] - year
-        $publishedAtString = $publishedAtString[0].' '.$publishedAtString[1].' '.$publishedAtString[2];
-        $timezone = new DateTimeZone('Europe/Moscow');
-        $publishedAt = DateTimeImmutable::createFromFormat('d m Y', $publishedAtString, $timezone);
-        $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
-        $previewNewsDTO->setPublishedAt($publishedAtUTC);
 
         $contentCrawler = $newsPostCrawler->filterXPath('//div[contains(@class,"detail-text")]');
         $this->removeDomNodes($newsPageCrawler, '//section[contains(@class,"detail-news")][last()]');
