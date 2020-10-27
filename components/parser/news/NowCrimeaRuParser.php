@@ -7,6 +7,8 @@ use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
+use DateTime;
+use DateTimeZone;
 use RuntimeException;
 use Symfony\Component\DomCrawler\Crawler;
 
@@ -33,21 +35,27 @@ class NowCrimeaRuParser implements ParserInterface
         $newsPage = $this->getPageContent($urlNews);
         $newsList = $this->getListNews($newsPage);
         foreach ($newsList as $newsUrl) {
-            $contentPage = $this->getPageContent(self::SITE_URL . $newsUrl);
-            $itemCrawler = new Crawler($contentPage);
-
-            $title = $itemCrawler->filterXPath("//*[@class='detail__title']")->text();
-            $date = new \DateTime($itemCrawler->filterXPath("//*[@class='detail__date']")->text());
-            $date->setTimezone(new \DateTimeZone("UTC"));
-            $description = $itemCrawler->filterXPath("//*[@class='detail__main-content']")->text();
-            $image = self::SITE_URL . $itemCrawler->filterXPath("//*[@class='detail__img']")->attr('src');
             $url = self::SITE_URL . $newsUrl;
+            $contentPage = $this->getPageContent($url);
+            $itemCrawler = new Crawler($contentPage);
+            $title = $itemCrawler->filterXPath("//*[@class='detail__title']")->text();
+            $date = $this->getDate($itemCrawler->filterXPath("//*[@class='detail__date']")->text());
+            $description = '';
+            $descriptionSrc = $itemCrawler->filterXPath("//*[@class='detail__main-content']");
+            foreach ($descriptionSrc as $item) {
+                foreach ($item->childNodes as $value) {
+                    if (!$description && $text = $this->clearText($value->nodeValue)) {
+                        $description = $text;
+                    }
+                }
+            }
+            $image = self::SITE_URL . $itemCrawler->filterXPath("//*[@class='detail__img']")->attr('src');
 
             $post = new NewsPost(
                 self::class,
                 $title,
                 $description,
-                $date->format("Y-m-d H:i:s"),
+                $date,
                 $url,
                 $image
             );
@@ -56,7 +64,7 @@ class NowCrimeaRuParser implements ParserInterface
 
             foreach ($newContentCrawler as $content) {
                 foreach ($content->childNodes as $childNode) {
-                    $nodeValue = trim($childNode->nodeValue);
+                    $nodeValue = $this->clearText($childNode->nodeValue, [$post->description]);
                     if (in_array($childNode->nodeName, ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'])) {
 
                         $this->addItemPost($post, NewsPostItem::TYPE_HEADER, $nodeValue, null, null, (int) substr($childNode->nodeName, 1));
@@ -165,6 +173,38 @@ class NowCrimeaRuParser implements ParserInterface
         }
 
         throw new RuntimeException("Не удалось скачать страницу {$uri}, код ответа {$httpCode}");
+    }
+
+    /**
+     *
+     * @param string $date
+     *
+     * @return string
+     */
+    protected function getDate(string $date): string
+    {
+        $time = (new DateTime())->setTimezone(new DateTimeZone("UTC"))->format("H:i:s");
+        $newDate = $date ? new DateTime($time . ' '. $date) : '';
+        $newDate->setTimezone(new DateTimeZone("UTC"));
+        return $newDate->format("Y-m-d H:i:s");
+    }
+
+    /**
+     *
+     * @param string $text
+     * @param array $search
+     *
+     * @return string
+     */
+    protected function clearText(string $text, array $search = []): string
+    {
+        $text = html_entity_decode($text);
+        $text = strip_tags($text);
+        $text = htmlentities($text);
+        $search = array_merge(["&nbsp;"], $search);
+        $text = str_replace($search, ' ', $text);
+        $text = html_entity_decode($text);
+        return trim($text);
     }
 
 }
