@@ -17,26 +17,6 @@ class MichPravdaParser extends AbstractBaseParser
     public const USER_ID = 2;
     public const FEED_ID = 2;
 
-    public function convertStringMonthToNumber($stringMonth): int
-    {
-        $stringMonth = mb_strtolower($stringMonth);
-        $monthsList = [
-            "января" => 1,
-            "февраля" => 2,
-            "марта" => 3,
-            "апреля" => 4,
-            "мая" => 5,
-            "июня" => 6,
-            "июля" => 7,
-            "августа" => 8,
-            "сентября" => 9,
-            "октября" => 10,
-            "ноября" => 11,
-            "декабря" => 12,
-        ];
-        return $monthsList[$stringMonth];
-    }
-
     protected function getPreviewNewsDTOList(int $minNewsCount = 10, int $maxNewsCount = 100): array
     {
         $previewNewsDTOList = [];
@@ -67,13 +47,16 @@ class MichPravdaParser extends AbstractBaseParser
                     $uri = UriResolver::resolve($titleCrawler->attr('href'), $this->getSiteUrl());
 
                     $publishedAtString = $newsPreview->filterXPath('//span[@class="front_day_created"]')->text();
-
-                    $publishedAtString = explode(' ', $publishedAtString);
-                    $publishedAtString[1] = $this->convertStringMonthToNumber($publishedAtString[1]);
-                    //[1] - day // [2] - month // [3] - year
-                    $publishedAtString = $publishedAtString[0].' '.$publishedAtString[1].' '.$publishedAtString[2];
                     $timezone = new DateTimeZone('Europe/Moscow');
-                    $publishedAt = DateTimeImmutable::createFromFormat('d m Y,', $publishedAtString, $timezone);
+                    $publishedAtString = explode(' ', $publishedAtString);
+                    if ($publishedAtString[0] === 'сегодня') {
+                        $publishedAtString = date('d m Y').' '.$publishedAtString[1];
+                    } else {
+                        $publishedAtString[1] = $this->convertStringMonthToNumber($publishedAtString[1]);
+                        $publishedAtString = $publishedAtString[0].' '.$publishedAtString[1].' '.$publishedAtString[2] . $publishedAtString[3];
+                        $publishedAtString = str_replace(',',' ',$publishedAtString);
+                    }
+                    $publishedAt = DateTimeImmutable::createFromFormat('d m Y H:i', $publishedAtString, $timezone);
                     $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
 
                     $description = null;
@@ -127,5 +110,25 @@ class MichPravdaParser extends AbstractBaseParser
         $newsPostItemDTOList = $this->parseNewsPostContent($contentCrawler, $previewNewsDTO);
 
         return $this->factoryNewsPost($previewNewsDTO, $newsPostItemDTOList);
+    }
+
+    public function convertStringMonthToNumber($stringMonth): int
+    {
+        $stringMonth = mb_strtolower($stringMonth);
+        $monthsList = [
+            "января" => 1,
+            "февраля" => 2,
+            "марта" => 3,
+            "апреля" => 4,
+            "мая" => 5,
+            "июня" => 6,
+            "июля" => 7,
+            "августа" => 8,
+            "сентября" => 9,
+            "октября" => 10,
+            "ноября" => 11,
+            "декабря" => 12,
+        ];
+        return $monthsList[$stringMonth];
     }
 }
