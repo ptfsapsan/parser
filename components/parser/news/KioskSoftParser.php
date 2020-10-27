@@ -67,7 +67,7 @@ class KioskSoftParser extends AbstractBaseParser
         $newsPage = $this->getPageContent($uri);
 
         $newsPageCrawler = new Crawler($newsPage);
-        $newsPostCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"news-article js-mediator-article")]')->first();
+        $newsPostCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"col-md-9 article")]')->first();
 
         $mainImageCrawler = $newsPostCrawler->filterXPath('//img[1]');
         if ($this->crawlerHasNodes($mainImageCrawler)) {
@@ -79,11 +79,20 @@ class KioskSoftParser extends AbstractBaseParser
             $previewNewsDTO->setImage($this->encodeUri($image));
         }
 
+        $publishedAtString = $newsPageCrawler->filterXPath('//div[@class="headstat"]//div[@class="stats"][1]')->text();
+        $publishedAtString = explode(' ', $publishedAtString);
+        $publishedAtString[1] = $this->convertStringMonthToNumber($publishedAtString[1]);
+        $publishedAtString = $publishedAtString[0].' '.$publishedAtString[1].' '.$publishedAtString[2];
+        $timezone = new DateTimeZone('Europe/Moscow');
+        $publishedAt = DateTimeImmutable::createFromFormat('d m H:i', $publishedAtString, $timezone);
+        $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
+        $previewNewsDTO->setPublishedAt($publishedAtUTC);
+
         $previewNewsDTO->setDescription(null);
 
-        $contentCrawler = $newsPostCrawler;
-        $this->removeDomNodes($contentCrawler,'//div[contains(@class,"mobile-slider")]');
+        $contentCrawler = $newsPostCrawler->filterXPath('//div[contains(@class,"news-article js-mediator-article")]');
 
+        $this->removeDomNodes($contentCrawler,'//div[@class="news-image"]//p[1]');
         $this->purifyNewsPostContent($contentCrawler);
 
         $newsPostItemDTOList = $this->parseNewsPostContent($contentCrawler, $previewNewsDTO);
@@ -93,7 +102,7 @@ class KioskSoftParser extends AbstractBaseParser
 
     public function convertStringMonthToNumber($stringMonth): int
     {
-        $stringMonth = mb_strtolower($stringMonth);
+        $stringMonth = mb_strtolower(str_replace(',','',$stringMonth));
         $monthsList = [
             "января" => 1,
             "февраля" => 2,
