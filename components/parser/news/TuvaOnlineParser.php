@@ -87,9 +87,9 @@ class TuvaOnlineParser extends AbstractBaseParser
         $this->removeDomNodes($contentCrawler, '//td[@class="article_date"]');
         $this->removeDomNodes($contentCrawler, '//td[@class="bg_top_category"]');
         $this->removeDomNodes($contentCrawler, '//div[@class="full-link"]');
+        $this->removeDomNodes($contentCrawler, '//td[@class="article_header"]');
         $this->removeDomNodes($contentCrawler, '//tr[@height="6"]//following-sibling::*');
         $this->removeDomNodes($contentCrawler, '//a[starts-with(@href, "javascript")]');
-        $this->removeDomNodes($contentCrawler, '//script | //video');
 
 
         $newsPostItemDTOList = $this->parseNewsPostContent($contentCrawler, $previewNewsDTO);
