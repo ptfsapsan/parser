@@ -81,9 +81,8 @@ class TvComParser extends AbstractBaseParser
 
         $contentCrawler = $newsPostCrawler;
 
-        $this->removeDomNodes($contentCrawler, '//a[starts-with(@href, "javascript")]');
-        $this->removeDomNodes($contentCrawler, '//script | //video');
-        $this->removeDomNodes($contentCrawler, '//table');
+        $this->removeDomNodes($contentCrawler, '//p[@style="text-align:right"][last()]//following-sibling::*');
+        $this->removeDomNodes($contentCrawler, '//p[@style="text-align:right"][last()]');
 
         $this->purifyNewsPostContent($contentCrawler);
 
