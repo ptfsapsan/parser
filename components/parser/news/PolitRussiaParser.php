@@ -92,6 +92,14 @@ class PolitRussiaParser extends AbstractBaseParser
             $previewNewsItem->setImage(UriResolver::resolve($image, $uri));
         }
 
+        $time = mb_substr($newsPostCrawler->filterXPath('//div[contains(@class,"date")]')->text(), 0, 5);
+        $date = $previewNewsItem->getPublishedAt()->format('d.m.Y');
+        $timezone = new DateTimeZone('Europe/Moscow');
+        $dateTime = DateTimeImmutable::createFromFormat('d.m.Y H:i', $date .' '. $time, $timezone);
+        if($dateTime !== false){
+            $previewNewsItem->setPublishedAt($dateTime);
+        }
+
         $contentXPath = '//div[contains(@class,"article-vibox")] | //div[contains(@class,"article-body")]';
         $contentCrawler = $newsPostCrawler->filterXPath($contentXPath);
 
