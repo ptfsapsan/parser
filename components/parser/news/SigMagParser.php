@@ -46,9 +46,10 @@ class SigMagParser extends AbstractBaseParser
             $previewNewsCrawler = $previewNewsCrawler->filterXPath($previewNewsXPath);
 
             $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$previewNewsDTOList) {
-                $titleCrawler = $newsPreview->filterXPath('//a[contains(@class,"cell event-ann")]');
+                $titleCrawler = $newsPreview->filterXPath('//div[@class="title"]');
                 $title = $titleCrawler->text();
-                $uri = UriResolver::resolve($titleCrawler->attr('href'), $this->getSiteUrl());
+                $url = $newsPreview->filterXPath('//a[contains(@class,"cell event-ann")]')->attr('href');
+                $uri = UriResolver::resolve($url, $this->getSiteUrl());
 
                 $publishedAtString = $newsPreview->filterXPath('//div[@class="date"]')->text();
                 $publishedAtString = explode('.', $publishedAtString);
@@ -89,7 +90,8 @@ class SigMagParser extends AbstractBaseParser
         $previewNewsDTO->setDescription(null);
 
         $contentCrawler = $newsPostCrawler;
-        $this->removeDomNodes($contentCrawler,'//h1[contains(@class,"title el-block")]');
+        $this->removeDomNodes($newsPageCrawler,'//h1[contains(@class,"title el-block")]');
+        $this->removeDomNodes($contentCrawler,'//h1');
 
         $this->purifyNewsPostContent($contentCrawler);
 
