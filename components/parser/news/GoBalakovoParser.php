@@ -163,31 +163,33 @@ class GoBalakovoParser implements ParserInterface
                 continue;
             }
 
-
-            if ($node->matches("div") && $node->filter("img")->count() !== 0) {
-                $image = $node->filter("img");
-                $src = self::normalizeUrl($image->attr("src"));
-                if($post->image === null){
-                    $post->image = $src;
-                }else{
-                    self::addImage($post, $src);
-                }
-                continue;
-            }
-
-
             if ($node->matches("div.article-text") && !empty(trim($node->text(), "\xC2\xA0"))) {
                 $node->children()->each(function (Crawler $pNode) use ($post){
+                    if ($pNode->matches("div, p") && $pNode->filter("img")->count() !== 0) {
+                        $image = $pNode->filter("img");
+                        $src = self::normalizeUrl($image->attr("src"));
+                        if($post->image === null){
+                            $post->image = $src;
+                        }else{
+                            self::addImage($post, $src);
+                        }
+                    }
+
+                    if(empty(trim($pNode->text(), "\xC2\xA0"))){
+                        return;
+                    }
                     if(empty($post->description)){
                         $post->description = Helper::prepareString($pNode->text());
                     }else{
                         self::addText($post, $pNode->text());
                     }
                 });
-
-
-                continue;
             }
+
+
+
+
+
 
             if ($node->matches("img")) {
                 $src = self::normalizeUrl($node->attr("src"));
