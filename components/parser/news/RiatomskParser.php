@@ -50,6 +50,7 @@ class RiatomskParser extends MediasferaNewsParser implements ParserInterface
             'stat-author' => false,
             'storyNewDiv' => false,
             'statInfoName' => false,
+            'stat-mainImg' => false,
         ],
         'id' => [
             'ctl00_InfoPlaceHolder_TimeLabel' => false,
