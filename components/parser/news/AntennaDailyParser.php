@@ -68,10 +68,10 @@ class AntennaDailyParser extends AbstractBaseParser
         $newsPageCrawler = new Crawler($newsPage);
         $newsPostCrawler = $newsPageCrawler->filterXPath('//div[@class="dropcap-content columnable-content entry-content single-component"]');
 
-        $mainImageCrawler = $newsPostCrawler->filterXPath('//img')->first();
+        $mainImageCrawler = $newsPageCrawler->filterXPath('//span[contains(@class,"image-element")]//img')->first();
         if ($this->crawlerHasNodes($mainImageCrawler)) {
             $image = $mainImageCrawler->attr('src');
-            $this->removeDomNodes($newsPostCrawler,'//img[1]');
+            $this->removeDomNodes($newsPageCrawler,'//span[contains(@class,"image-element")]');
         }
         if ($image !== null && $image !== '') {
             $image = UriResolver::resolve($image, $uri);
@@ -84,9 +84,6 @@ class AntennaDailyParser extends AbstractBaseParser
 
         $this->removeDomNodes($contentCrawler,'//div[@class="sharedaddy sd-sharing-enabled"]');
         $this->removeDomNodes($contentCrawler,'//div[@class="google-auto-placed ap_container"]');
-        $this->removeDomNodes($contentCrawler, '//a[starts-with(@href, "javascript")]');
-        $this->removeDomNodes($contentCrawler, '//script | //video');
-        $this->removeDomNodes($contentCrawler, '//table');
 
         $this->purifyNewsPostContent($contentCrawler);
 
