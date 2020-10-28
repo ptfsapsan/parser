@@ -80,7 +80,7 @@ class RiatomskParser extends MediasferaNewsParser implements ParserInterface
             self::$post->image = self::getNodeData('url', $node, self::NEWSLIST_IMAGE);
 
             $articleContent = self::getPage(self::$post->original);
-            $articleContent = str_replace("\n", ' ', $articleContent);
+            $articleContent = str_replace(["\r\n", "\r", "\n"], ' ', $articleContent);
 
             if (!empty($articleContent)) {
 
