@@ -77,14 +77,16 @@ class Bmf74Parser extends AbstractBaseParser
             $previewNewsDTO->setImage(Helper::encodeUrl($image));
         }
 
-        $previewNewsDTO->setDescription(null);
+        $descriptionXpath = $newsPageCrawler->filterXPath('//div[@class="news-detail-preview-text"]')->text();
+        $previewNewsDTO->setDescription($descriptionXpath);
 
         $contentCrawler = $newsPostCrawler;
 
         $this->removeDomNodes($contentCrawler,'//div[contains(@class,"mobile-slider")]');
         $this->removeDomNodes($contentCrawler, '//a[starts-with(@href, "javascript")]');
-        $this->removeDomNodes($contentCrawler, '//script | //video');
-        $this->removeDomNodes($contentCrawler, '//table');
+        $this->removeDomNodes($contentCrawler, '//div[@id="audioPlayer"]');
+        $this->removeDomNodes($contentCrawler, '//div[@class="news-photo-line"]');
+        $this->removeDomNodes($contentCrawler, '//div[@class="news-detail-link-element"]');
 
         $this->purifyNewsPostContent($contentCrawler);
 
