@@ -6,7 +6,6 @@ use app\components\helper\metallizzer\Parser;
 use app\components\helper\metallizzer\Text;
 use app\components\helper\metallizzer\Url;
 use app\components\parser\NewsPost;
-use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use DateTime;
 use DateTimeZone;
@@ -25,7 +24,7 @@ class ProvinceRuPenzaParser implements ParserInterface
 
     public static function run(): array
     {
-        $url  = self::SITE_URL;
+        $url  = self::SITE_URL.'component/obrss/penza-provintsiya-ru.feed';
         $html = self::request($url);
 
         if (!$html) {
@@ -34,7 +33,7 @@ class ProvinceRuPenzaParser implements ParserInterface
 
         $crawler = new Crawler($html, $url);
 
-        $crawler->filter('.moduletable .k2ItemsLenta .moduleItemTitle')->each(function ($node) {
+        $crawler->filter('item')->each(function ($node) {
             self::loadPost($node);
         });
 
@@ -43,7 +42,7 @@ class ProvinceRuPenzaParser implements ParserInterface
 
     protected static function loadPost($node)
     {
-        $url = Url::encode($node->link()->getUri());
+        $url = Url::encode($node->filter('link')->text());
 
         if (!$html = self::request($url)) {
             throw new Exception("Не удалось загрузить страницу '{$url}'.");
@@ -52,36 +51,23 @@ class ProvinceRuPenzaParser implements ParserInterface
         $crawler = new Crawler(Text::decode($html), $url);
 
         $tz = new DateTimeZone('Europe/Moscow');
-        $dt = DateTime::createFromFormat('d-m-Y/H:i', $crawler->filter('.itemDateCreated')->first()->text(), $tz);
+        $dt = new DateTime($node->filter('pubDate')->text(), $tz);
 
         $image = $crawler->filter('.itemImage img')->first();
 
         $post = new NewsPost(
             self::class,
-            html_entity_decode($crawler->filter('h1.itemTitle')->first()->text()),
-            html_entity_decode($crawler->filter('.itemIntroText')->first()->text()),
+            html_entity_decode($node->filter('title')->first()->text()),
+            html_entity_decode($crawler->filter('.itemIntroText')->first()->text()) ?: '~',
             $dt->setTimezone(new DateTimeZone('UTC'))->format('c'),
             $url,
             $image->count() ? Url::encode($image->image()->getUri()) : null
         );
 
-        $items = (new Parser())->parseMany($crawler->filterXpath('//div[@class="itemFullText"]/node()[not(self::google)]'));
-
-        foreach ($items as $item) {
-            if (!$post->image && $item['type'] === NewsPostItem::TYPE_IMAGE) {
-                $post->image = $item['image'];
-
-                continue;
-            }
-
-            // if ($item['type'] === NewsPostItem::TYPE_TEXT && $item['text'] == $post->description) {
-            //     continue;
-            // }
-
-            $post->addItem(new NewsPostItem(...array_values($item)));
-        }
-
-        self::$posts[] = $post;
+        self::$posts[] = (new Parser())->fill(
+            $post,
+            $crawler->filterXpath('//div[@class="itemFullText"]/node()[not(self::google)]')
+        );
     }
 
     protected static function parseDate($string)
