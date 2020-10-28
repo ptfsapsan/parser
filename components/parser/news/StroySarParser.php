@@ -66,7 +66,8 @@ class StroySarParser extends AbstractBaseParser
         $newsPage = $this->getPageContent($uri);
 
         $newsPageCrawler = new Crawler($newsPage);
-        $newsPostCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"col-md-9")]');
+//        $newsPostCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"col-md-9")]');
+        $newsPostCrawler = $newsPageCrawler->filterXPath('//div[@class="pub-data pub-news"]');
 
         $mainImageCrawler = $newsPostCrawler->filterXPath('//img')->first();
         if ($this->crawlerHasNodes($mainImageCrawler)) {
@@ -80,11 +81,11 @@ class StroySarParser extends AbstractBaseParser
 
         $previewNewsDTO->setDescription(null);
 
-        $contentCrawler = $newsPostCrawler->filterXPath('//div[@class="pub-text layer"]');
+        $contentCrawler = $newsPostCrawler;
 
-        $this->removeDomNodes($contentCrawler, '//a[starts-with(@href, "javascript")]');
-        $this->removeDomNodes($contentCrawler, '//script | //video');
-        $this->removeDomNodes($contentCrawler, '//table');
+        $this->removeDomNodes($contentCrawler, '//h1 | //p[@class="user-date"]');
+        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"pub-socialbutton")]//following-sibling::*');
+        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"pub-socialbutton")]');
 
         $this->purifyNewsPostContent($contentCrawler);
 
