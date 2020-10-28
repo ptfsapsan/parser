@@ -45,13 +45,46 @@ class AltairkParser extends AbstractBaseParser
                     $titleCrawler = $newsPreview->filterXPath('//h3/a');
                     $title = $titleCrawler->text();
                     $uri = UriResolver::resolve($titleCrawler->attr('href'), $this->getSiteUrl());
-                    $previewNewsDTOList[] = new PreviewNewsDTO($this->encodeUri($uri), null, $title, null);
+
+                    $publishedAtString = $newsPreview->filterXPath('//div[@class="date"]')->text();
+                    $publishedAtString = explode(' ', $publishedAtString);
+                    if ($publishedAtString[1] === 'сегодня') {
+                        $publishedAtString = $publishedAtString[0].' '.date('d m Y');
+                    } else {
+                        $publishedAtString[2] = $this->convertStringMonthToNumber($publishedAtString[2]);
+                        $publishedAtString = $publishedAtString[0].' '.$publishedAtString[1].' '.$publishedAtString[2].' '.$publishedAtString[3];
+                    }
+                    $timezone = new DateTimeZone('Asia/Irkutsk');
+                    $publishedAt = DateTimeImmutable::createFromFormat('H:i, d m Y', $publishedAtString, $timezone);
+                    $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
+
+                    $previewNewsDTOList[] = new PreviewNewsDTO($this->encodeUri($uri), $publishedAtUTC, $title, null);
                 }
             );
         }
 
         $previewNewsDTOList = array_slice($previewNewsDTOList, 0, $maxNewsCount);
         return $previewNewsDTOList;
+    }
+
+    public function convertStringMonthToNumber($stringMonth): int
+    {
+        $stringMonth = mb_strtolower($stringMonth);
+        $monthsList = [
+            "янв" => 1,
+            "фев" => 2,
+            "мар" => 3,
+            "апр" => 4,
+            "мая" => 5,
+            "июн" => 6,
+            "июл" => 7,
+            "авг" => 8,
+            "сен" => 9,
+            "окт" => 10,
+            "ноя" => 11,
+            "дек" => 12,
+        ];
+        return $monthsList[$stringMonth];
     }
 
     protected function getSiteUrl(): string
