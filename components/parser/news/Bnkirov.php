@@ -82,7 +82,6 @@ class Bnkirov extends Aleks007smolBaseParser implements ParserInterface
         $crawler = new Crawler($rss);
 
         $crawler->filter('channel item')->slice(0, self::MAX_NEWS_COUNT)->each(function ($node) use (&$curl, &$posts) {
-//        $crawler->filter('channel item')->slice(7, 1)->each(function ($node) use (&$curl, &$posts) {
             try {
                 $enclosure = $node->filter('enclosure')->attr('url');
             } catch (Exception $exception) {
@@ -217,6 +216,7 @@ class Bnkirov extends Aleks007smolBaseParser implements ParserInterface
             case 'span':
             case 'figure':
             case 'strong':
+                self::parseParagraph($node, $newPost, $descriptionSentences);
                 $nodes = $node->children();
                 if ($nodes->count()) {
                     $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing) {
@@ -225,7 +225,7 @@ class Bnkirov extends Aleks007smolBaseParser implements ParserInterface
                 }
                 break;
             case 'p':
-                self::parseParagraph($node, $newPost, $descriptionSentences);
+//                self::parseParagraph($node, $newPost, $descriptionSentences);
                 if ($nodes = $node->children()) {
                     $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing) {
                         self::parseNode($node, $newPost, $maxDepth, $stopParsing);
