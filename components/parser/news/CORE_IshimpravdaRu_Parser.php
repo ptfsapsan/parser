@@ -30,7 +30,7 @@ class CORE_IshimpravdaRu_Parser extends ParserCore implements ParserInterface
     // 1 - включен
     // 2 - включен (очень подробный режим)
     // 3 - режим "зануда"
-    protected const DEBUG = 1;
+    protected const DEBUG = 0;
 
     public function __construct()
     {
@@ -109,49 +109,12 @@ class CORE_IshimpravdaRu_Parser extends ParserCore implements ParserInterface
 
                     // css селектор для картинки элемента
                     // (опционально)
-                    'element-image'       => 'enclosure[url]',
+//                    'element-image'       => 'enclosure[url]',
+                    // @note  в РСС ставит не те картинки, что в карточке. Берем из карточки
 
                     // css селектор для даты элемента
                     // (опционально)
                     'element-date'        => 'pubDate',
-            ],
-
-            // настройки витрины (режим HTML)
-            // !!! заполняется, только при отсутствии витрины RSS !!!
-            'list'    => [
-                // URL где находится витрина
-                // (обязательный)
-                'url'                 => '',
-
-                // css селектор для контейнера витрины
-                // (обязательный)
-                'container'           => '',
-
-                    // css селектор для элемента витрины (относительно контейнера)
-                    // (обязательный)
-                    'element'             => '',
-
-                        // ** дальнейшие css-селекторы указываются относительно element
-
-                        // css селектор для ссылки на элемент !должен содержать конечный аттрибут href!
-                        // (обязательный + должен быть обязательный атрибут, где хранится ссылка)
-                        'element-link'        => '',
-
-                        // css селектор для названия элемента
-                        // (опционально)
-                        'element-title'       => '',
-
-                        // css селектор для описания элемента
-                        // (опционально)
-                        'element-description' => '',
-
-                        // css селектор !должен содержать конечный аттрибут src! для картинки элемента
-                        // (опционально)
-                        'element-image'       => '',
-
-                        // css селектор для даты элемента
-                        // (опционально)
-                        'element-date'        => '',
             ],
 
             // настройка карточки элемента
@@ -176,12 +139,12 @@ class CORE_IshimpravdaRu_Parser extends ParserCore implements ParserInterface
 
                     // css селектор для описания элемента
                     // (опционально)
-                    'element-description' => '',
+                    'element-description' => 'p:first-child',
 
                     // css селектор для получения картинки
                     // !должен содержать конечный аттрибут src! (например: img.main-image[src])
                     // (опционально)
-                    'element-image'       => '',
+                    'element-image'       => '.thumb-wrap img.full-image[src]',
 
                     // css-селектор для цитаты
                     // (если не заполнено, то по умолчанию берутся теги: blockquote и q)
@@ -191,7 +154,7 @@ class CORE_IshimpravdaRu_Parser extends ParserCore implements ParserInterface
                 // игнорируемые css-селекторы (будут вырезаться из результата)
                 // (можно несколько через запятую)
                 // (опционально)
-                'ignore-selectors'    => '',
+                'ignore-selectors'    => '.entry > p:first-child',
 
                 // css-селекторы которые будут вставлятся в начало текста новости element-text (селекторы ищутся от корня)
                 // (опционально)
