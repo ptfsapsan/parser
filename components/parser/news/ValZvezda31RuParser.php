@@ -26,7 +26,7 @@ class ValZvezda31RuParser extends AbstractBaseParser
     {
         $previewNewsDTOList = [];
 
-        $uriPreviewPage = UriResolver::resolve("edw/api/data-marts/32/entities.json?&limit={$maxNewsCount}", $this->getSiteUrl());
+        $uriPreviewPage = UriResolver::resolve("edw/api/data-marts/30/entities.json?&limit={$maxNewsCount}", $this->getSiteUrl());
 
         try {
             $previewNewsContent = $this->getJsonContent($uriPreviewPage);
@@ -76,13 +76,8 @@ class ValZvezda31RuParser extends AbstractBaseParser
             $this->removeDomNodes($contentCrawler, '//div[contains(@class,"topic_image")]/img');
         }
 
-        if ($image !== null) {
-            $image = UriResolver::resolve($image, $uri);
-            $image = $this->encodeUri($image);
-        }
-
         if ($image !== null && $image !== '') {
-            $image = $this->encodeUri(UriResolver::resolve($image, $this->getSiteUrl()));
+            $image = UriResolver::resolve($image, $this->getSiteUrl());
             $previewNewsDTO->setImage($this->encodeUri($image));
         }
 
