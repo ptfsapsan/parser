@@ -80,16 +80,6 @@ class AtkarskGazetaParser extends AbstractBaseParser
         $newsPageCrawler = new Crawler($newsPage);
         $newsPostCrawler = $newsPageCrawler->filterXPath('//section[contains(@class,"onenews")]');
 
-        $image = null;
-        $mainImageCrawler = $newsPageCrawler->filterXPath('//meta[@property="og:image" and not(contains(@content,"logo.png"))]')->first();
-        if ($this->crawlerHasNodes($mainImageCrawler)) {
-            $image = $mainImageCrawler->attr('content');
-        }
-        if ($image !== null) {
-            $previewNewsItem->setImage(UriResolver::resolve($image, $uri));
-        }
-
-
         $contentXPath = '//div[contains(@class,"content__container")]/span[contains(@class,"onenews__content-postdate")]/parent::*';
         $contentCrawler = $newsPostCrawler->filterXPath($contentXPath);
         $this->removeDomNodes($contentCrawler, '//span[contains(@class,"onenews__content__autor")]');
