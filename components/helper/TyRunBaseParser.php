@@ -2,6 +2,7 @@
 
 namespace app\components\helper;
 
+use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use DateTime;
@@ -102,19 +103,22 @@ abstract class TyRunBaseParser
      */
     protected static function parseImage(Crawler $node, NewsPost $newPost, $lazySrcAttr = 'data-src'): void
     {
-        $src = self::getProperImageSrc($node, $lazySrcAttr);
+        $src = static::getProperImageSrc($node, $lazySrcAttr);
         if ($src && $src != $newPost->image) {
-            $newPost->addItem(
-                new NewsPostItem(
-                    NewsPostItem::TYPE_IMAGE,
-                    null,
-                    $src,
-                    null,
-                    null,
-                    null
-                ));
+            if (empty($newPost->image)) {
+                $newPost->image = $src;
+            } else {
+                $newPost->addItem(
+                    new NewsPostItem(
+                        NewsPostItem::TYPE_IMAGE,
+                        null,
+                        $src,
+                        null,
+                        null,
+                        null
+                    ));
+            }
         }
-
     }
 
     /**
@@ -241,5 +245,4 @@ abstract class TyRunBaseParser
     {
         return str_replace(['%3A', '%2F'], [':', '/'], rawurlencode($url));
     }
-
 }
