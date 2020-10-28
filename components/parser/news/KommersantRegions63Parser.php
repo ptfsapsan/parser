@@ -31,7 +31,6 @@ class KommersantRegions63Parser extends MediasferaNewsParser implements ParserIn
     //public const SITE_URL = 'https://www.kommersant.ru/regions/63';
     public const NEWSLIST_URL = 'https://www.kommersant.ru/regions/63';
 
-    public const IS_CURRENT_TIME = true;
     public const DATEFORMAT = 'Y-m-d\TH:i:sP';
 
     public const ATTR_IMAGE = 'data-lazyimage-src';
@@ -82,7 +81,9 @@ class KommersantRegions63Parser extends MediasferaNewsParser implements ParserIn
             $articleCrawler = new Crawler($articleContent);
 
             self::$post->description = self::getNodeData('text', $articleCrawler, self::ARTICLE_DESC);
-            self::$post->createDate = self::getNodeDate('content', $articleCrawler, self::ARTICLE_DATE);
+
+            $date = str_replace('00:00:00', date('H:i:s'),self::getNodeData('content', $articleCrawler, self::ARTICLE_DATE));
+            self::$post->createDate = self::fixDate($date);
 
             self::parse($articleCrawler->filter(self::ARTICLE_TEXT));
         }
@@ -108,7 +109,9 @@ class KommersantRegions63Parser extends MediasferaNewsParser implements ParserIn
                 $articleCrawler = new Crawler($articleContent);
 
                 self::$post->description = self::getNodeData('text', $articleCrawler, self::ARTICLE_DESC);
-                self::$post->createDate = self::getNodeDate('content', $articleCrawler, self::ARTICLE_DATE);
+
+                $date = str_replace('00:00:00', date('H:i:s'),self::getNodeData('content', $articleCrawler, self::ARTICLE_DATE));
+                self::$post->createDate = self::fixDate($date);
 
                 self::parse($articleCrawler->filter(self::ARTICLE_TEXT));
             }
