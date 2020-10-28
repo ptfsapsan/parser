@@ -35,8 +35,8 @@ class UfarbcParser extends MediasferaNewsParser implements ParserInterface
     public const NEWSLIST_POST = '.g-overflow .l-row .item__wrap';
     public const NEWSLIST_TITLE = '.item__title';
     public const NEWSLIST_LINK = 'a.item__link';
-    public const NEWSLIST_IMG = 'img.item__image';
 
+    public const ARTICLE_IMG =   'img.article__main-image__image';
     public const ARTICLE_DATE =   'span.article__header__date';
     public const ARTICLE_DESC =  '.article .article__text .article__text__overview';
     public const ARTICLE_TEXT =   '.article .article__text';
@@ -45,6 +45,7 @@ class UfarbcParser extends MediasferaNewsParser implements ParserInterface
         'class' => [
             'article__text__overview' => false,
             'article__main-image__author' => false,
+            'article__main-image' => false,
             'banner' => false,
             'pro-anons' => false,
             'article__authors' => true,
@@ -69,7 +70,7 @@ class UfarbcParser extends MediasferaNewsParser implements ParserInterface
 
             self::$post->title = self::getNodeData('text', $node, self::NEWSLIST_TITLE);
             self::$post->original = self::getNodeData('href', $node, self::NEWSLIST_LINK);
-            self::$post->image = self::getNodeImage('src', $node, self::NEWSLIST_IMG);
+
 
             $articleContent = self::getPage(self::$post->original);
 
@@ -79,6 +80,7 @@ class UfarbcParser extends MediasferaNewsParser implements ParserInterface
 
                 self::$post->createDate = self::getNodeDate('content', $articleCrawler, self::ARTICLE_DATE);
                 self::$post->description = self::getNodeData('text', $articleCrawler, self::ARTICLE_DESC);
+                self::$post->image = self::getNodeImage('src', $articleCrawler, self::ARTICLE_IMG);
 
                 $articleCrawler->filter(self::ARTICLE_TEXT)->each(function ($node) {
                     self::parse($node);
