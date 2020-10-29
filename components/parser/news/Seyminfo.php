@@ -1,6 +1,5 @@
 <?php
 
-
 namespace app\components\parser\news;
 
 use app\components\Helper;
@@ -8,34 +7,34 @@ use app\components\helper\Aleks007smolBaseParser;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
+use DateTime;
+use DateTimeZone;
 use Exception;
 use Symfony\Component\DomCrawler\Crawler;
 
 /**
- * Парсер новостей из RSS ленты 1ul.ru
+ * Парсер новостей из RSS ленты
  *
  */
-class Ul1 extends Aleks007smolBaseParser implements ParserInterface
+class Seyminfo extends Aleks007smolBaseParser implements ParserInterface
 {
-    /*run*/
     const USER_ID = 2;
     const FEED_ID = 2;
 
     /**
      * Ссылка на главную страницу сайта
      */
-    const MAIN_PAGE_URI = 'https:';
-
+    const MAIN_PAGE_URI = 'https://seyminfo.ru';
 
     /**
      * CSS класс, где хранится содержимое новости
      */
-    const BODY_CONTAINER_CSS_SELECTOR = '.theme_day';
+    const BODY_CONTAINER_CSS_SELECTOR = '.full_post_text';
 
     /**
      * CSS  класс для параграфов - цитат
      */
-    const QUOTE_TAG = 'em';
+    const QUOTE_TAG = 'blockquote';
 
     /**
      * Классы эоементов, которые не нужно парсить, например блоки с рекламой и т.п.
@@ -48,11 +47,10 @@ class Ul1 extends Aleks007smolBaseParser implements ParserInterface
      */
     const CUT_CSS_CLASS = '';
 
-
     /**
      * Ссылка на RSS фид (XML)
      */
-    const FEED_URL = 'https://1ul.ru/rss';
+    const FEED_URL = 'http://seyminfo.ru/feed';
 
     /**
      *  Максимальная глубина для парсинга <div> тегов
@@ -82,11 +80,12 @@ class Ul1 extends Aleks007smolBaseParser implements ParserInterface
         $rss = $curl->get(self::FEED_URL);
 
         $crawler = new Crawler($rss);
-        $crawler->filter('rss channel item')->slice(0, self::MAX_NEWS_COUNT)->each(function ($node) use (&$curl, &$posts) {
+
+        $crawler->filter('channel item')->slice(0, self::MAX_NEWS_COUNT)->each(function ($node) use (&$curl, &$posts) {
             $newPost = new NewsPost(
                 self::class,
                 $node->filter('title')->text(),
-                $node->filter('description')->text() ?: 'description',
+                'description',
                 self::stringToDateTime($node->filter('pubDate')->text()),
                 $node->filter('link')->text(),
                 null
@@ -95,8 +94,6 @@ class Ul1 extends Aleks007smolBaseParser implements ParserInterface
             /**
              * Предложения содержащиеся в описании (для последующей проверки при парсинга тела новости)
              */
-
-
             $descriptionSentences = explode('. ', html_entity_decode($newPost->description));
 
             /**
@@ -105,12 +102,19 @@ class Ul1 extends Aleks007smolBaseParser implements ParserInterface
             $newsContent = $curl->get($newPost->original);
 
             if (!empty($newsContent)) {
-                $newsContent = (new Crawler($newsContent))->filter(self::BODY_CONTAINER_CSS_SELECTOR);
+                /**
+                 * Если время в rss указано как timestamp = 0, то берем из html новости
+                 */
+                if ($newPost->createDate->format('U') == 0) {
+                    $createDate = (new Crawler($newsContent))->filter('.c-date')->text();
+                    $newPost->createDate = DateTime::createFromFormat('d.m.Y H:i O', $createDate . ' +0800')
+                        ->setTimezone(new DateTimeZone('UTC'));
+                }
 
                 /**
-                 * Основное фото ( всегда одно в начале статьи)
+                 * Основное фото (всегда одно в начале статьи)
                  */
-                $mainImage = $newsContent->filter('.image_ex');
+                $mainImage = (new Crawler($newsContent))->filter('.post_full img');
 
                 if ($mainImage->count()) {
                     if ($mainImage->attr('src')) {
@@ -119,15 +123,30 @@ class Ul1 extends Aleks007smolBaseParser implements ParserInterface
                 }
 
                 /**
-                 * Подпись под основным фото (отсутствует)
+                 * Подпись под основным фото
                  */
-                $annotation = null;
+                $annotation = (new Crawler($newsContent))->filter('.author_photo');
+
+                if ($annotation->count() && !empty($annotation->text())) {
+                    $newPost->addItem(
+                        new NewsPostItem(
+                            NewsPostItem::TYPE_TEXT,
+                            $annotation->text(),
+                            null,
+                            null,
+                            null,
+                            null
+                        )
+                    );
+                }
+
+                $newsContent = (new Crawler($newsContent))->filter(self::BODY_CONTAINER_CSS_SELECTOR);
 
                 /**
                  * Текст статьи, может содержать цитаты ( все полезное содержимое в тегах <p> )
                  * Не знаю нужно или нет, но сделал более универсально, с рекурсией
                  */
-                $articleContent = $newsContent->children();
+                $articleContent = $newsContent;
 
                 $stopParsing = false;
                 if ($articleContent->count()) {
@@ -150,11 +169,21 @@ class Ul1 extends Aleks007smolBaseParser implements ParserInterface
     protected static function parseNode(Crawler $node, NewsPost $newPost, int $maxDepth, bool &$stopParsing, $descriptionSentences = []): void
     {
         /**
+         * Удаляем ненужный блок
+         */
+        if ($node->filter('.nd_ln_float')) {
+            $node->filter('.nd_ln_float')->each(function (Crawler $crawler) {
+                $node = $crawler->getNode(0);
+                $node->parentNode->removeChild($node);
+            });
+        }
+
+        /**
          * Пропускаем элемент, если элемент имеет определенный класс
          * @see EXCLUDE_CSS_CLASSES_PATTERN
          */
         if (self::EXCLUDE_CSS_CLASSES_PATTERN
-            && preg_match(self::EXCLUDE_CSS_CLASSES_PATTERN, $node->attr('class'))) {
+            && strpos($node->attr('class'),self::EXCLUDE_CSS_CLASSES_PATTERN) !== false) {
             return;
         }
 
@@ -178,8 +207,10 @@ class Ul1 extends Aleks007smolBaseParser implements ParserInterface
         $maxDepth--;
 
         switch ($node->nodeName()) {
-            case 'div': //запускаем рекурсивно на дочерние ноды, если есть, если нет то там обычно ненужный шлак
+            case 'div':
             case 'span':
+            case 'figure':
+            case 'strong':
                 $nodes = $node->children();
                 if ($nodes->count()) {
                     $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing) {
@@ -194,6 +225,9 @@ class Ul1 extends Aleks007smolBaseParser implements ParserInterface
                         self::parseNode($node, $newPost, $maxDepth, $stopParsing);
                     });
                 }
+                break;
+            case self::QUOTE_TAG:
+                self::parseParagraph($node, $newPost, $descriptionSentences);
                 break;
             case 'img':
                 self::parseImage($node, $newPost);
@@ -218,6 +252,15 @@ class Ul1 extends Aleks007smolBaseParser implements ParserInterface
             case 'ol':
                 self::parseUl($node, $newPost);
                 break;
+            case 'h1':
+            case 'h2':
+            case 'h3':
+            case 'h4':
+            case 'h5':
+            case 'h6':
+                $headerLevel = $node->nodeName()[1];
+                self::parseH($node, $newPost, $headerLevel);
+                break;
         }
 
     }
@@ -229,14 +272,21 @@ class Ul1 extends Aleks007smolBaseParser implements ParserInterface
      */
     protected static function parseLink(Crawler $node, NewsPost $newPost): void
     {
-        if (filter_var($node->attr('href'), FILTER_VALIDATE_URL)
-            && !stristr($node->attr('class'), 'link-more')) {
+        $href = $node->attr('href');
+
+        if (strpos($href, self::MAIN_PAGE_URI) === false) {
+            $href = self::MAIN_PAGE_URI . $href;
+        }
+
+        if (filter_var($href, FILTER_VALIDATE_URL)
+            && !stristr($node->attr('class'), 'link-more')
+            && strpos($href, '.jpg') === false) {
             $newPost->addItem(
                 new NewsPostItem(
                     NewsPostItem::TYPE_LINK,
+                    $node->text(),
                     null,
-                    null,
-                    $node->attr('href'),
+                    $href,
                     null,
                     null
                 ));
@@ -254,10 +304,13 @@ class Ul1 extends Aleks007smolBaseParser implements ParserInterface
     {
         $nodeSentences = array_map(function ($item) {
             return !empty($item) ? trim($item, "  \t\n\r\0\x0B") : false;
-        }, explode('. ', $node->text()));
+        }, explode('. ', str_replace(' ', '', Helper::prepareString($node->text()))));
 
-        if ($newPost->description == 'description') {
-            $newPost->description = implode('. ', $nodeSentences);
+        if ($newPost->description == 'description' || $newPost->description == '') {
+            if (!empty($nodeSentences)) {
+                $newPost->description = self::prepareDescription(implode('. ', $nodeSentences));
+            }
+
             return;
         }
 
@@ -330,6 +383,8 @@ class Ul1 extends Aleks007smolBaseParser implements ParserInterface
      */
     private static function prepareImage(string $imageUrl): string
     {
+        $imageUrl = str_replace(['background-image: url(', ')'], [''], $imageUrl);
+
         if (strpos($imageUrl, self::MAIN_PAGE_URI) === false) {
             $imageUrl = self::MAIN_PAGE_URI . $imageUrl;
         }
@@ -337,4 +392,33 @@ class Ul1 extends Aleks007smolBaseParser implements ParserInterface
         return str_replace(['%3A', '%2F'], [':', '/'], rawurlencode($imageUrl));
     }
 
+    private static function prepareDescription(string $description): string
+    {
+        $description = Helper::prepareString($description);
+        $description = str_replace(
+            [
+                '[&#8230;]',
+                '&#8220;',
+                '&#8211;',
+                '&#8212;',
+                '&#8230;',
+                ' появились сначала на SGPRESS - Самара, люди, события',
+                '&#171;',
+                '&#187;'
+            ],
+            [
+                '',
+                '"',
+                '—',
+                '—',
+                '…',
+                '',
+                '«',
+                '»'
+            ], $description);
+
+        return $description;
+    }
+
 }
+
