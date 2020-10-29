@@ -109,6 +109,6 @@ class Ural24ComParser extends AbstractBaseParser
             $publishedAt = DateTimeImmutable::createFromFormat('d.m.Y', $publishedAtString, new DateTimeZone('Asia/Yekaterinburg'));
         }
 
-        return $publishedAt->setTime(0, 0, 0);
+        return $publishedAt->setTimezone(new DateTimeZone('UTC'));
     }
 }
