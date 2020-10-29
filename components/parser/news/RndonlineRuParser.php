@@ -47,7 +47,7 @@ class RndonlineRuParser extends MediasferaNewsParser implements ParserInterface
     public const NEWSLIST_DATE = '//pubDate';
     public const NEWSLIST_DESC = '//description';
 
-    public const ARTICLE_IMAGE = '#top-news .news-additional-info-block img.news-photo';
+    public const ARTICLE_IMAGE = '#top-news .news-additional-info-block img[name="news-photo"]';
     public const ARTICLE_TEXT = '#top-news .news-text';
 
     protected static NewsPostWrapper $post;
