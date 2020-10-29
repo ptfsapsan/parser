@@ -30,6 +30,7 @@ class Parser
         'embed',
         'form',
         'table',
+        'noindex',
     ];
     protected $joinText = true;
 
@@ -172,6 +173,10 @@ class Parser
         $lastKey  = null;
 
         foreach ($items as $key => $item) {
+            if (empty($item)) {
+                continue;
+            }
+
             if ($lastItem
                 && NewsPostItem::TYPE_TEXT == $item['type']
                 && $item['type'] == $lastItem['type']
@@ -271,7 +276,7 @@ class Parser
     protected function filterItems(array $items)
     {
         return array_filter($items, function ($item) {
-            if (empty($item['type'])) {
+            if (empty($item)) {
                 return false;
             }
 
