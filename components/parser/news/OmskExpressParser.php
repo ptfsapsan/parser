@@ -142,12 +142,6 @@ class OmskExpressParser implements ParserInterface
             $post->image = self::normalizeUrl($imgHolder->attr("data-src"));
         }
 
-        $authHolder = $crawler->filter("div.jeg_main_content div.author_photo");
-        if ($authHolder->count() !== 0) {
-            self::addText($post, $authHolder->text());
-        }
-
-
         $body = $crawler->filter("div.jeg_main_content > div.entry-content > div.content-inner");
 
         if ($body->count() === 0) {
