@@ -62,7 +62,6 @@ class AviaReviewParser implements ParserInterface
                 continue;
             }
         }
-
         foreach ($posts as $key => $post) {
             try {
                 self::inflatePostContent($post, $curl);
@@ -150,6 +149,16 @@ class AviaReviewParser implements ParserInterface
         foreach ($body->children() as $bodyNode) {
             $node = new Crawler($bodyNode);
 
+            if ($node->matches("p") && $node->filter("img")->count() !== 0) {
+                $image = $node->filter("img");
+                $src = self::normalizeUrl(self::ROOT_SRC . $image->attr("src"));
+                if($post->image === null){
+                    $post->image = $src;
+                }else{
+                    self::addImage($post, $src);
+                }
+            }
+
             if ($node->matches("p") && !empty(trim($node->text(), "\xC2\xA0"))) {
                 if (empty($post->description)) {
                     $post->description = Helper::prepareString($node->text());
@@ -158,7 +167,6 @@ class AviaReviewParser implements ParserInterface
                 }
                 continue;
             }
-
         }
 
         $imageGallery = $crawler->filter("div.single_page_content div.gamma-container ul li noscript img");
