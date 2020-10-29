@@ -110,7 +110,7 @@ class MvestnikRuParser extends AbstractBaseParser
         ];
 
         $publishedAtString = Text::trim($this->normalizeSpaces($crawler->filterXPath('//div[contains(@class,"article_meta")]/span[contains(@class,"article_author")][1]')->text()));
-        $publishedAtString = str_replace([...$months, ',','&nbsp;'], [...array_keys($months), '', ' '], $publishedAtString);
+        $publishedAtString = str_replace([...$months, ',', '&nbsp;', 'Реклама | '], [...array_keys($months), '', ' ', ''], $publishedAtString);
 
         $publishedAt = DateTimeImmutable::createFromFormat('d m Y H:i', $publishedAtString, new DateTimeZone('Europe/Moscow'));
         $publishedAt = $publishedAt->setTimezone(new DateTimeZone('UTC'));
