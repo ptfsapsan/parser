@@ -130,7 +130,7 @@ class ZvezdaAltaiaParser implements ParserInterface
 
         $content = $crawler->filter("div.mg-blog-post-box");
 
-        $image = $crawler->filter("div.mg-blog-post-box img");
+        $image = $crawler->filter("div.mg-blog-post-box img.wp-post-image");
         if ($image->count() !== 0) {
             $post->image = self::normalizeUrl($image->attr("src"));
         }
