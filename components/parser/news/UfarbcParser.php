@@ -78,7 +78,11 @@ class UfarbcParser extends MediasferaNewsParser implements ParserInterface
 
                 $articleCrawler = new Crawler($articleContent);
 
-                self::$post->createDate = self::getNodeDate('content', $articleCrawler, self::ARTICLE_DATE);
+//                self::$post->createDate = self::getNodeDate('content', $articleCrawler, self::ARTICLE_DATE);
+
+                $date = self::getNodeData('content', $articleCrawler, self::ARTICLE_DATE);
+                self::$post->createDate = static::fixDate(str_replace('+03:00', '+05:00', $date));
+
                 self::$post->description = self::getNodeData('text', $articleCrawler, self::ARTICLE_DESC);
                 self::$post->image = self::getNodeImage('src', $articleCrawler, self::ARTICLE_IMG);
 
