@@ -113,9 +113,6 @@ class FantazyRuParser extends AbstractBaseParser
         $publishedAtString = mb_strtolower($publishedAtString);
         $publishedAtString = str_replace($months, array_keys($months), $publishedAtString);
 
-        $publishedAt = DateTimeImmutable::createFromFormat('d m Y', $publishedAtString, new DateTimeZone('UTC'));
-        $publishedAtUTC = $publishedAt->setTime(0, 0, 0);
-
-        return $publishedAtUTC;
+        return DateTimeImmutable::createFromFormat('d m Y', $publishedAtString, new DateTimeZone('UTC'));
     }
 }
