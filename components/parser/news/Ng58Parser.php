@@ -22,6 +22,7 @@ use Throwable;
 
 class Ng58Parser implements ParserInterface
 {
+    /*run*/
     public const USER_ID = 2;
     public const FEED_ID = 2;
     public const SITE_URL = 'http://ng58.ru';

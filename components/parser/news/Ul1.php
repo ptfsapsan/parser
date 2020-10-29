@@ -17,6 +17,7 @@ use Symfony\Component\DomCrawler\Crawler;
  */
 class Ul1 extends Aleks007smolBaseParser implements ParserInterface
 {
+    /*run*/
     const USER_ID = 2;
     const FEED_ID = 2;
 
@@ -82,7 +83,6 @@ class Ul1 extends Aleks007smolBaseParser implements ParserInterface
 
         $crawler = new Crawler($rss);
         $crawler->filter('rss channel item')->slice(0, self::MAX_NEWS_COUNT)->each(function ($node) use (&$curl, &$posts) {
-
             $newPost = new NewsPost(
                 self::class,
                 $node->filter('title')->text(),
@@ -114,7 +114,7 @@ class Ul1 extends Aleks007smolBaseParser implements ParserInterface
 
                 if ($mainImage->count()) {
                     if ($mainImage->attr('src')) {
-                        $newPost->image = self::MAIN_PAGE_URI . $mainImage->attr('src');
+                        $newPost->image = self::prepareImage($mainImage->attr('src'));
                     }
                 }
 

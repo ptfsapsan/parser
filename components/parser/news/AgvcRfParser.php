@@ -22,6 +22,7 @@ use Throwable;
 
 class AgvcRfParser implements ParserInterface
 {
+    /*run*/
     public const USER_ID = 2;
     public const FEED_ID = 2;
     private const SITE_URL = 'http://xn--80aec1d.xn--p1ai';

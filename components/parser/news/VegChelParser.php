@@ -24,6 +24,7 @@ use Throwable;
 
 class VegChelParser implements ParserInterface
 {
+    /*run*/
     public const USER_ID = 2;
     public const FEED_ID = 2;
     private const SITE_URL = 'http://vegchel.ru';

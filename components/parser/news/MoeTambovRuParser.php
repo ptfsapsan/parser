@@ -13,6 +13,7 @@ use Symfony\Component\DomCrawler\Crawler;
 
 class MoeTambovRuParser implements ParserInterface
 {
+    /*run*/
     use \app\components\helper\metallizzer\Cacheable;
 
     const USER_ID  = 2;

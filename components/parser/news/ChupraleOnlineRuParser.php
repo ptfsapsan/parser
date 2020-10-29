@@ -23,6 +23,7 @@ use Throwable;
 
 class ChupraleOnlineRuParser implements ParserInterface
 {
+    /*run*/
     public const USER_ID = 2;
     public const FEED_ID = 2;
     public const SITE_URL = 'http://chuprale-online.ru';

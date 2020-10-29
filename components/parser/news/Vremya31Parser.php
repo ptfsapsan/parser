@@ -23,6 +23,7 @@ use Throwable;
 
 class Vremya31Parser implements ParserInterface
 {
+    /*run*/
     public const USER_ID = 2;
     public const FEED_ID = 2;
     private const SITE_URL = 'https://vremya31.ru';

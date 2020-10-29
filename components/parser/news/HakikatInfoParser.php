@@ -22,6 +22,7 @@ use Throwable;
 
 class HakikatInfoParser implements ParserInterface
 {
+    /*run*/
     public const USER_ID = 2;
     public const FEED_ID = 2;
     private const SITE_URL = 'http://hakikat.info';

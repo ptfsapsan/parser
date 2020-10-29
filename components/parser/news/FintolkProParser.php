@@ -15,6 +15,7 @@ use Symfony\Component\DomCrawler\Crawler;
 
 class FintolkProParser implements ParserInterface
 {
+    /*run*/
     use \app\components\helper\metallizzer\Cacheable;
 
     const USER_ID  = 2;

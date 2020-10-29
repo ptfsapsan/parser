@@ -21,6 +21,7 @@ use Symfony\Component\DomCrawler\Crawler;
 
 class SutyNews extends TyRunBaseParser implements ParserInterface
 {
+    /*run*/
     const USER_ID = 2;
     const FEED_ID = 2;
 
@@ -178,8 +179,8 @@ class SutyNews extends TyRunBaseParser implements ParserInterface
                 } else {
                     $nodes = $node->children();
                     if ($nodes->count()) {
-                        $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing) {
-                            self::parseNode($node, $newPost, $maxDepth, $stopParsing);
+                        $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing, &$descriptionSentences) {
+                            self::parseNode($node, $newPost, $maxDepth, $stopParsing, $descriptionSentences);
                         });
                     }
                 }
@@ -188,8 +189,8 @@ class SutyNews extends TyRunBaseParser implements ParserInterface
             case 'p':
                 self::parseDescriptionIntersectParagraph($node, $newPost, $descriptionSentences);
                 if ($nodes = $node->children()) {
-                    $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing) {
-                        self::parseNode($node, $newPost, $maxDepth, $stopParsing);
+                    $nodes->each(function ($node) use ($newPost, $maxDepth, &$stopParsing, &$descriptionSentences) {
+                        self::parseNode($node, $newPost, $maxDepth, $stopParsing, $descriptionSentences);
                     });
                 }
                 break;
