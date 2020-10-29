@@ -72,7 +72,7 @@ class FantazyRuParser extends AbstractBaseParser
         $image = null;
         $mainImageCrawler = $contentCrawler->filterXPath('//img[1]');
         if ($this->crawlerHasNodes($mainImageCrawler)) {
-            $image = $mainImageCrawler->attr('content');
+            $image = $mainImageCrawler->attr('src');
             $this->removeDomNodes($contentCrawler, '//img[1]');
         }
 
