@@ -90,9 +90,10 @@ class Yk24Parser extends AbstractBaseParser
         $publishedAt = DateTimeImmutable::createFromFormat('d.m.Y H:i', mb_substr($publishedAtString,0,14), $timezone);
         $previewNewsItem->setPublishedAt($publishedAt->setTimezone(new DateTimeZone('UTC')));
 
-        $contentXPath = '//div[contains(@class,"ms2Gallery")]//img | //div[contains(@class,"news__content")]';
+        $contentXPath = '//div[contains(@class,"news__video")] | //div[contains(@class,"ms2Gallery")]//img | //div[contains(@class,"news__content")]';
         $contentCrawler = $newsPostCrawler->filterXPath($contentXPath);
-        $this->removeDomNodes($contentCrawler, '// img[contains(@src,"digital-3x6-1.-09-04-2020.jpg")]');
+        $this->removeDomNodes($contentCrawler, '//img[contains(@src,"digital-3x6-1.-09-04-2020.jpg")]');
+        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"btn-group")]');
 
         $this->purifyNewsPostContent($contentCrawler);
 
