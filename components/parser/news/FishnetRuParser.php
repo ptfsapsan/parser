@@ -75,7 +75,7 @@ class FishnetRuParser extends AbstractBaseParser
 
         $newsPageCrawler = new Crawler($newsPage);
 
-        $contentCrawler = $newsPageCrawler->filter('.content .boxed .body');
+        $contentCrawler = $newsPageCrawler->filterXPath('//*[contains(concat(" ",normalize-space(@class)," ")," content ")]//*[contains(concat(" ",normalize-space(@class)," ")," boxed ")]//*[contains(concat(" ",normalize-space(@class)," ")," body ")] | //*[contains(concat(" ",normalize-space(@class)," ")," content ")]//*[contains(concat(" ",normalize-space(@class)," ")," boxed ")]//*[contains(concat(" ",normalize-space(@class)," ")," tizer ")]');
 
         $image = null;
 
