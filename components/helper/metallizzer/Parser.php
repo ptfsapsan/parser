@@ -212,7 +212,9 @@ class Parser
                 $method = 'parse'.ucfirst($type);
                 $item   = $this->{$method}($node, $i);
 
-                $this->items = array_merge($this->items, [$item]);
+                if ($item) {
+                    $this->items = array_merge($this->items, [$item]);
+                }
 
                 return;
             }
@@ -239,8 +241,11 @@ class Parser
                 }
             } elseif ($node->nodeName() == '#text') {
                 $text = Text::normalizeWhitespace($node->text(null, false));
+                $item = $this->textNode($text);
 
-                $this->items = array_merge($this->items, [$this->textNode($text)]);
+                if ($item) {
+                    $this->items = array_merge($this->items, [$item]);
+                }
             }
         }
 
