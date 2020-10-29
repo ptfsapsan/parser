@@ -32,7 +32,7 @@ class KrasnoznamenskParser implements ParserInterface
         "апр." => "04",
         "мая" => "05",
         "июня" => "06",
-        "июл." => "07",
+        "июля" => "07",
         "авг." => "08",
         "сен." => "09",
         "окт." => "10",
@@ -107,10 +107,6 @@ class KrasnoznamenskParser implements ParserInterface
         $original = self::ROOT_SRC . $postData->filter("h3 a")->attr("href");
 
         $imageUrl = null;
-        $image = $postData->filter("img");
-        if ($image->count() !== 0) {
-            $imageUrl = self::ROOT_SRC . $image->attr("src");
-        }
 
         $dateString = $postData->filter("p.news-itm__date")->text();
         $dateArr = explode(" ", $dateString);
@@ -119,7 +115,7 @@ class KrasnoznamenskParser implements ParserInterface
             throw new Exception("Date format error");
         }
         if (!isset($dateArr[1]) || !isset(self::MONTHS[$dateArr[1]])) {
-            throw new Exception("Could not parse date string");
+            throw new Exception("Could not parse date string: " . $dateString);
         }
 
         $dateString = $dateArr[2] . "-" . self::MONTHS[$dateArr[1]] . "-" . $dateArr[0] . " " . $dateArr[4] . "+03:00";
@@ -156,7 +152,10 @@ class KrasnoznamenskParser implements ParserInterface
         }
 
         $crawler = new Crawler($pageData);
-
+        $picHolder = $crawler->filter("div.b-page__image img");
+        if($picHolder->count() !== 0){
+            $post->image = self::normalizeUrl(self::ROOT_SRC . $picHolder->attr("src"));
+        }
         $content = $crawler->filter("div.b-page__main");
 
         $header = $content->filter("div.b-page__start");
