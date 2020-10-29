@@ -76,7 +76,7 @@ class MorozvestRuParser extends AbstractBaseParser
         $contentCrawler = $newsPageCrawler->filter('#main .post');
 
         $image = null;
-        $mainImageCrawler = $contentCrawler->filter('meta[property="og:image"]');
+        $mainImageCrawler = $newsPageCrawler->filter('meta[property="og:image"]');
         if ($this->crawlerHasNodes($mainImageCrawler)) {
             $image = $mainImageCrawler->attr('content');
         }
