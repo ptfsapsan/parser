@@ -73,7 +73,7 @@ class StaroekrukovoRuParser extends AbstractBaseParser
         $newsPage = $this->getPageContent($uri);
         $newsPageCrawler = new Crawler($newsPage);
 
-        $contentCrawler = $newsPageCrawler->filter('#ap_news_detail_page_txt');
+        $contentCrawler = $newsPageCrawler->filterXPath('//div[contains(@id,"ap_news_detail_page_txt")] | //div[contains(@id,"ap_news_detail_page_video")]');
         $this->removeDomNodes($contentCrawler, '//h1[1]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@id,"social-buttons-div-horizontal")]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@id,"ap_news_detail_page_tags")]');
