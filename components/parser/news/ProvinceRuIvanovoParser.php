@@ -39,6 +39,7 @@ class ProvinceRuIvanovoParser extends MediasferaNewsParser implements ParserInte
     public const NEWSLIST_LINK = '//link';
     public const NEWSLIST_DATE = '//pubDate';
     public const NEWSLIST_CONTENT = '//yandex:full-text';
+    public const NEWSLIST_IMG = '//image';
 
     public const ARTICLE_BREAKPOINTS = [];
 
@@ -63,6 +64,7 @@ class ProvinceRuIvanovoParser extends MediasferaNewsParser implements ParserInte
             self::$post->title = self::getNodeData('text', $node, self::NEWSLIST_TITLE);
             self::$post->original = self::getNodeData('text', $node, self::NEWSLIST_LINK);
             self::$post->createDate = self::getNodeDate('text', $node, self::NEWSLIST_DATE);
+            self::$post->image = self::getNodeImage('text', $node, self::NEWSLIST_IMG);
 
             $content = self::getNodeData('text', $node, self::NEWSLIST_CONTENT);
 
