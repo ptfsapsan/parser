@@ -19,7 +19,7 @@ use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
 /**
- * @fullrss
+ * @rss_html
  */
 class PsyhRuParser extends MediasferaNewsParser implements ParserInterface
 {
@@ -39,6 +39,8 @@ class PsyhRuParser extends MediasferaNewsParser implements ParserInterface
     public const NEWSLIST_DATE = '//pubDate';
     public const NEWSLIST_DESC = '//description';
     public const NEWSLIST_CONTENT = '//content:encoded';
+
+    public const ARTICLE_IMAGE = '.post-image img';
 
     public const ARTICLE_BREAKPOINTS = [];
 
@@ -68,6 +70,13 @@ class PsyhRuParser extends MediasferaNewsParser implements ParserInterface
             $content = self::getNodeData('text', $node, self::NEWSLIST_CONTENT);
 
             $contentCrawler = new Crawler('<body><div>' . $content . '</div></body>');
+
+            $articleContent = self::getPage(self::$post->original);
+
+            if (!empty($articleContent)) {
+                $articleCrawler = new Crawler($articleContent);
+                self::$post->image = self::getNodeImage('src', $articleCrawler, self::ARTICLE_IMAGE);
+            }
 
             self::parse($contentCrawler->filter('body > div'));
 
