@@ -8,12 +8,12 @@ use app\components\parser\ParserInterface;
 use Exception;
 
 
-class SevpoiskSevastopoliParser implements ParserInterface
+class SevpoiskEvpatoriaParser implements ParserInterface
 {
     const USER_ID = 2;
     const FEED_ID = 2;
 
-    const FEED_SRC = "/sevastopol/";
+    const FEED_SRC = "/evpatoria/";
 
     /**
      * @return array
