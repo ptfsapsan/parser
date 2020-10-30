@@ -17,7 +17,7 @@ namespace app\components\parser\news;
 use fingli\ParserCore\ParserCore;
 use app\components\parser\ParserInterface;
 
-// CORE_XXX_Parser -> необходимо заменить на актуальное название парсера (так как называется ваш файл)
+// part 2 approved roman
 class CORE_MoyaokolicaRf_Parser extends ParserCore implements ParserInterface
 {
     const USER_ID = 2;
@@ -76,35 +76,35 @@ class CORE_MoyaokolicaRf_Parser extends ParserCore implements ParserInterface
             'list'    => [
                 // URL где находится витрина
                 // (обязательный)
-                'url'                 => 'https://xn--80apfedmab8e4d.xn--p1ai/category/important/',
+                'url'           => 'https://xn--80apfedmab8e4d.xn--p1ai/category/important/',
 
                 // css селектор для контейнера витрины
                 // (обязательный)
-                'container'           => '.col-md-9 .col-sm-12',
+                'container'     => '.col-md-9 .col-sm-12',
 
                 // css селектор для элемента витрины (относительно контейнера)
                 // (обязательный)
-                'element'             => '.post-container',
+                'element'       => '.post-container',
 
                 // css селектор !должен содержать конечный аттрибут href!  для ссылки (относительно элемента)
                 // (обязательный + должен быть обязательный атрибут, где хранится ссылка)
-                'element-link'        => '.post-item a[href]',
+                'element-link'  => '.post-item a[href]',
 
                 // css селектор для названия элемента (относительно элемента)
                 // (заполняется только, если отсутствует в карточке)
-                'element-title'       => '.post-item-content h3',
+                'element-title' => '.post-item-content h3',
 
                 // css селектор для описания элемента (относительно элемента)
                 // (заполняется только, если отсутствует в карточке)
-                'element-description' => '.post-item-content p',
+                //                'element-description' => '.post-item-content p',
 
                 // css селектор !должен содержать конечный аттрибут src! для картинки элемента (относительно элемента)
                 // (заполняется только, если отсутствует в карточке)
-                'element-image'       => '.post-item-thumb[style]',
+                'element-image' => '.post-item-thumb[style]',
 
                 // css селектор для даты элемента (относительно элемента)
                 // (заполняется только, если отсутствует в карточке)
-                'element-date'        => '.post-info',
+                'element-date'  => '.post-info',
             ],
 
             // настройка карточки элемента
@@ -142,7 +142,7 @@ class CORE_MoyaokolicaRf_Parser extends ParserCore implements ParserInterface
                 // игнорируемые css-селекторы
                 // (можно через запятую)
                 // (опционально)
-                'ignore-selectors'    => '',
+                'ignore-selectors'    => '[itemprop=articleBody] > p:first-child',
             ]
         ];
 
