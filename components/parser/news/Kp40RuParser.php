@@ -40,7 +40,6 @@ class Kp40RuParser extends MediasferaNewsParser implements ParserInterface
     public const NEWSLIST_DESC = '//description';
     public const NEWSLIST_IMAGE = '//enclosure';
 
-    public const ARTICLE_HEADER = 'h1.news-h1';
     public const ARTICLE_IMAGE = '.news-article-wrapper .news-body-img img';
     public const ARTICLE_TEXT = '.news-article-wrapper .news-body';
 
@@ -89,6 +88,11 @@ class Kp40RuParser extends MediasferaNewsParser implements ParserInterface
                 * */
                 if(!$articleCrawler->filter(self::ARTICLE_TEXT)->count()) {
                     return;
+                }
+
+                $image = self::getNodeImage('src', $articleCrawler, self::ARTICLE_IMAGE);
+                if($image) {
+                    self::$post->image = $image;
                 }
 
                 self::parse($articleCrawler->filter(self::ARTICLE_TEXT));
