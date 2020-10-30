@@ -51,13 +51,7 @@ class Media65Parser extends AbstractBaseParser
             $publishedAt = DateTimeImmutable::createFromFormat(DATE_RFC1123, $publishedAtString);
             $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
 
-            $image = null;
-            $imageCrawler = $newsPreview->filterXPath('//enclosure');
-            if ($this->crawlerHasNodes($imageCrawler)) {
-                $image = $imageCrawler->attr('url') ?: null;
-            }
-
-            $previewNewsDTOList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $title, null, $image);
+            $previewNewsDTOList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $title);
         });
 
         $previewNewsDTOList = array_slice($previewNewsDTOList, 0, $maxNewsCount);
@@ -78,18 +72,6 @@ class Media65Parser extends AbstractBaseParser
         $contentCrawler = $contentCrawler->filterXPath('//div[contains(@class,"article-text")] | //div[contains(@class,"article-text")]/following-sibling::div[contains(@class,"fotorama")]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"fheader")]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"article-subinfo__keyword")]');
-
-        $image = null;
-
-        $mainImageCrawler = $newsPageCrawler->filter('meta[property="og:image"]');
-        if ($this->crawlerHasNodes($mainImageCrawler)) {
-            $image = $mainImageCrawler->attr('content');
-        }
-
-        if ($image !== null && $image !== '') {
-            $image = $this->encodeUri(UriResolver::resolve($image, $this->getSiteUrl()));
-            $previewNewsDTO->setImage($image);
-        }
 
         if ($description && $description !== '') {
             $previewNewsDTO->setDescription($description);
