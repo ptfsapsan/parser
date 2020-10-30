@@ -172,6 +172,10 @@ class Parser
         $lastKey  = null;
 
         foreach ($items as $key => $item) {
+            if (empty($item)) {
+                continue;
+            }
+
             if ($lastItem
                 && NewsPostItem::TYPE_TEXT == $item['type']
                 && $item['type'] == $lastItem['type']
