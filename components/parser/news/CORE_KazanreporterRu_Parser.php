@@ -17,7 +17,7 @@ namespace app\components\parser\news;
 use fingli\ParserCore\ParserCore;
 use app\components\parser\ParserInterface;
 
-// CORE_XXX_Parser -> необходимо заменить на актуальное название парсера (так как называется ваш файл)
+// part 2 approved alex
 class CORE_KazanreporterRu_Parser extends ParserCore implements ParserInterface
 {
     const USER_ID = 2;
