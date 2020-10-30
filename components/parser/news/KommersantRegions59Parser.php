@@ -82,7 +82,8 @@ class KommersantRegions59Parser extends MediasferaNewsParser implements ParserIn
 
             self::$post->description = self::getNodeData('text', $articleCrawler, self::ARTICLE_DESC);
 
-            $date = str_replace('00:00:00', date('H:i:s'),self::getNodeData('content', $articleCrawler, self::ARTICLE_DATE));
+            $date = str_replace('00:00:00+03:00', date('H:i:sP'), self::getNodeData('content', $articleCrawler, self::ARTICLE_DATE));
+
             self::$post->createDate = self::fixDate($date);
 
             self::parse($articleCrawler->filter(self::ARTICLE_TEXT));
@@ -110,7 +111,8 @@ class KommersantRegions59Parser extends MediasferaNewsParser implements ParserIn
 
                 self::$post->description = self::getNodeData('text', $articleCrawler, self::ARTICLE_DESC);
 
-                $date = str_replace('00:00:00', date('H:i:s'),self::getNodeData('content', $articleCrawler, self::ARTICLE_DATE));
+                $date = str_replace('00:00:00+03:00', date('H:i:sP'),self::getNodeData('content', $articleCrawler, self::ARTICLE_DATE));
+
                 self::$post->createDate = self::fixDate($date);
 
                 self::parse($articleCrawler->filter(self::ARTICLE_TEXT));
