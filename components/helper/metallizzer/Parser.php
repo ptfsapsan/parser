@@ -30,6 +30,7 @@ class Parser
         'embed',
         'form',
         'table',
+        'noindex',
     ];
     protected $joinText = true;
 
@@ -172,7 +173,7 @@ class Parser
         $lastKey  = null;
 
         foreach ($items as $key => $item) {
-            if (empty($item['type'])) {
+            if (empty($item)) {
                 continue;
             }
 
@@ -211,7 +212,9 @@ class Parser
                 $method = 'parse'.ucfirst($type);
                 $item   = $this->{$method}($node, $i);
 
-                $this->items = array_merge($this->items, [$item]);
+                if ($item) {
+                    $this->items = array_merge($this->items, [$item]);
+                }
 
                 return;
             }
@@ -238,8 +241,11 @@ class Parser
                 }
             } elseif ($node->nodeName() == '#text') {
                 $text = Text::normalizeWhitespace($node->text(null, false));
+                $item = $this->textNode($text);
 
-                $this->items = array_merge($this->items, [$this->textNode($text)]);
+                if ($item) {
+                    $this->items = array_merge($this->items, [$item]);
+                }
             }
         }
 
@@ -275,7 +281,7 @@ class Parser
     protected function filterItems(array $items)
     {
         return array_filter($items, function ($item) {
-            if (empty($item['type'])) {
+            if (empty($item)) {
                 return false;
             }
 
