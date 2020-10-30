@@ -3,6 +3,7 @@
 namespace app\components\parser\news;
 
 use app\components\Helper;
+use app\components\helper\aayaami\DOMNodeRecursiveIterator;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
@@ -104,14 +105,14 @@ class News09Parser implements ParserInterface
         $createdAt->setTimezone(new DateTimeZone('UTC'));
         $createdAt = $createdAt->format('c');
 
-        /** Get description */
-        $description = self::cleanText($itemCrawler->filterXPath('//description')->text());
-        $description = preg_replace('/(<a.*\/a>)/', '', $description);
-
         /** Detail page parser creation */
         $curl = Helper::getCurl();
         $curlResult = $curl->get($link);
         $crawler = new Crawler($curlResult);
+
+        self::removeNodes($crawler, '
+            //comment() | //br | //hr | //script | //style | //head | //link | //meta | //form | //amp-ad
+        ');
 
         //Get image if exists
         $picture = null;
@@ -121,13 +122,24 @@ class News09Parser implements ParserInterface
             $imageBlock->parentNode->removeChild($imageBlock);
         }
 
+        /** Get description */
+        $detailPage = $crawler->filterXPath('//div[contains(@class, "entry-content")]')->getNode(0);
+        $description = [];
+        $nodeIterator = new DOMNodeRecursiveIterator($detailPage->childNodes);
+        foreach ($nodeIterator->getRecursiveIterator() as $node) {
+            $text = self::cleanText($node->textContent);
+            $description[] = $text;
+            if (! empty($node->textContent)) {
+                $node->parentNode->removeChild($node);
+            }
+            if (substr($text, -1) === '.') {
+                break;
+            }
+        }
+        $description = implode(' ', $description);
+
         /** @var NewsPost */
         $post = new NewsPost(static::class, $title, $description, $createdAt, $link, $picture);
-
-        $detailPage = $crawler->filterXPath('//div[contains(@class, "entry-content")]')->getNode(0);
-
-        self::removeNodes($crawler, '//comment()');
-        self::removeNodes($crawler, '//script');
 
         // parse detail page for texts
         foreach ($detailPage->childNodes as $node) {
