@@ -41,6 +41,8 @@ class Progorod62Parser extends MediasferaNewsParser implements ParserInterface
     public const NEWSLIST_IMG = '//enclosure';
     public const NEWSLIST_CONTENT = '//content:encoded';
 
+    public const ARTICLE_TEXT = '.article__main.article__container';
+
     public const ARTICLE_BREAKPOINTS = [
         'name' => [
             'Ext24smiWidget' => false,
@@ -97,13 +99,18 @@ class Progorod62Parser extends MediasferaNewsParser implements ParserInterface
             self::$post->description = self::getNodeData('text', $node, self::NEWSLIST_DESC);
             self::$post->image = self::getNodeData('url', $node, self::NEWSLIST_IMG);
 
-            $html = html_entity_decode(static::filterNode($node, self::NEWSLIST_CONTENT)->html());
+            $articleContent = self::getPage(self::$post->original);
 
-            $articleCrawler = new Crawler('<body><div>'.$html.'</div></body>');
+            if (!empty($articleContent)) {
 
-            static::parse($articleCrawler);
+                $articleCrawler = new Crawler($articleContent);
 
-            $posts[] = self::$post->getNewsPost();
+                $contentNode = $articleCrawler->filter(self::ARTICLE_TEXT);
+
+                self::parse($contentNode);
+
+                $posts[] = self::$post->getNewsPost();
+            }
         });
 
         return $posts;
