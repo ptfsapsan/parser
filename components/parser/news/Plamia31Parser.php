@@ -8,6 +8,7 @@ use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use DateTime;
+use DateTimeZone;
 use Exception;
 use InvalidArgumentException;
 use linslin\yii2\curl\Curl;
@@ -89,7 +90,9 @@ class Plamia31Parser implements ParserInterface
         }
 
         $title = $entityData["title"];
-        $createDate = new DateTime($entityData["created_at"]);
+        $dateStr = str_ireplace("Z", " +03:00", $entityData["created_at"]);
+        $createDate = new DateTime($dateStr);
+        $createDate->setTimezone(new DateTimeZone("UTC"));
         $description = $entityData["lead"];
         $original = $entityData["detail_url"];
         $galleryItem = array_shift($entityData["gallery"]);
