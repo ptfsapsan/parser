@@ -105,7 +105,7 @@ class CORE_PinregRu_Parser extends ParserCore implements ParserInterface
 
                     // css селектор для описания элемента
                     // (опционально)
-                    'element-description' => 'description',
+                    'element-description' => '',
 
                     // css селектор для картинки элемента
                     // (опционально)
@@ -153,7 +153,7 @@ class CORE_PinregRu_Parser extends ParserCore implements ParserInterface
                 // игнорируемые css-селекторы (будут вырезаться из результата)
                 // (можно несколько через запятую)
                 // (опционально)
-                'ignore-selectors'    => '.ya-share2',
+                'ignore-selectors'    => '.ya-share2, .gridlove-content-share',
 
                 // css-селекторы которые будут вставлятся в начало текста новости element-text (селекторы ищутся от корня)
                 // (опционально)
