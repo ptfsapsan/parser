@@ -12,6 +12,7 @@ use RuntimeException;
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\DomCrawler\UriResolver;
 use Throwable;
+use yii\web\NotFoundHttpException;
 
 class BaltnewsEeParser extends AbstractBaseParser
 {
@@ -71,8 +72,12 @@ class BaltnewsEeParser extends AbstractBaseParser
         $contentCrawler = $newsPageCrawler->filter('.main__content article');
         $this->removeDomNodes($contentCrawler, '//*[contains(@class,"article-inject")]');
 
-        $title = Text::trim($this->normalizeSpaces($contentCrawler->filter('.article-header__title')->text()));
-        $previewNewsDTO->setTitle($title);
+        try {
+            $title = Text::trim($this->normalizeSpaces($contentCrawler->filter('.article-header__title')->text()));
+            $previewNewsDTO->setTitle($title);
+        } catch (\Exception $exception) {
+            throw new NotFoundHttpException(null, null, $exception);
+        }
 
         $publishedAtString = $contentCrawler->filter('.article-header__date')->attr('datetime');
         $publishedAt = DateTimeImmutable::createFromFormat(DATE_ATOM, $publishedAtString);
