@@ -33,10 +33,11 @@ class PiterskieZametkiRuParser extends MediasferaNewsParser implements ParserInt
     public const IS_CURRENT_TIME = true;
     public const DATEFORMAT = 'd m, Y';
 
+    public const ATTR_IMAGE = 'data-lazy-src';
+
     public const NEWSLIST_POST =  'section.content article.post';
     public const NEWSLIST_TITLE = '.post-title';
     public const NEWSLIST_LINK =  '.post-title a';
-    public const NEWSLIST_IMAGE = '.leftimg img';
     public const NEWSLIST_DATE =  '.fa.fa-clock-o';
 
     public const ARTICLE_IMAGE = 'article.post .entry img';
@@ -67,7 +68,7 @@ class PiterskieZametkiRuParser extends MediasferaNewsParser implements ParserInt
 
             self::$post->title = self::getNodeData('text', $node, self::NEWSLIST_TITLE);
             self::$post->original = self::getNodeLink('href', $node, self::NEWSLIST_LINK);
-            self::$post->image = self::getNodeImage('src', $node, self::NEWSLIST_IMAGE);
+
 
             $date = $node->filter(self::NEWSLIST_DATE)->closest('li')->text();
             self::$post->createDate = self::fixDate($date);
@@ -78,6 +79,8 @@ class PiterskieZametkiRuParser extends MediasferaNewsParser implements ParserInt
             if (!empty($articleContent)) {
 
                 $articleCrawler = new Crawler($articleContent);
+
+                self::$post->image = self::getNodeImage('data-lazy-src', $articleCrawler, self::ARTICLE_IMAGE);
 
                 self::parse($articleCrawler->filter(self::ARTICLE_TEXT));
 
@@ -111,61 +114,5 @@ class PiterskieZametkiRuParser extends MediasferaNewsParser implements ParserInt
         $date = trim(str_ireplace(array_keys($replace), $replace, $date));
 
         return parent::fixDate($date);
-    }
-
-
-    protected static function parseNode(Crawler $node, ?string $filter = null) : void
-    {
-        $node = static::filterNode($node, $filter);
-
-        $nodeName = $node->nodeName();
-
-        switch ($nodeName)
-        {
-            case 'img' :
-                static::$post->itemImage = [
-                    $node->attr('alt') ?? $node->attr('title') ?? null,
-                    static::getNodeImage('data-lazy-src', $node)
-                ];
-                break;
-
-            case 'picture' :
-                if($node->filter('img')->count()) {
-                    static::$post->itemImage = [
-                        $node->filter('img')->attr('alt') ?? $node->filter('img')->attr('title') ?? null,
-                        static::getNodeImage('data-lazy-src', $node->filter('img'))
-                    ];
-                }
-                break;
-
-            case 'figure' :
-                if($node->filter('img')->count() == 1) {
-                    static::$post->itemImage = [
-                        $node->text() ?? $node->filter('img')->attr('alt') ?? $node->filter('img')->attr('title') ?? null,
-                        static::getNodeImage('data-lazy-src', $node->filter('img'))
-                    ];
-                }
-                else {
-                    static::parseSection($node);
-                }
-                break;
-
-            case 'a' :
-                if($node->filter('img')->count() == 1) {
-                    static::$post->itemImage = [
-                        $node->attr('alt') ?? $node->attr('title') ?? $node->text() ?? null,
-                        static::getNodeImage('data-lazy-src', $node->filter('img')),
-                    ];
-                }
-                else {
-                    static::$post->itemLink = [
-                        $node->text() ?? $node->attr('href'),
-                        static::getNodeLink('href', $node)
-                    ];
-                }
-                break;
-            default :
-                parent::parseNode($node, $filter);
-        }
     }
 }
