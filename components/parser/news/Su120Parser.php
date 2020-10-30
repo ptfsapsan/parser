@@ -83,6 +83,10 @@ class Su120Parser extends AbstractBaseParser
         $mainImageCrawler = $contentCrawler->filterXPath('//img[1]');
         if ($this->crawlerHasNodes($mainImageCrawler)) {
             $image = $mainImageCrawler->attr('src');
+            $imageSize = getimagesize($image);
+            if (!is_array($imageSize) || $imageSize[0] < 200 || $imageSize[1] < 200) {
+                $image = null;
+            }
             $this->removeDomNodes($contentCrawler, '//img[1]');
         }
 
