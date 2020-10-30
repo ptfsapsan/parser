@@ -54,8 +54,7 @@ class BelPobedaParser extends AbstractBaseParser
             $uri = $this->encodeUri($uri);
 
             $publishedAtString = $object['extra']['created_at'];
-            $publishedAt = DateTimeImmutable::createFromFormat('Y-m-d\TH:i:s\Z', $publishedAtString,
-                new DateTimeZone('Europe/Moscow'));
+            $publishedAt = DateTimeImmutable::createFromFormat('Y-m-d\TH:i:s\Z', $publishedAtString);
             $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
 
             $preview = $object['extra']['short_subtitle'];
