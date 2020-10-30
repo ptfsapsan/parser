@@ -14,6 +14,7 @@ namespace app\components\parser\news;
 
 use app\components\mediasfera\MediasferaNewsParser;
 use app\components\mediasfera\NewsPostWrapper;
+use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
@@ -39,7 +40,8 @@ class SovaParser extends MediasferaNewsParser implements ParserInterface
     public const NEWSLIST_DATE = '//pubDate';
     public const NEWSLIST_IMG = '//enclosure';
 
-    public const ARTICLE_TEXT = '.articleContent .generalContent .justify-content-center div:first-child';
+    public const ARTICLE_IMAGE = '.articleContent .generalContent .justify-content-center div:first-child img:last-of-type';
+    public const ARTICLE_TEXT =  '.articleContent .generalContent .justify-content-center div:first-child';
 
     public const ARTICLE_BREAKPOINTS = [
         'href' => [
@@ -79,30 +81,30 @@ class SovaParser extends MediasferaNewsParser implements ParserInterface
 
             $articleContent = self::getPage(self::$post->original);
 
-//            print_r($articleContent);
-
             if (!empty($articleContent)) {
 
                 $articleCrawler = new Crawler($articleContent);
 
+                $image = self::getNodeImage('src', $articleCrawler, self::ARTICLE_IMAGE);
+
+                if($image) {
+                    self::$post->image = $image;
+                }
+
                 self::parse($articleCrawler->filter(self::ARTICLE_TEXT));
             }
 
-            $posts[] = self::$post->getNewsPost();
+            $newsPost = self::$post->getNewsPost();
+
+            $lastKey = array_key_last($newsPost->items);
+
+            if($newsPost->items[$lastKey]->type == NewsPostItem::TYPE_TEXT && strpos($newsPost->items[$lastKey]->text, 'Фото:') === 0) {
+                unset($newsPost->items[$lastKey]);
+            }
+
+            $posts[] = $newsPost;
         });
 
         return $posts;
     }
-
-
-//    protected static function parseNode(Crawler $node, ?string $filter = null): void
-//    {
-//        $node = static::filterNode($node, $filter);
-//
-//        if(strpos($node->text(), 'Фото:') === 0) {
-//            return;
-//        }
-//
-//        parent::parseNode($node);
-//    }
 }
