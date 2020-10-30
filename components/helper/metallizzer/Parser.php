@@ -172,7 +172,7 @@ class Parser
         $lastKey  = null;
 
         foreach ($items as $key => $item) {
-            if (empty($item)) {
+            if (empty($item['type'])) {
                 continue;
             }
 
