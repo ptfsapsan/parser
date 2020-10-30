@@ -31,7 +31,6 @@ class OreltimesRuParser extends MediasferaNewsParser implements ParserInterface
     public const SITE_URL = 'https://oreltimes.ru/';
     public const NEWSLIST_URL = 'https://oreltimes.ru/feed/';
 
-    //    public const TIMEZONE = '+0000';
     public const DATEFORMAT = 'D, d M Y H:i:s O';
 
     public const NEWSLIST_POST = '//rss/channel/item';
@@ -40,6 +39,8 @@ class OreltimesRuParser extends MediasferaNewsParser implements ParserInterface
     public const NEWSLIST_DATE = '//pubDate';
     public const NEWSLIST_IMG = '//enclosure';
     public const NEWSLIST_CONTENT = '//content:encoded';
+
+    public const ARTICLE_IMAGE = 'img.attachment-post-thumbnail';
 
     public const ARTICLE_BREAKPOINTS = [];
 
@@ -67,6 +68,15 @@ class OreltimesRuParser extends MediasferaNewsParser implements ParserInterface
             $contentCrawler = new Crawler('<body><div>' . $content . '</div></body>');
 
             self::parse($contentCrawler->filter('body > div'));
+
+            $articleContent = self::getPage(self::$post->original);
+
+            if (!empty($articleContent)) {
+
+                $articleCrawler = new Crawler($articleContent);
+
+                self::$post->image = self::getNodeImage('src', $articleCrawler, self::ARTICLE_IMAGE);
+            }
 
             $posts[] = self::$post->getNewsPost();
         });
