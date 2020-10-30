@@ -105,6 +105,7 @@ class KommersantRegions36Parser extends MediasferaNewsParser implements ParserIn
 
             $articleContent = self::getPage(self::$post->original);
 
+
             if (!empty($articleContent)) {
 
                 $articleCrawler = new Crawler($articleContent);
