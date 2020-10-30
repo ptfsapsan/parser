@@ -156,6 +156,11 @@ class KlopsParser implements ParserInterface
                 if($post->image !== $src) {
                     self::addImage($post, $image->attr("src"));
                 }
+
+                $caption = $bodyContainer->filter("figcaption");
+                if($caption->count() !== 0){
+                    self::addText($post, $caption->text());
+                }
             }
             if ($bodyContainer->matches("div.text")) {
                 /** @var DOMNode $bodyNode */
@@ -172,9 +177,11 @@ class KlopsParser implements ParserInterface
                         continue;
                     }
 
-                    if ($node->matches("ol") && !empty(trim($node->text(), "\xC2\xA0"))) {
+                    if ($node->matches("ol, ul") && !empty(trim($node->text(), "\xC2\xA0"))) {
                         $node->children("li")->each(function (Crawler $liNode) use ($post) {
-                            self::addText($post, $liNode->text());
+                            if(!empty(trim($liNode->text(), "\xC2\xA0"))) {
+                                self::addText($post, $liNode->text());
+                            }
                         });
                         continue;
                     }
