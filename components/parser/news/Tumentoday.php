@@ -64,7 +64,7 @@ class Tumentoday extends TyRunBaseParser implements ParserInterface
     /**
      * Кол-во новостей, которое необходимо парсить
      */
-    const MAX_NEWS_COUNT = 30;
+    const MAX_NEWS_COUNT = 10;
 
     /**
      * @return array
