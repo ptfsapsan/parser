@@ -82,6 +82,7 @@ class DglRuParser extends AbstractBaseParser
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"ads-block")]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"hide-on-mobile")]');
         $this->removeDomNodes($contentCrawler, '//a[contains(@class,"carousel-wrapper")]');
+        $this->removeDomNodes($contentCrawler, '//a[contains(@class,"carousel-control")]');
 
         $image = null;
         $mainImageCrawler = $newsPageCrawler->filter('meta[property="og:image"]');
