@@ -17,7 +17,7 @@ namespace app\components\parser\news;
 use fingli\ParserCore\ParserCore;
 use app\components\parser\ParserInterface;
 
-// CORE_XXX_Parser -> необходимо заменить на актуальное название парсера (так как называется ваш файл)
+// part 2 approved roma
 class CORE_PropermRu_Parser extends ParserCore implements ParserInterface
 {
     const USER_ID = 2;
@@ -148,7 +148,7 @@ class CORE_PropermRu_Parser extends ParserCore implements ParserInterface
                     // css-селектор для цитаты
                     // (если не заполнено, то по умолчанию берутся теги: blockquote и q)
                     // (опционально)
-                    'element-quote'       => '',
+                    'element-quote'       => 'em',
 
                 // игнорируемые css-селекторы (будут вырезаться из результата)
                 // (можно несколько через запятую)
