@@ -64,7 +64,7 @@ class Tumentoday extends TyRunBaseParser implements ParserInterface
     /**
      * Кол-во новостей, которое необходимо парсить
      */
-    const MAX_NEWS_COUNT = 10;
+    const MAX_NEWS_COUNT = 30;
 
     /**
      * @return array
@@ -105,7 +105,12 @@ class Tumentoday extends TyRunBaseParser implements ParserInterface
                     $newPost->image = self::absoluteUrl($mainImage->first()->attr('src'));
                 }
 
-                $articleContent = $newsContent->filter(self::CONTENT_CSS_SELECTOR)->children();
+                $articleContent = $newsContent->filter(self::CONTENT_CSS_SELECTOR);
+                if (!$articleContent->count()) {
+                    return;
+                }
+
+                $articleContent = $articleContent->children();
                 $stopParsing = false;
                 if ($articleContent->count()) {
                     /**
