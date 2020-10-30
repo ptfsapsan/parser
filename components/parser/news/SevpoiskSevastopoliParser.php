@@ -35,37 +35,33 @@ class SevpoiskSevastopoliParser implements ParserInterface
     {
         $curl = Helper::getCurl();
         $posts = [];
-        $now = new DateTime();
+
         $counter = 0;
-        for ($pageId = 0; $pageId <= 10; $pageId++) {
 
+        $listSourcePath = self::ROOT_SRC . self::FEED_SRC . "/news/";
 
+        $listSourceData = $curl->get($listSourcePath);
+        if (empty($listSourceData)) {
+            throw new Exception("Получен пустой ответ от источника списка новостей: " . $listSourcePath);
+        }
 
-            $listSourcePath = self::ROOT_SRC . self::FEED_SRC .  $now->format("Y-m-d") . "/";
-
-            $listSourceData = $curl->get($listSourcePath);
-            if(empty($listSourceData)){
-                throw new Exception("Получен пустой ответ от источника списка новостей: ". $listSourcePath);
-            }
-            $now->modify("-1 day");
-            $crawler = new Crawler($listSourceData);
-            $items = $crawler->filter("div.r24_article");
-            if($items->count() === 0){
-                throw new Exception("Пустой список новостей в ленте: ". $listSourcePath);
-            }
-            foreach ($items as $newsItem) {
-                try {
-                    $node = new Crawler($newsItem);
-                    $newsPost = self::inflatePost($node);
-                    $posts[] = $newsPost;
-                    $counter++;
-                    if ($counter >= self::LIMIT) {
-                        break 2;
-                    }
-                } catch (Exception $e) {
-                    error_log($e->getMessage());
-                    continue;
+        $crawler = new Crawler($listSourceData);
+        $items = $crawler->filter("div.r24_article");
+        if ($items->count() === 0) {
+            throw new Exception("Пустой список новостей в ленте: " . $listSourcePath);
+        }
+        foreach ($items as $newsItem) {
+            try {
+                $node = new Crawler($newsItem);
+                $newsPost = self::inflatePost($node);
+                $posts[] = $newsPost;
+                $counter++;
+                if ($counter >= self::LIMIT) {
+                    break;
                 }
+            } catch (Exception $e) {
+                error_log($e->getMessage());
+                continue;
             }
         }
 
@@ -98,23 +94,10 @@ class SevpoiskSevastopoliParser implements ParserInterface
 
         $createDate = new DateTime($postData->filter("div.r24_info time")->attr("datetime"));
         $createDate->setTimezone(new DateTimeZone("UTC"));
-print_r([
-        $title,
-    $original,
-    $createDate
-]);
-exit;
+
         $imageUrl = null;
-        $image = $postData->filter("enclosure");
-        if ($image->count() !== 0) {
-            $imageUrl = self::normalizeUrl($image->attr("url"));
-        }
 
         $description = self::EMPTY_DESCRIPTION;
-        $descrHolder = $postData->filter("description");
-        if (empty($descrHolder->count() !== 0)) {
-            $description = $descrHolder->text();
-        }
 
         return new NewsPost(
             self::class,
@@ -136,7 +119,7 @@ exit;
     private static function inflatePostContent(NewsPost $post, Curl $curl)
     {
         $url = $post->original;
-        if($post->description === self::EMPTY_DESCRIPTION){
+        if ($post->description === self::EMPTY_DESCRIPTION) {
             $post->description = "";
         }
         $pageData = $curl->get($url);
@@ -146,17 +129,51 @@ exit;
 
         $crawler = new Crawler($pageData);
 
-        $body = $crawler->filter("div.ftext div.fdesc.full-text");
+        $picHolder = $crawler->filter("article div.r24_body > img");
+        if ($picHolder->count() !== 0) {
+            $post->image = self::normalizeUrl($picHolder->attr("src"));
+        }
 
-        if($body->count() === 0){
+        $body = $crawler->filter("article div.r24_body div.r24_text");
+        if ($body->children("div.ui-rss-text")->count() !== 0) {
+            $picHolder = $crawler->filter("article div.r24_body div.ui-rss-img-first img");
+            if ($picHolder->count() !== 0) {
+                $post->image = self::ROOT_SRC . self::normalizeUrl($picHolder->attr("src"));
+            }
+
+
+            $body = $crawler->filter("article div.r24_body div.r24_text div.ui-rss-text");
+        }elseif($body->children("div")->count() === 1){
+            $body = $crawler->filter("article div.r24_body div.r24_text > div");
+        }
+
+        if ($body->count() === 0) {
             throw new Exception("Не найден блок новости в полученой странице: " . $url);
         }
 
         /** @var DOMNode $bodyNode */
-        foreach ($body->children() as $bodyNode) {
+        foreach ($body->getNode(0)->childNodes as $bodyNode) {
             $node = new Crawler($bodyNode);
 
-            if ($bodyNode->nodeName === "#text" && !empty(trim($bodyNode->nodeValue, " \n\r\xC2\xA0"))) {
+            if ($node->matches("p") && $node->filter("img")->count() !== 0) {
+                $image = $node->filter("img");
+                $src = self::normalizeUrl(self::ROOT_SRC . $image->attr("src"));
+                if ($post->image === null) {
+                    $post->image = $src;
+                } else {
+                    self::addImage($post, $src);
+                }
+            }
+
+            if ($node->matches("div") && $node->filter("iframe")->count() !== 0) {
+                $videoContainer = $node->filter("iframe");
+                if ($videoContainer->count() !== 0) {
+                    self::addVideo($post, $videoContainer->attr("src"));
+                }
+            }
+
+
+            if ($bodyNode->nodeName === "#text" && !empty(trim($bodyNode->nodeValue, " \r\n\xC2\xA0\x0D\x0A\x09"))) {
                 if (empty($post->description)) {
                     $post->description = Helper::prepareString(trim($bodyNode->nodeValue));
                 } else {
@@ -165,8 +182,8 @@ exit;
                 continue;
             }
 
-            if ($node->matches("p") && !empty(trim($node->text(), "\xC2\xA0"))) {
-                if(empty($post->description)){
+            if ($node->matches("p,div") && !empty(trim($node->text(), "\xC2\xA0"))) {
+                if (empty($post->description)) {
                     $post->description = Helper::prepareString($node->text());
                 }else{
                     self::addText($post, $node->text());
@@ -174,16 +191,6 @@ exit;
                 continue;
             }
 
-
-            if ($node->matches("div") && $node->filter("img")->count() !== 0) {
-                $image = $node->filter("img");
-                $src = self::normalizeUrl(self::ROOT_SRC . $image->attr("src"));
-                if($post->image === null){
-                    $post->image = $src;
-                }else{
-                    self::addImage($post, $src);
-                }
-            }
 
             if ($node->matches("ul, ol") && !empty(trim($node->text(), "\xC2\xA0"))) {
                 $node->children("li")->each(function (Crawler $liNode) use ($post){
@@ -198,12 +205,6 @@ exit;
             }
 
 
-            if ($node->matches("div") && $node->filter("iframe")->count() !== 0) {
-                $videoContainer = $node->filter("iframe");
-                if ($videoContainer->count() !== 0) {
-                    self::addVideo($post, $videoContainer->attr("src"));
-                }
-            }
         }
 
 
@@ -259,25 +260,6 @@ exit;
         return preg_replace_callback('/[^\x21-\x7f]/', function ($match) {
             return rawurlencode($match[0]);
         }, $content);
-    }
-
-
-    /**
-     * @param NewsPost $post
-     * @param string   $content
-     * @param int      $level
-     */
-    private static function addHeader(NewsPost $post, string $content, int $level): void
-    {
-        $post->addItem(
-            new NewsPostItem(
-                NewsPostItem::TYPE_HEADER,
-                $content,
-                null,
-                null,
-                $level,
-                null
-            ));
     }
 
     /**
