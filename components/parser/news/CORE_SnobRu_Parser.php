@@ -17,7 +17,7 @@ namespace app\components\parser\news;
 use fingli\ParserCore\ParserCore;
 use app\components\parser\ParserInterface;
 
-// part 2 approved
+// part 2 approved alex
 class CORE_SnobRu_Parser extends ParserCore implements ParserInterface
 {
     const USER_ID = 2;
