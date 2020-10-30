@@ -16,7 +16,7 @@ use linslin\yii2\curl\Curl;
 use Symfony\Component\DomCrawler\Crawler;
 
 
-class NewsKalugaParser implements ParserInterface
+class NewsKalugaInfoParser implements ParserInterface
 {
     const USER_ID = 2;
     const FEED_ID = 2;
