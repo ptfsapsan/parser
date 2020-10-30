@@ -174,6 +174,16 @@ class ObzorPressParser implements ParserInterface
                 self::addHeader($post, $node->text(), 2);
                 continue;
             }
+            if ($node->matches("h3")) {
+                self::addHeader($post, $node->text(), 3);
+                continue;
+            }
+            if ($node->matches("ul, ol") && !empty(trim($node->text(), "\xC2\xA0"))) {
+                $node->children("li")->each(function (Crawler $liNode) use ($post) {
+                    self::addText($post, $liNode->text());
+                });
+                continue;
+            }
         }
     }
 
