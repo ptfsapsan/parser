@@ -97,7 +97,7 @@ class NewdayOneParser implements ParserInterface
         $createdAt = $createdAt->format('c');
 
         /** Get description */
-        $description = self::cleanText($itemCrawler->filterXPath('//yandex:full-text')->text());
+        $description = self::cleanText($itemCrawler->filterXPath('//description')->text());
 
         /** Detail page parser creation */
         $curl = Helper::getCurl();
