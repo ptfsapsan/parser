@@ -17,7 +17,7 @@ namespace app\components\parser\news;
 use fingli\ParserCore\ParserCore;
 use app\components\parser\ParserInterface;
 
-// CORE_XXX_Parser -> необходимо заменить на актуальное название парсера (так как называется ваш файл)
+// part 2 approved roma
 class CORE_NashcheremshanRu_Parser extends ParserCore implements ParserInterface
 {
     const USER_ID = 2;
@@ -153,7 +153,7 @@ class CORE_NashcheremshanRu_Parser extends ParserCore implements ParserInterface
                 // игнорируемые css-селекторы (будут вырезаться из результата)
                 // (можно несколько через запятую)
                 // (опционально)
-                'ignore-selectors'    => '.widget-any-content, .page-main__options, .page-main__rubric, h1, .page-main__publish, p.page-main__lead',
+                'ignore-selectors'    => '.widget-any-content, .page-main__options, .page-main__rubric, h1, .page-main__publish, p.page-main__lead, .page-main__text ~ p',
 
                 // css-селекторы которые будут вставлятся в начало текста новости element-text (селекторы ищутся от корня)
                 // (опционально)
