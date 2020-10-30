@@ -8,7 +8,6 @@ use app\components\helper\nai4rus\PreviewNewsDTO;
 use app\components\parser\NewsPost;
 use DateTimeImmutable;
 use DateTimeZone;
-use DOMElement;
 use RuntimeException;
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\DomCrawler\UriResolver;
@@ -24,47 +23,34 @@ class CinformRuParser extends AbstractBaseParser
         return 'http://www.cinform.ru/';
     }
 
+
     protected function getPreviewNewsDTOList(int $minNewsCount = 10, int $maxNewsCount = 100): array
     {
-        $previewNewsDTOList = [];
+        $previewList = [];
 
-        $uriPreviewPage = UriResolver::resolve('/feed', $this->getSiteUrl());
+        $uriPreviewPage = UriResolver::resolve('/?ui=desktop', $this->getSiteUrl());
 
         try {
             $previewNewsContent = $this->getPageContent($uriPreviewPage);
             $previewNewsCrawler = new Crawler($previewNewsContent);
         } catch (Throwable $exception) {
-            if (count($previewNewsDTOList) < $minNewsCount) {
+            if (count($previewList) < $minNewsCount) {
                 throw new RuntimeException('Не удалось получить достаточное кол-во новостей', null, $exception);
             }
         }
 
-        $previewNewsCrawler = $previewNewsCrawler->filterXPath('//item');
+        $previewNewsCrawler = $previewNewsCrawler->filter('.ja-bullettin li a.mostread');
 
-        $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$previewNewsDTOList, $maxNewsCount) {
-            if (count($previewNewsDTOList) >= $maxNewsCount) {
-                return;
-            }
+        $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$previewList) {
+            $title = Text::trim($this->normalizeSpaces($newsPreview->text()));
+            $uri = UriResolver::resolve($newsPreview->attr('href'), $this->getSiteUrl());
 
-            $title = $newsPreview->filterXPath('//title')->text();
-            $uri = $newsPreview->filterXPath('//link')->text();
-
-            $publishedAtString = $newsPreview->filterXPath('//pubDate')->text();
-            $publishedAt = DateTimeImmutable::createFromFormat(DATE_RFC1123, $publishedAtString);
-            $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
-
-            $image = null;
-            $imageCrawler = $newsPreview->filterXPath('//enclosure');
-            if ($this->crawlerHasNodes($imageCrawler)) {
-                $image = $imageCrawler->attr('url') ?: null;
-            }
-
-            $previewNewsDTOList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $title, null, $image);
+            $previewList[] = new PreviewNewsDTO($uri, null, $title);
         });
 
-        $previewNewsDTOList = array_slice($previewNewsDTOList, 0, $maxNewsCount);
+        $previewList = array_slice($previewList, 0, $maxNewsCount);
 
-        return $previewNewsDTOList;
+        return $previewList;
     }
 
     protected function parseNewsPage(PreviewNewsDTO $previewNewsDTO): NewsPost
@@ -76,34 +62,11 @@ class CinformRuParser extends AbstractBaseParser
 
         $newsPageCrawler = new Crawler($newsPage);
 
-        $contentCrawler = $newsPageCrawler->filter('.post .entry-content');
-        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"sharedaddy")]');
-        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"jp-relatedposts")]');
-        $this->removeDomNodes($contentCrawler, '//*[contains(@class,"wp-caption-text")]');
-        $contentCrawler->filterXPath('//img[contains(@class,"wp-image")]/parent::a')->each(function (Crawler $crawler) {
-            $imageNode = $crawler->filterXPath('//img[contains(@class,"wp-image")]')->getNode(0);
-            if ($imageNode instanceof DOMElement) {
-                $imageNode->setAttribute('src', $crawler->attr('href'));
-            }
-            $node = $crawler->getNode(0);
-            if ($node instanceof DOMElement) {
-                $node->setAttribute('href', '');
-            }
-        });
+        $publishedAtString = Text::trim($this->normalizeSpaces($newsPageCrawler->filter('.createdate')->text()));
+        $publishedAt = DateTimeImmutable::createFromFormat('d.m.Y H:i', $publishedAtString, new DateTimeZone('Europe/Moscow'));
+        $previewNewsDTO->setPublishedAt($publishedAt->setTimezone(new DateTimeZone('UTC')));
 
-        $image = null;
-        $mainImageCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"post")]//div[contains(@class,"nv-thumb-wrap")]//img[1]');
-        if ($this->crawlerHasNodes($mainImageCrawler)) {
-            $image = $mainImageCrawler->attr('src');
-            $this->removeDomNodes($newsPageCrawler, '//div[contains(@class,"post")]//div[contains(@class,"nv-thumb-wrap")]');
-        }
-
-        if ($image !== null && $image !== '') {
-            $image = UriResolver::resolve($image, $this->getSiteUrl());
-            $previewNewsDTO->setImage($image);
-        }
-
-        $description = $this->getDescriptionFromContentText($newsPageCrawler);
+        $contentCrawler = $newsPageCrawler->filter('.article-content');
 
         if ($description && $description !== '') {
             $previewNewsDTO->setDescription($description);
@@ -114,21 +77,5 @@ class CinformRuParser extends AbstractBaseParser
         $newsPostItemDTOList = $this->parseNewsPostContent($contentCrawler, $previewNewsDTO);
 
         return $this->factoryNewsPost($previewNewsDTO, $newsPostItemDTOList);
-    }
-
-    private function getDescriptionFromContentText(Crawler $crawler): ?string
-    {
-        $descriptionCrawler = $crawler->filterXPath('//p[1]/strong');
-
-        if ($this->crawlerHasNodes($descriptionCrawler)) {
-            $descriptionText = Text::trim($this->normalizeSpaces($descriptionCrawler->text()));
-
-            if ($descriptionText) {
-                $this->removeDomNodes($crawler, '//p[1]/strong');
-                return $descriptionText;
-            }
-        }
-
-        return null;
     }
 }
