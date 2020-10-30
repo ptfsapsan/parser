@@ -27,7 +27,7 @@ class BloknotAnnaParser implements ParserInterface
     public const SITE_URL = 'http://bloknot-anna.ru';
 
     /** @var array */
-    protected static $parsedEntities = ['a', 'img', 'blockquote'];
+    protected static $parsedEntities = ['a', 'img', 'blockquote', 'iframe'];
 
     /**
      * @inheritDoc
@@ -158,6 +158,27 @@ class BloknotAnnaParser implements ParserInterface
             $imageLink = UriResolver::resolve($imageLink, static::SITE_URL);
 
             $post->addItem(new NewsPostItem(NewsPostItem::TYPE_IMAGE, $node->getAttribute('alt'), $imageLink));
+            return;
+        }
+
+        //Get videos from text
+        if (self::isVideoType($node)) {
+            $link = self::cleanUrl($node->getAttribute('src'));
+            if ($link && $link !== '') {
+                if ($ytVideoId = self::getYoutubeVideoId($link)) {
+                    $post->addItem(new NewsPostItem(NewsPostItem::TYPE_VIDEO, null, null, null, null, $ytVideoId));
+                    return;
+                }
+                if (! preg_match('/http[s]?/', $link)) {
+                    $link = UriResolver::resolve($link, static::SITE_URL);
+                }
+                if (preg_match('/vk\.com/', $link)) {
+                    $link = preg_replace('/^(\/\/)(.*)/', 'https://$2', html_entity_decode($link));
+                }
+                if (filter_var($link, FILTER_VALIDATE_URL)) {
+                    $post->addItem(new NewsPostItem(NewsPostItem::TYPE_LINK, null, null, $link));
+                }
+            }
             return;
         }
 
@@ -313,6 +334,23 @@ class BloknotAnnaParser implements ParserInterface
     }
 
     /**
+     * Function check if node is video
+     * 
+     * @param DOMNode
+     * 
+     * @return bool
+     */
+    protected static function isVideoType(DOMNode $node): bool
+    {
+        return 
+            isset($node->tagName) === true && 
+            in_array(
+                $node->tagName,
+                ['iframe', 'video']
+            );
+    }
+
+    /**
      * Function check if node is #text
      * 
      * @param DOMNode
@@ -322,6 +360,24 @@ class BloknotAnnaParser implements ParserInterface
     protected static function isText(DOMNode $node): bool
     {
         return $node->nodeName === '#text';
+    }
+
+    /**
+     * Function parse's out youtube video id from link
+     * 
+     * @param string $link
+     * 
+     * @return string|null
+     */
+    protected static function getYoutubeVideoId(string $link): ?string
+    {
+        preg_match(
+            '/(youtu\.be\/|youtube\.com\/(watch\?(.*&)?v=|(embed|v)\/))([\w-]{11})/iu',
+            $link,
+            $matches
+        );
+
+        return $matches[5] ?? null;
     }
 
     /**
