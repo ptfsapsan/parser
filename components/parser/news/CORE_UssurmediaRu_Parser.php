@@ -17,7 +17,7 @@ namespace app\components\parser\news;
 use fingli\ParserCore\ParserCore;
 use app\components\parser\ParserInterface;
 
-// CORE_XXX_Parser -> необходимо заменить на актуальное название парсера (так как называется ваш файл)
+// part 2 approved roma
 class CORE_UssurmediaRu_Parser extends ParserCore implements ParserInterface
 {
     const USER_ID = 2;
@@ -105,7 +105,7 @@ class CORE_UssurmediaRu_Parser extends ParserCore implements ParserInterface
 
                     // css селектор для описания элемента
                     // (опционально)
-                    'element-description' => 'description',
+//                    'element-description' => 'description',
 
                     // css селектор для картинки элемента
                     // (опционально)
@@ -138,7 +138,7 @@ class CORE_UssurmediaRu_Parser extends ParserCore implements ParserInterface
 
                     // css селектор для описания элемента
                     // (опционально)
-                    'element-description' => '',
+                    'element-description' => '.fn-descr',
 
                     // css селектор для получения картинки
                     // !должен содержать конечный аттрибут src! (например: img.main-image[src])
