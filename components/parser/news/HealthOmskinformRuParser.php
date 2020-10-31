@@ -53,7 +53,7 @@ class HealthOmskinformRuParser extends AbstractBaseParser
                 $preview = $this->crawlerHasNodes($preview) ? Text::trim(strip_tags($this->normalizeSpaces($preview->text()))) : null;
 
                 $publishedAtString = Text::trim($newsPreview->filter('.n_text .n_date')->text());
-                $publishedAt = DateTimeImmutable::createFromFormat('d.m.y H:i', $publishedAtString, new DateTimeZone('Asia/Yekaterinburg'));
+                $publishedAt = DateTimeImmutable::createFromFormat('d.m.y H:i', $publishedAtString, new DateTimeZone('Asia/Omsk'));
                 $publishedAt = $publishedAt->setTimezone(new DateTimeZone('UTC'));
 
                 $previewList[] = new PreviewNewsDTO($uri, $publishedAt, $title, $preview);
