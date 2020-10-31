@@ -8,6 +8,7 @@ use app\components\helper\nai4rus\PreviewNewsDTO;
 use app\components\parser\NewsPost;
 use DateTimeImmutable;
 use DateTimeZone;
+use DOMElement;
 use RuntimeException;
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\DomCrawler\UriResolver;
@@ -104,6 +105,33 @@ class ArgayashComParser extends AbstractBaseParser
         $newsPostItemDTOList = $this->parseNewsPostContent($contentCrawler, $previewNewsDTO);
 
         return $this->factoryNewsPost($previewNewsDTO, $newsPostItemDTOList);
+    }
+
+    protected function getImageLinkFromNode(DOMElement $node): string
+    {
+        $nodeSrcSet = $node->getAttribute('srcset');
+        if ($nodeSrcSet) {
+            $images = array_map('trim', explode(',', $nodeSrcSet));
+            $regex = "/\s\d+([wh])$/";
+            usort($images, static function (string $a, string $b) use ($regex) {
+                $clearVar = static function (string $var) use ($regex): int {
+                    preg_match($regex, $var, $var);
+                    return (int)trim($var[0], ' wh');
+                };
+                $aInt = $clearVar($a);
+                $bInt = $clearVar($b);
+
+                if ($aInt === $bInt) {
+                    return 0;
+                }
+
+                return $bInt > $aInt ? 1 : -1;
+            });
+
+            return preg_replace($regex, '', $images[0]);
+        }
+
+        return $node->getAttribute('src');
     }
 
     protected function getDescriptionFromContentText(Crawler $crawler): ?string
