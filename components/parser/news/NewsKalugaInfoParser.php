@@ -151,6 +151,10 @@ class NewsKalugaInfoParser implements ParserInterface
         foreach ($body->children() as $bodyNode) {
             $node = new Crawler($bodyNode);
 
+            if(mb_stripos(trim($node->text()), "Тем временем") === 0){
+                break;
+            }
+
             if ($node->matches("p") && $node->filter("img")->count() !== 0) {
                 $image = $node->filter("img");
                 $src = self::normalizeUrl($image->attr("src"));
