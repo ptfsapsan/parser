@@ -4,10 +4,13 @@ namespace app\components\parser\news;
 
 use app\components\helper\metallizzer\Text;
 use app\components\helper\nai4rus\AbstractBaseParser;
+use app\components\helper\nai4rus\NewsPostItemDTO;
 use app\components\helper\nai4rus\PreviewNewsDTO;
 use app\components\parser\NewsPost;
 use DateTimeImmutable;
 use DateTimeZone;
+use DOMElement;
+use DOMNode;
 use RuntimeException;
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\DomCrawler\UriResolver;
@@ -86,7 +89,7 @@ class ZnamenkaInfoParser extends AbstractBaseParser
 
         if ($image !== null && $image !== '') {
             $image = UriResolver::resolve($image, $uri);
-            $previewNewsDTO->setImage($this->encodeUri($image));
+            $previewNewsDTO->setImage($image);
         }
 
         if ($description && $description !== '') {
@@ -98,5 +101,64 @@ class ZnamenkaInfoParser extends AbstractBaseParser
         $newsPostItemDTOList = $this->parseNewsPostContent($contentCrawler, $previewNewsDTO);
 
         return $this->factoryNewsPost($previewNewsDTO, $newsPostItemDTOList);
+    }
+
+    protected function searchLinkNewsItem(DOMNode $node, PreviewNewsDTO $newsPostDTO): ?NewsPostItemDTO
+    {
+        if ($this->isImageType($node)) {
+            return null;
+        }
+
+        if ($node->nodeName === '#text' || !$this->isLink($node)) {
+            $parentNode = $this->getRecursivelyParentNode($node, function (DOMNode $parentNode) {
+                $isLink = $this->isLink($parentNode);
+
+                if ($this->getRootContentNodeStorage()->contains($parentNode) && !$isLink) {
+                    return null;
+                }
+
+                return $isLink;
+            });
+            $node = $parentNode ?: $node;
+        }
+
+
+        if (!$node instanceof DOMElement || !$this->isLink($node)) {
+            return null;
+        }
+
+        $link = UriResolver::resolve($node->getAttribute('href'), $newsPostDTO->getUri());
+        if ($link === null) {
+            return null;
+        }
+
+        if ($this->getNodeStorage()->contains($node)) {
+            throw new RuntimeException('Тег уже сохранен');
+        }
+
+        $linkText = null;
+
+        if ($this->hasText($node) && trim($node->textContent, " /\t\n\r\0\x0B") !== trim($link, " /\t\n\r\0\x0B")) {
+            $linkText = $this->normalizeSpaces($node->textContent);
+        }
+
+        $newsPostItem = null;
+        if (str_contains($node->getAttribute('class'), 'fancybox')) {
+            foreach ($node->childNodes as $childNode) {
+                if (!$childNode instanceof DOMElement || !$childNode->tagName === 'img') {
+                    continue;
+                }
+                $childNode->setAttribute('src', $node->getAttribute('href'));
+                $node->setAttribute('href', '');
+                return null;
+            }
+        }
+
+        $newsPostItem = NewsPostItemDTO::createLinkItem($link, $linkText);
+
+        $this->getNodeStorage()->attach($node, $newsPostItem);
+        $this->removeParentsFromStorage($node->parentNode);
+
+        return $newsPostItem;
     }
 }
