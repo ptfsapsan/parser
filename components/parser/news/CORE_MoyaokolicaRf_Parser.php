@@ -43,7 +43,7 @@ class CORE_MoyaokolicaRf_Parser extends ParserCore implements ParserInterface
             'site'    => [
                 // протокол и домен
                 // (обязательный)
-                'url'         => 'https://мояоколица.рф',
+                'url'         => 'https://xn--80apfedmab8e4d.xn--p1ai',
 
                 // использовать юзер-агенты в http запросах.
                 // (опционально)
@@ -76,7 +76,7 @@ class CORE_MoyaokolicaRf_Parser extends ParserCore implements ParserInterface
             'list'    => [
                 // URL где находится витрина
                 // (обязательный)
-                'url'           => 'https://xn--80apfedmab8e4d.xn--p1ai/category/important/',
+                'url'           => '/category/important/',
 
                 // css селектор для контейнера витрины
                 // (обязательный)
