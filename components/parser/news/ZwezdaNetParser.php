@@ -6,6 +6,7 @@ use app\components\helper\metallizzer\Text;
 use app\components\helper\nai4rus\AbstractBaseParser;
 use app\components\helper\nai4rus\PreviewNewsDTO;
 use app\components\parser\NewsPost;
+use DOMElement;
 use RuntimeException;
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\DomCrawler\UriResolver;
@@ -64,7 +65,8 @@ class ZwezdaNetParser extends AbstractBaseParser
 
         $newsPageCrawler = new Crawler($newsPage);
 
-        $contentCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"field-name-body")] | //div[contains(@class,"field-name-field-body-summary")]');
+        $contentCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"field-name-body")] | //div[contains(@class,"field-name-field-body-summary")] | //div[contains(@class,"field-name-field-article-images")]');
+
         $this->removeDomNodes($contentCrawler, '//*[contains(@class,"rteright")]');
 
         $image = null;
@@ -89,5 +91,11 @@ class ZwezdaNetParser extends AbstractBaseParser
         $newsPostItemDTOList = $this->parseNewsPostContent($contentCrawler, $previewNewsDTO);
 
         return $this->factoryNewsPost($previewNewsDTO, $newsPostItemDTOList);
+    }
+
+    protected function getImageLinkFromNode(DOMElement $node): string
+    {
+        $src = $node->getAttribute('src');
+        return preg_replace('/styles\/\d+x\d+\/public\//', '', $src);
     }
 }
