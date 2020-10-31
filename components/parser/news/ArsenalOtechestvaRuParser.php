@@ -2,11 +2,14 @@
 
 namespace app\components\parser\news;
 
+use app\components\helper\metallizzer\Text;
 use app\components\helper\nai4rus\AbstractBaseParser;
+use app\components\helper\nai4rus\NewsPostItemDTO;
 use app\components\helper\nai4rus\PreviewNewsDTO;
 use app\components\parser\NewsPost;
 use DateTimeImmutable;
 use DateTimeZone;
+use DOMNode;
 use RuntimeException;
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\DomCrawler\UriResolver;
@@ -85,6 +88,13 @@ class ArsenalOtechestvaRuParser extends AbstractBaseParser
             $image = $mainImageCrawler->attr('src');
             $this->removeDomNodes($contentCrawler, '//img[1]');
         }
+        if (str_contains($uri, 'aviadarts-2020-chast-2')) {
+            $descriptionCrawler = $contentCrawler->filterXPath('//div[@dir="auto"][2]');
+            if ($this->crawlerHasNodes($descriptionCrawler)) {
+                $description = Text::trim($this->normalizeSpaces($descriptionCrawler->text()));
+                $this->removeDomNodes($contentCrawler, '//div[@dir="auto"][2]');
+            }
+        }
 
         if ($image !== null && $image !== '') {
             $image = $this->encodeUri(UriResolver::resolve($image, $this->getSiteUrl()));
@@ -101,4 +111,49 @@ class ArsenalOtechestvaRuParser extends AbstractBaseParser
 
         return $this->factoryNewsPost($previewNewsDTO, $newsPostItemDTOList);
     }
+
+    protected function parseDOMNode(DOMNode $node, PreviewNewsDTO $newsPostDTO): ?NewsPostItemDTO
+    {
+        try {
+            $newsPostItem = $this->searchImageNewsItem($node, $newsPostDTO);
+            if ($newsPostItem) {
+                return $newsPostItem;
+            }
+
+            $newsPostItem = $this->searchQuoteNewsItem($node);
+            if ($newsPostItem) {
+                return $newsPostItem;
+            }
+
+            $newsPostItem = $this->searchHeadingNewsItem($node);
+            if ($newsPostItem) {
+                return $newsPostItem;
+            }
+
+            $newsPostItem = $this->searchLinkNewsItem($node, $newsPostDTO);
+            if ($newsPostItem) {
+                return $newsPostItem;
+            }
+
+            $newsPostItem = $this->searchYoutubeVideoNewsItem($node);
+            if ($newsPostItem) {
+                return $newsPostItem;
+            }
+
+            $newsPostItem = $this->searchTextNewsItem($node);
+            if ($newsPostItem) {
+                return $newsPostItem;
+            }
+
+
+            if ($node->nodeName === 'br') {
+                $this->removeParentsFromStorage($node->parentNode);
+                return null;
+            }
+        } catch (RuntimeException $exception) {
+            return null;
+        }
+        return null;
+    }
+
 }
