@@ -78,7 +78,7 @@ class NedraDvRuParser extends AbstractBaseParser
         }
 
         try {
-            $publishedAtString = $newsPostCrawler->filterXPath('//header//li');
+            $publishedAtString = $newsPostCrawler->filterXPath('//header//li')->text();
             $publishedAtArray = explode(' ', $publishedAtString);
             $publishedAtArray[1] = $this->RuMonthToFormat($publishedAtArray[1]);
             $publishedAtString = implode(' ', $publishedAtArray);
