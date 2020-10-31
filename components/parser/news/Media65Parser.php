@@ -69,7 +69,7 @@ class Media65Parser extends AbstractBaseParser
         $newsPageCrawler = new Crawler($newsPage);
 
         $contentCrawler = $newsPageCrawler->filterXPath('//div[@itemtype="http://schema.org/NewsArticle"]');
-        $contentCrawler = $contentCrawler->filterXPath('//div[contains(@class,"article-text")] | //div[contains(@class,"article-text")]/following-sibling::div[contains(@class,"fotorama")]');
+        $contentCrawler = $contentCrawler->filterXPath('//div[contains(@class,"article-text")] | //div[contains(@class,"article-photo")] | //div[contains(@class,"article-text")]/following-sibling::div[contains(@class,"fotorama")]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"fheader")]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"article-subinfo__keyword")]');
 
