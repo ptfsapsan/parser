@@ -195,6 +195,19 @@ class TosnoVestnikParser implements ParserInterface
                 self::addHeader($post, $node->text(), 2);
                 continue;
             }
+
+            if ($node->matches("div") && !empty(trim($node->text(), "\xC2\xA0"))) {
+                $node->children()->each(function (Crawler $liNode) use ($post) {
+                    if ($liNode->matches("p") && !empty(trim($liNode->text(), "\xC2\xA0"))) {
+                        if (empty($post->description)) {
+                            $post->description = Helper::prepareString($liNode->text());
+                        } else {
+                            self::addText($post, $liNode->text());
+                        }
+                    }
+                });
+                continue;
+            }
         }
     }
 
