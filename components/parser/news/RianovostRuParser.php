@@ -53,7 +53,7 @@ class RianovostRuParser implements ParserInterface
         $tz = new DateTimeZone('Europe/Moscow');
         $dt = new DateTime($item->filter('[itemprop="datePublished"]')->first()->attr('datetime'), $tz);
 
-        $image = $page->filter('.wp-block-image img');
+        $image = $page->filter('.featured-image img');
 
         $post = new NewsPost(
             self::class,

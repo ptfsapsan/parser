@@ -212,7 +212,9 @@ class Parser
                 $method = 'parse'.ucfirst($type);
                 $item   = $this->{$method}($node, $i);
 
-                $this->items = array_merge($this->items, [$item]);
+                if ($item) {
+                    $this->items = array_merge($this->items, [$item]);
+                }
 
                 return;
             }
@@ -239,8 +241,11 @@ class Parser
                 }
             } elseif ($node->nodeName() == '#text') {
                 $text = Text::normalizeWhitespace($node->text(null, false));
+                $item = $this->textNode($text);
 
-                $this->items = array_merge($this->items, [$this->textNode($text)]);
+                if ($item) {
+                    $this->items = array_merge($this->items, [$item]);
+                }
             }
         }
 
@@ -386,10 +391,22 @@ class Parser
         }
 
         $quote = $node->filter($this->glued['quote'])->first();
+        $pairs = [
+            '/<\s*\/?\s*br\s*>/i'                         => PHP_EOL,
+            '/(\s*\/\s*(li|div|p)\s*>)(<\s*(\2)(\s|>))/i' => '\\1'.PHP_EOL.'\\3',
+        ];
+
+        if ($html = $quote->html()) {
+            $text = strip_tags(preg_replace(array_keys($pairs), array_values($pairs), $html));
+        } else {
+            $text = $quote->text(null, false);
+        }
+
+        $text = Text::normalizeWhitespace($text);
 
         return [
             'type'        => NewsPostItem::TYPE_QUOTE,
-            'text'        => Text::normalizeWhitespace($quote->text(null, false)),
+            'text'        => $text,
             'image'       => null,
             'link'        => null,
             'headerLevel' => null,
@@ -426,6 +443,10 @@ class Parser
 
         if (!preg_match('/^(?:(?:(?<proto>https?|ftp):)?\/)?\//i', $link->attr('href'))) {
             return $this->textNode($text ?: $link->attr('href'));
+        }
+
+        if ($url && $text === $url) {
+            $text = null;
         }
 
         return [
