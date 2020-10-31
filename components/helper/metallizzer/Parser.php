@@ -433,6 +433,10 @@ class Parser
             return $this->textNode($text ?: $link->attr('href'));
         }
 
+        if ($url && $text === $url) {
+            $text = null;
+        }
+
         return [
             'type'        => $type,
             'text'        => $text,
