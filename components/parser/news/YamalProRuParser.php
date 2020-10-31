@@ -79,10 +79,10 @@ class YamalProRuParser extends AbstractBaseParser
             $previewNewsItem->setImage(UriResolver::resolve($image, $uri));
         }
 
-        $descriptionCrawler = $newsPostCrawler->filterXPath('//h5[1]');
+        $descriptionCrawler = $newsPostCrawler->filterXPath('//strong[not(child::*)][child::text()]');
         if ($this->crawlerHasNodes($descriptionCrawler) && $descriptionCrawler->text() !== '') {
             $previewNewsItem->setDescription($descriptionCrawler->text());
-            $this->removeDomNodes($newsPostCrawler, '//h5[1]');
+            $this->removeDomNodes($newsPostCrawler, '//strong[not(child::*)][child::text()]');
         }
 
         // $contentCrawler = $newsPostCrawler->filterXPath('//*[@class="omc-date-time"][last()]/following-sibling::*');
