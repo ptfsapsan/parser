@@ -13,21 +13,21 @@ use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\DomCrawler\UriResolver;
 use Throwable;
 
-class AcademInfoParser extends AbstractBaseParser
+class TochkaPressParser extends AbstractBaseParser
 {
     public const USER_ID = 2;
     public const FEED_ID = 2;
 
     protected function getSiteUrl(): string
     {
-        return 'https://academ.info/';
+        return 'https://tochka.press/';
     }
 
     protected function getPreviewNewsDTOList(int $minNewsCount = 10, int $maxNewsCount = 100): array
     {
         $previewNewsDTOList = [];
 
-        $uriPreviewPage = UriResolver::resolve('/rss.xml', $this->getSiteUrl());
+        $uriPreviewPage = UriResolver::resolve('/category/news/feed/', $this->getSiteUrl());
 
         try {
             $previewNewsContent = $this->getPageContent($uriPreviewPage);
@@ -47,7 +47,6 @@ class AcademInfoParser extends AbstractBaseParser
 
             $title = $newsPreview->filterXPath('//title')->text();
             $uri = $newsPreview->filterXPath('//link')->text();
-            $uri = str_replace('http://academ.info', 'http://m.academ.info', $uri);
 
             $publishedAtString = $newsPreview->filterXPath('//pubDate')->text();
             $publishedAt = DateTimeImmutable::createFromFormat(DATE_RFC1123, $publishedAtString);
@@ -71,31 +70,37 @@ class AcademInfoParser extends AbstractBaseParser
     {
         $description = $previewNewsDTO->getDescription();
         $uri = $previewNewsDTO->getUri();
+        $uri = rawurldecode($uri);
 
         $newsPage = $this->getPageContent($uri);
+
         $newsPageCrawler = new Crawler($newsPage);
 
+        $contentCrawler = $newsPageCrawler->filter('#main article.post .entry-content');
+        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"mistape_caption")]');
+        $this->removeDomNodes($contentCrawler, '//*[contains(text(),"реклама в TZ")]/ancestor::p');
+        $this->removeDomNodes($contentCrawler, '//p[@class="has-small-font-size"]');
+
         $image = null;
-        $mainImageCrawler = $newsPageCrawler->filterXPath('//article/a/img[1]');
+
+        $mainImageCrawler = $newsPageCrawler->filter('meta[property="og:image"]');
         if ($this->crawlerHasNodes($mainImageCrawler)) {
-            $image = $mainImageCrawler->attr('src');
-            $this->removeDomNodes($newsPageCrawler, '//article/a/img[1]/parent::a');
-            $this->removeDomNodes($newsPageCrawler, '//article/a/img[1]');
+            $image = $mainImageCrawler->attr('content');
         }
 
         if ($image !== null && $image !== '') {
-            $image = UriResolver::resolve($image, $this->getSiteUrl());
-            $previewNewsDTO->setImage($this->encodeUri($image));
+            $image = $this->encodeUri(UriResolver::resolve($image, $this->getSiteUrl()));
+            $previewNewsDTO->setImage($image);
         }
 
-        $description = $this->getDescriptionFromContentText($newsPageCrawler);
-        $this->removeDomNodes($newsPageCrawler, '//div[contains(@class,"author")]/following-sibling::*');
-        $this->removeDomNodes($newsPageCrawler, '//div[contains(@class,"author")]');
-        $this->removeDomNodes($newsPageCrawler, '//a[contains(text(),"Обсуждение на Форуме Академгородка")]/parent::p');
-        $this->removeDomNodes($newsPageCrawler, '//p[contains(text(),"Обсуждение на Форуме Академгородка")]');
-        $this->removeDomNodes($newsPageCrawler, '//span[contains(text(),"Изображение носит иллюстрационный")]/parent::p');
-
-        $contentCrawler = $newsPageCrawler->filter('article > p');
+        $descriptionCrawler = $contentCrawler->filterXPath('//p[contains(@class,"has-medium-font-size")][1]/strong');
+        if ($this->crawlerHasNodes($descriptionCrawler)) {
+            $descriptionText= Text::trim($this->normalizeSpaces($descriptionCrawler->text()));
+            if ($descriptionText) {
+                $description = $descriptionText;
+                $this->removeDomNodes($contentCrawler, '//p[1]');
+            }
+        }
 
         if ($description && $description !== '') {
             $previewNewsDTO->setDescription($description);
@@ -106,22 +111,5 @@ class AcademInfoParser extends AbstractBaseParser
         $newsPostItemDTOList = $this->parseNewsPostContent($contentCrawler, $previewNewsDTO);
 
         return $this->factoryNewsPost($previewNewsDTO, $newsPostItemDTOList);
-    }
-
-    private function getDescriptionFromContentText(Crawler $crawler): ?string
-    {
-        $descriptionCrawler = $crawler->filterXPath('//div[contains(@class,"lead")]');
-
-        if ($this->crawlerHasNodes($descriptionCrawler)) {
-            $descriptionText = Text::trim($this->normalizeSpaces($descriptionCrawler->text()));
-
-            if ($descriptionText) {
-                $this->removeDomNodes($crawler, '//div[contains(@class,"lead")]/preceding-sibling::*');
-                $this->removeDomNodes($crawler, '//div[contains(@class,"lead")]');
-                return $descriptionText;
-            }
-        }
-
-        return null;
     }
 }

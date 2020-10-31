@@ -2,32 +2,58 @@
 
 namespace app\components\parser\news;
 
-use app\components\helper\metallizzer\Text;
 use app\components\helper\nai4rus\AbstractBaseParser;
 use app\components\helper\nai4rus\PreviewNewsDTO;
 use app\components\parser\NewsPost;
 use DateTimeImmutable;
 use DateTimeZone;
+use linslin\yii2\curl\Curl;
 use RuntimeException;
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\DomCrawler\UriResolver;
 use Throwable;
+use yii\web\NotFoundHttpException;
 
-class AcademInfoParser extends AbstractBaseParser
+class IrktorgnewsRuParser extends AbstractBaseParser
 {
     public const USER_ID = 2;
     public const FEED_ID = 2;
 
     protected function getSiteUrl(): string
     {
-        return 'https://academ.info/';
+        return 'https://irktorgnews.ru';
     }
+
+    public function parse(int $minNewsCount = 10, int $maxNewsCount = 50): array
+    {
+        $previewList = $this->getPreviewNewsDTOList($minNewsCount, $maxNewsCount);
+
+        $newsList = [];
+
+        /** @var PreviewNewsDTO $newsPostDTO */
+        foreach ($previewList as $key => $newsPostDTO) {
+            try {
+                $newsList[] = $this->parseNewsPage($newsPostDTO);
+            } catch (NotFoundHttpException $exception) {
+                continue;
+            }
+            $this->getNodeStorage()->removeAll($this->getNodeStorage());
+
+            if ($key % $this->getPageCountBetweenDelay() === 0) {
+                usleep($this->getMicrosecondsDelay());
+            }
+        }
+
+        $this->getCurl()->reset();
+        return $newsList;
+    }
+
 
     protected function getPreviewNewsDTOList(int $minNewsCount = 10, int $maxNewsCount = 100): array
     {
         $previewNewsDTOList = [];
 
-        $uriPreviewPage = UriResolver::resolve('/rss.xml', $this->getSiteUrl());
+        $uriPreviewPage = UriResolver::resolve('/rss', $this->getSiteUrl());
 
         try {
             $previewNewsContent = $this->getPageContent($uriPreviewPage);
@@ -47,7 +73,6 @@ class AcademInfoParser extends AbstractBaseParser
 
             $title = $newsPreview->filterXPath('//title')->text();
             $uri = $newsPreview->filterXPath('//link')->text();
-            $uri = str_replace('http://academ.info', 'http://m.academ.info', $uri);
 
             $publishedAtString = $newsPreview->filterXPath('//pubDate')->text();
             $publishedAt = DateTimeImmutable::createFromFormat(DATE_RFC1123, $publishedAtString);
@@ -73,29 +98,28 @@ class AcademInfoParser extends AbstractBaseParser
         $uri = $previewNewsDTO->getUri();
 
         $newsPage = $this->getPageContent($uri);
+
         $newsPageCrawler = new Crawler($newsPage);
 
-        $image = null;
-        $mainImageCrawler = $newsPageCrawler->filterXPath('//article/a/img[1]');
-        if ($this->crawlerHasNodes($mainImageCrawler)) {
-            $image = $mainImageCrawler->attr('src');
-            $this->removeDomNodes($newsPageCrawler, '//article/a/img[1]/parent::a');
-            $this->removeDomNodes($newsPageCrawler, '//article/a/img[1]');
+        $contentCrawler = $newsPageCrawler->filterXPath('//div[contains(@id,"content")]//table[contains(@class,"contentpaneopen")][2]');
+        $this->removeDomNodes($contentCrawler, '//table[contains(@class,"contentpaneopen")]//tr[1]');
+        $this->removeDomNodes($contentCrawler, '//table[contains(@class,"contentpaneopen")]//tr[1]');
+        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"ad-injection-block")]/following-sibling::*');
+        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"ad-injection-block")]');
+
+        if (!$previewNewsDTO->getImage()) {
+            $image = null;
+            $mainImageCrawler = $contentCrawler->filterXPath('//img[1]');
+            if ($this->crawlerHasNodes($mainImageCrawler)) {
+                $image = $mainImageCrawler->attr('src');
+                $this->removeDomNodes($contentCrawler, '//img[1]');
+            }
+
+            if ($image !== null && $image !== '') {
+                $image = $this->encodeUri(UriResolver::resolve($image, $this->getSiteUrl()));
+                $previewNewsDTO->setImage($this->encodeUri($image));
+            }
         }
-
-        if ($image !== null && $image !== '') {
-            $image = UriResolver::resolve($image, $this->getSiteUrl());
-            $previewNewsDTO->setImage($this->encodeUri($image));
-        }
-
-        $description = $this->getDescriptionFromContentText($newsPageCrawler);
-        $this->removeDomNodes($newsPageCrawler, '//div[contains(@class,"author")]/following-sibling::*');
-        $this->removeDomNodes($newsPageCrawler, '//div[contains(@class,"author")]');
-        $this->removeDomNodes($newsPageCrawler, '//a[contains(text(),"Обсуждение на Форуме Академгородка")]/parent::p');
-        $this->removeDomNodes($newsPageCrawler, '//p[contains(text(),"Обсуждение на Форуме Академгородка")]');
-        $this->removeDomNodes($newsPageCrawler, '//span[contains(text(),"Изображение носит иллюстрационный")]/parent::p');
-
-        $contentCrawler = $newsPageCrawler->filter('article > p');
 
         if ($description && $description !== '') {
             $previewNewsDTO->setDescription($description);
@@ -108,20 +132,19 @@ class AcademInfoParser extends AbstractBaseParser
         return $this->factoryNewsPost($previewNewsDTO, $newsPostItemDTOList);
     }
 
-    private function getDescriptionFromContentText(Crawler $crawler): ?string
+    protected function checkResponseCode(Curl $curl): void
     {
-        $descriptionCrawler = $crawler->filterXPath('//div[contains(@class,"lead")]');
+        $responseInfo = $curl->getInfo();
 
-        if ($this->crawlerHasNodes($descriptionCrawler)) {
-            $descriptionText = Text::trim($this->normalizeSpaces($descriptionCrawler->text()));
+        $httpCode = $responseInfo['http_code'] ?? null;
+        $uri = $responseInfo['url'] ?? null;
 
-            if ($descriptionText) {
-                $this->removeDomNodes($crawler, '//div[contains(@class,"lead")]/preceding-sibling::*');
-                $this->removeDomNodes($crawler, '//div[contains(@class,"lead")]');
-                return $descriptionText;
-            }
+        if ($httpCode === 404) {
+            throw new NotFoundHttpException("Страница не найдена {$uri}");
         }
 
-        return null;
+        if ($httpCode < 200 || $httpCode >= 400) {
+            throw new RuntimeException("Не удалось скачать страницу {$uri}, код ответа {$httpCode}");
+        }
     }
 }

@@ -2,32 +2,34 @@
 
 namespace app\components\parser\news;
 
-use app\components\helper\metallizzer\Text;
 use app\components\helper\nai4rus\AbstractBaseParser;
+use app\components\helper\nai4rus\NewsPostItemDTO;
 use app\components\helper\nai4rus\PreviewNewsDTO;
 use app\components\parser\NewsPost;
 use DateTimeImmutable;
 use DateTimeZone;
+use DOMElement;
+use DOMNode;
 use RuntimeException;
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\DomCrawler\UriResolver;
 use Throwable;
 
-class AcademInfoParser extends AbstractBaseParser
+class SevernayaPravdaRfParser extends AbstractBaseParser
 {
     public const USER_ID = 2;
     public const FEED_ID = 2;
 
     protected function getSiteUrl(): string
     {
-        return 'https://academ.info/';
+        return 'https://xn--80aaafcmcb6evaidf6r.xn--p1ai/';
     }
 
     protected function getPreviewNewsDTOList(int $minNewsCount = 10, int $maxNewsCount = 100): array
     {
         $previewNewsDTOList = [];
 
-        $uriPreviewPage = UriResolver::resolve('/rss.xml', $this->getSiteUrl());
+        $uriPreviewPage = UriResolver::resolve('/?yandex_feed=news', $this->getSiteUrl());
 
         try {
             $previewNewsContent = $this->getPageContent($uriPreviewPage);
@@ -47,7 +49,6 @@ class AcademInfoParser extends AbstractBaseParser
 
             $title = $newsPreview->filterXPath('//title')->text();
             $uri = $newsPreview->filterXPath('//link')->text();
-            $uri = str_replace('http://academ.info', 'http://m.academ.info', $uri);
 
             $publishedAtString = $newsPreview->filterXPath('//pubDate')->text();
             $publishedAt = DateTimeImmutable::createFromFormat(DATE_RFC1123, $publishedAtString);
@@ -73,29 +74,25 @@ class AcademInfoParser extends AbstractBaseParser
         $uri = $previewNewsDTO->getUri();
 
         $newsPage = $this->getPageContent($uri);
+
         $newsPageCrawler = new Crawler($newsPage);
 
+        $contentCrawler = $newsPageCrawler->filter('#main .post');
+
         $image = null;
-        $mainImageCrawler = $newsPageCrawler->filterXPath('//article/a/img[1]');
+
+        $mainImageCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"entry-thumbnail")]/img[1]');
         if ($this->crawlerHasNodes($mainImageCrawler)) {
             $image = $mainImageCrawler->attr('src');
-            $this->removeDomNodes($newsPageCrawler, '//article/a/img[1]/parent::a');
-            $this->removeDomNodes($newsPageCrawler, '//article/a/img[1]');
+            $this->removeDomNodes($contentCrawler, '//div[contains(@class,"entry-thumbnail")]');
         }
 
         if ($image !== null && $image !== '') {
-            $image = UriResolver::resolve($image, $this->getSiteUrl());
-            $previewNewsDTO->setImage($this->encodeUri($image));
+            $image = $this->encodeUri(UriResolver::resolve($image, $this->getSiteUrl()));
+            $previewNewsDTO->setImage($image);
         }
 
-        $description = $this->getDescriptionFromContentText($newsPageCrawler);
-        $this->removeDomNodes($newsPageCrawler, '//div[contains(@class,"author")]/following-sibling::*');
-        $this->removeDomNodes($newsPageCrawler, '//div[contains(@class,"author")]');
-        $this->removeDomNodes($newsPageCrawler, '//a[contains(text(),"Обсуждение на Форуме Академгородка")]/parent::p');
-        $this->removeDomNodes($newsPageCrawler, '//p[contains(text(),"Обсуждение на Форуме Академгородка")]');
-        $this->removeDomNodes($newsPageCrawler, '//span[contains(text(),"Изображение носит иллюстрационный")]/parent::p');
-
-        $contentCrawler = $newsPageCrawler->filter('article > p');
+        $contentCrawler = $contentCrawler->filter('.entry-content-block .entry-content');
 
         if ($description && $description !== '') {
             $previewNewsDTO->setDescription($description);
@@ -108,20 +105,67 @@ class AcademInfoParser extends AbstractBaseParser
         return $this->factoryNewsPost($previewNewsDTO, $newsPostItemDTOList);
     }
 
-    private function getDescriptionFromContentText(Crawler $crawler): ?string
+    protected function searchImageNewsItem(DOMNode $node, PreviewNewsDTO $newsPostDTO): ?NewsPostItemDTO
     {
-        $descriptionCrawler = $crawler->filterXPath('//div[contains(@class,"lead")]');
+        $isPicture = $this->isPictureType($node);
 
-        if ($this->crawlerHasNodes($descriptionCrawler)) {
-            $descriptionText = Text::trim($this->normalizeSpaces($descriptionCrawler->text()));
+        if (!$node instanceof DOMElement || (!$this->isImageType($node) && !$isPicture)) {
+            return null;
+        }
 
-            if ($descriptionText) {
-                $this->removeDomNodes($crawler, '//div[contains(@class,"lead")]/preceding-sibling::*');
-                $this->removeDomNodes($crawler, '//div[contains(@class,"lead")]');
-                return $descriptionText;
+        if ($node->hasAttribute('srcset')) {
+            $imageLink = $node->getAttribute('srcset');
+            $images = array_map('trim', explode(',', $imageLink) ?: []);
+            usort($images, function (string $a, string $b) {
+                preg_match('/\s\d+w$/', $a, $a);
+                preg_match('/\s\d+w$/', $b, $b);
+                $a = (int)$a[0];
+                $b = (int)$b[0];
+                if ($a === $b) {
+                    return 0;
+                }
+                return $a < $b ? 1 : -1;
+            });
+            $imageLink = count($images) ? array_values($images)[0] : [];
+            $imageLink = preg_replace('/\s\d+w$/', '', $imageLink);
+            $imageLink = $this->encodeUri(rawurldecode($imageLink));
+        }
+
+        if (empty($imageLink) || !$imageLink) {
+            $imageLink = $node->getAttribute('src');
+        }
+
+        if ($isPicture) {
+            if ($this->getNodeStorage()->contains($node->parentNode)) {
+                throw new RuntimeException('Тег уже сохранен');
+            }
+
+            $pictureCrawler = new Crawler($node->parentNode);
+            $imgCrawler = $pictureCrawler->filterXPath('//img');
+
+            if ($imgCrawler->count()) {
+                $imageLink = $imgCrawler->first()->attr('src');
             }
         }
 
-        return null;
+        if ($imageLink === '' || mb_stripos($imageLink, 'data:') === 0) {
+            return null;
+        }
+
+        $imageLink = UriResolver::resolve($imageLink, $newsPostDTO->getUri());
+        if ($imageLink === null) {
+            return null;
+        }
+
+        $alt = $node->getAttribute('alt');
+        $alt = $alt !== '' ? $alt : null;
+
+        $newsPostItem = NewsPostItemDTO::createImageItem($imageLink, $alt);
+
+        if ($isPicture) {
+            $this->getNodeStorage()->attach($node->parentNode, $newsPostItem);
+        }
+
+        return $newsPostItem;
     }
 }
