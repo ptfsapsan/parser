@@ -130,7 +130,8 @@ class EerRuParser implements ParserInterface
         
         $description = html_entity_decode($description);
         
-        $newsPostCrawler = $newsPageCrawler->filterXPath('//div[@property="content:encoded"]');
+        $newsPostCrawler = $newsPageCrawler->filterXPath('//div[contains(concat(" ",normalize-space(@class)," ")," field-name-field-mt-subheader-body ")]
+        | //div[@property="content:encoded"]');
 
         $imageNode = $newsPageCrawler->filterXPath('//meta[@property="og:image"]');
         if ($this->crawlerHasNodes($imageNode)) {
@@ -264,7 +265,7 @@ class EerRuParser implements ParserInterface
             $node = $parentNode ?: $node;
         }
 
-        if ((!$this->isQuoteType($node) || !$this->hasText($node)) && !preg_match('/(^“.+”$)|(^[«"].*[»"].*\.)|(-.*[,] - .*\.)/m', $node->textContent)) {
+        if (!$this->isQuoteType($node) || !$this->hasText($node)) {
             return null;
         }
 
