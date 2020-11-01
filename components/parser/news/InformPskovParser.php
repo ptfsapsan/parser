@@ -70,15 +70,6 @@ class InformPskovParser extends AbstractBaseParser
         $newsPageCrawler = new Crawler($newsPage);
         $newsPostCrawler = $newsPageCrawler->filterXPath('//article');
 
-        $image = null;
-        $mainImageCrawler = $newsPageCrawler->filterXPath('//meta[@property="og:image"]');
-        if ($this->crawlerHasNodes($mainImageCrawler)) {
-            $image = $mainImageCrawler->attr('content');
-        }
-        if ($image !== null && $image !== '') {
-            $previewNewsItem->setImage(UriResolver::resolve($image, $uri));
-        }
-
         $contentCrawler = $newsPostCrawler;
         $this->removeDomNodes($contentCrawler, '//h1 | //time | //span[@class="author"]');
         $this->removeDomNodes($contentCrawler, '//span[contains(@class,"image-span")]');
