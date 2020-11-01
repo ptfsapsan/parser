@@ -87,7 +87,7 @@ class Yk24Parser extends AbstractBaseParser
 
         $timezone = new DateTimeZone('Asia/Yakutsk');
         $publishedAtString = $newsPostCrawler->filterXPath('//div[contains(@class,"news__label")]')->text();
-        $publishedAt = DateTimeImmutable::createFromFormat('d.m.Y H:i', mb_substr($publishedAtString,0,14), $timezone);
+        $publishedAt = DateTimeImmutable::createFromFormat('d.m.y H:i', mb_substr($publishedAtString,0,14), $timezone);
         $previewNewsItem->setPublishedAt($publishedAt->setTimezone(new DateTimeZone('UTC')));
 
         $contentXPath = '//div[contains(@class,"news__video")] | //div[contains(@class,"ms2Gallery")]//img | //div[contains(@class,"news__content")]';
