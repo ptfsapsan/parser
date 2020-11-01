@@ -33,6 +33,12 @@ class Parser
         'noindex',
     ];
     protected $joinText = true;
+    protected $newLine;
+
+    public function __construct()
+    {
+        $this->newLine = '#'.implode('#', [uniqid(), 'NEW', uniqid(), 'LINE', uniqid()]).'#';
+    }
 
     public static function flatten(array $blocks)
     {
@@ -155,6 +161,29 @@ class Parser
             });
         }
 
+        $node->filter('br')->each(function (Crawler $crawler) {
+            foreach ($crawler as $node) {
+                $doc = $node->ownerDocument;
+
+                if ($doc && $node->parentNode) {
+                    $node->parentNode->replaceChild($doc->createTextNode($this->newLine), $node);
+                }
+            }
+        });
+
+        $node->filter('p,ul li,ol li,div')->each(function (Crawler $crawler, $i) {
+            foreach ($crawler as $node) {
+                if ($doc = $node->ownerDocument) {
+                    if ($node->nodeName == 'li' && $node->parentNode && $node->hasChildNodes()) {
+                        $index = ($node->parentNode->nodeName == 'ul') ? '• ' : ++$i.'. ';
+                        $node->insertBefore($doc->createTextNode($index), $node->childNodes->item(0));
+                    }
+
+                    $node->appendChild($doc->createTextNode($this->newLine));
+                }
+            }
+        });
+
         $this->glued = array_map(function ($v) {
             return implode(',', $v);
         }, $this->selectors);
@@ -244,6 +273,13 @@ class Parser
                 $item = $this->textNode($text);
 
                 if ($item) {
+                    try {
+                        if ($node->parents()->closest($this->glued['quote'])) {
+                            $item['type'] = NewsPostItem::TYPE_QUOTE;
+                        }
+                    } catch (Exception $e) {
+                    }
+
                     $this->items = array_merge($this->items, [$item]);
                 }
             }
@@ -280,7 +316,13 @@ class Parser
 
     protected function filterItems(array $items)
     {
-        return array_filter($items, function ($item) {
+        return array_filter(array_map(function ($item) {
+            if (!empty($item['text'])) {
+                $item['text'] = str_replace($this->newLine, PHP_EOL, $item['text']);
+            }
+
+            return $item;
+        }, $items), function ($item) {
             if (empty($item)) {
                 return false;
             }
@@ -391,22 +433,10 @@ class Parser
         }
 
         $quote = $node->filter($this->glued['quote'])->first();
-        $pairs = [
-            '/<\s*\/?\s*br\s*>/i'                         => PHP_EOL,
-            '/(\s*\/\s*(li|div|p)\s*>)(<\s*(\2)(\s|>))/i' => '\\1'.PHP_EOL.'\\3',
-        ];
-
-        if ($html = $quote->html()) {
-            $text = strip_tags(preg_replace(array_keys($pairs), array_values($pairs), $html));
-        } else {
-            $text = $quote->text(null, false);
-        }
-
-        $text = Text::normalizeWhitespace($text);
 
         return [
             'type'        => NewsPostItem::TYPE_QUOTE,
-            'text'        => $text,
+            'text'        => Text::normalizeWhitespace($quote->text(null, false)),
             'image'       => null,
             'link'        => null,
             'headerLevel' => null,
