@@ -64,7 +64,7 @@ class TvComParser extends AbstractBaseParser
         $newsPage = $this->getPageContent($uri);
 
         $newsPageCrawler = new Crawler($newsPage);
-        $newsPostCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"main-content")]//div[@class="text-block"]');
+        $newsPostCrawler = $newsPageCrawler->filterXPath('//iframe[contains(@class,"video_wrapper")]/parent::* | //div[contains(@class,"main-content")]//div[@class="text-block"]');
 
         $mainImageCrawler = $newsPostCrawler->filterXPath('//img')->first();
         if ($this->crawlerHasNodes($mainImageCrawler)) {
