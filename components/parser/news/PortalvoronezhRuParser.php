@@ -2,9 +2,12 @@
 
 namespace app\components\parser\news;
 
+use app\components\Helper;
 use app\components\helper\nai4rus\AbstractBaseParser;
+use app\components\helper\nai4rus\NewsPostItemDTO;
 use app\components\helper\nai4rus\PreviewNewsDTO;
 use app\components\parser\NewsPost;
+use app\components\parser\NewsPostItem;
 use DateTimeImmutable;
 use DateTimeZone;
 use RuntimeException;
@@ -95,6 +98,12 @@ class PortalvoronezhRuParser extends AbstractBaseParser
         $this->purifyNewsPostContent($contentCrawler);
 
         $newsPostItemDTOList = $this->parseNewsPostContent($contentCrawler, $previewNewsDTO);
+        /** @var NewsPostItemDTO $item */
+        foreach ($newsPostItemDTOList as $item) {
+            if ($item->getType() === NewsPostItem::TYPE_TEXT && !Helper::prepareString($item->getText())) {
+                $item->setText(htmlentities($item->getText()));
+            }
+        }
 
         return $this->factoryNewsPost($previewNewsDTO, $newsPostItemDTOList);
     }
