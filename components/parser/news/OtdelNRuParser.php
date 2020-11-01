@@ -98,9 +98,6 @@ class OtdelNRuParser extends AbstractBaseParser
 
         $contentCrawler = $newsPostCrawler;
 
-        $this->removeDomNodes($contentCrawler, '//*[contains(text(), "Фото:")]
-        | //div[@class="entry-content"]//p[last()]/following-sibling::*');
-
         $this->purifyNewsPostContent($contentCrawler);
 
         $newsPostItemDTOList = $this->parseNewsPostContent($contentCrawler, $previewNewsItem);
