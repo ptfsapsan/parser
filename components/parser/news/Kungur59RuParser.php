@@ -83,7 +83,8 @@ class Kungur59RuParser extends AbstractBaseParser
 
         $removeSelector = '//a[img]
         | //p[@class="text-left"]
-        | //p[count(text()) = 0][last()]/following-sibling::*';
+        | //*[following-sibling::a[contains(@href, "hashtag")]][last()]/following-sibling::*
+        | //a[contains(@href, "hashtag")]';
         $hasNodesToRemove = $this->crawlerHasNodes($contentCrawler->filterXPath($removeSelector));
         if ($hasNodesToRemove) {
             $this->removeDomNodes($contentCrawler, $removeSelector);
