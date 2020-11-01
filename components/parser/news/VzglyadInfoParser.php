@@ -71,9 +71,9 @@ class VzglyadInfoParser extends AbstractBaseParser
         $newsPostCrawler = $newsPageCrawler->filterXPath('//article');
 
         $image = null;
-        $mainImageCrawler = $newsPageCrawler->filterXPath('//meta[@property="og:image"]')->first();
+        $mainImageCrawler = $newsPageCrawler->filterXPath('//div[@class="td-post-featured-image"]//a')->first();
         if ($this->crawlerHasNodes($mainImageCrawler)) {
-            $image = $mainImageCrawler->attr('content');
+            $image = $mainImageCrawler->attr('href');
         }
         if ($image !== null && $image !== '') {
             $previewNewsItem->setImage(UriResolver::resolve($image, $uri));
