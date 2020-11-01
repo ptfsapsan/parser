@@ -96,4 +96,10 @@ class RegCommentParser extends AbstractBaseParser
 
         return $this->factoryNewsPost($previewNewsDTO, $newsPostItemDTOList);
     }
+
+    protected function normalizeSpaces(string $string): string
+    {
+        $string = preg_replace('/[\r\n\pC]/u', '', $string);
+        return preg_replace('/(\s+|⠀+)/u', ' ', $string);
+    }
 }
