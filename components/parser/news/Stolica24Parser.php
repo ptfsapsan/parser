@@ -78,7 +78,10 @@ class Stolica24Parser extends AbstractBaseParser
             $previewNewsDTO->setImage(Helper::encodeUrl($image));
         }
 
-        $previewNewsDTO->setDescription(null);
+        $descriptionCrawler = $newsPostCrawler->filterXPath('//div[contains(@class,"detail-entry__lid")]');
+        if ($this->crawlerHasNodes($descriptionCrawler) && $descriptionCrawler->text() !== '') {
+            $previewNewsDTO->setDescription($descriptionCrawler->text());
+        }
 
         $contentCrawler = $newsPostCrawler->filterXPath('//div[@class="detail-entry__text"]');
 
