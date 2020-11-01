@@ -71,9 +71,10 @@ class YartsevoRuParser extends AbstractBaseParser
         $newsPostCrawler = $newsPageCrawler->filterXPath('//div[@class="news__content"]');
 
         $image = null;
-        $mainImageCrawler = $newsPageCrawler->filterXPath('//meta[@property="og:image"]')->first();
+        $mainImageCrawler = $newsPostCrawler->filterXPath('//a/img')->first();
         if ($this->crawlerHasNodes($mainImageCrawler)) {
-            $image = $mainImageCrawler->attr('content');
+            $image = $mainImageCrawler->attr('src');
+            $this->removeDomNodes($newsPostCrawler, '//a[child::img]');
         }
         if ($image !== null && $image !== '') {
             $previewNewsItem->setImage(UriResolver::resolve($image, $uri));
