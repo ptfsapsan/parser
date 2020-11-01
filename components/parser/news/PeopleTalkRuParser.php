@@ -83,6 +83,15 @@ class PeopleTalkRuParser extends AbstractBaseParser
         // if ($this->crawlerHasNodes($descriptionCrawler) && $descriptionCrawler->text() !== '') {
         //     $previewNewsItem->setDescription($descriptionCrawler->text());
         // }
+
+        $sliders = $newsPostCrawler->filterXPath('//figure//a');
+        if ($this->crawlerHasNodes($sliders)) {
+            $sliders->each(function(Crawler $crawlerNode) {
+                $node = $crawlerNode->getNode(0);
+                $node->setAttribute('href', null);
+            });
+        }
+
         
         $contentCrawler = $newsPostCrawler;
 
