@@ -7,6 +7,7 @@ use app\components\helper\nai4rus\PreviewNewsDTO;
 use app\components\parser\NewsPost;
 use DateTimeImmutable;
 use DateTimeZone;
+use DOMElement;
 use linslin\yii2\curl\Curl;
 use RuntimeException;
 use Symfony\Component\DomCrawler\Crawler;
@@ -99,4 +100,15 @@ class ItcrumbsParser extends AbstractBaseParser
 
         return $curl;
     }
+
+    protected function getImageLinkFromNode(DOMElement $node): string
+    {
+        $dataSrc = $node->getAttribute('data-src');
+        if($dataSrc !== '' && $dataSrc !== null){
+            return $dataSrc;
+        }
+
+        return $node->getAttribute('src');
+    }
+
 }
