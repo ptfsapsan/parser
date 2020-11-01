@@ -8,6 +8,7 @@ use app\components\helper\nai4rus\PreviewNewsDTO;
 use app\components\parser\NewsPost;
 use DateTimeImmutable;
 use DateTimeZone;
+use DOMElement;
 use RuntimeException;
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\DomCrawler\UriResolver;
@@ -71,7 +72,7 @@ class AntennaDailyParser extends AbstractBaseParser
         $mainImageCrawler = $newsPageCrawler->filterXPath('//span[contains(@class,"image-element")]//img')->first();
         if ($this->crawlerHasNodes($mainImageCrawler)) {
             $image = $mainImageCrawler->attr('src');
-            $this->removeDomNodes($newsPageCrawler,'//span[contains(@class,"image-element")]');
+            $this->removeDomNodes($newsPageCrawler, '//span[contains(@class,"image-element")]');
         }
         if ($image !== null && $image !== '') {
             $image = UriResolver::resolve($image, $uri);
@@ -82,13 +83,26 @@ class AntennaDailyParser extends AbstractBaseParser
 
         $contentCrawler = $newsPostCrawler;
 
-        $this->removeDomNodes($contentCrawler,'//div[@class="sharedaddy sd-sharing-enabled"]');
-        $this->removeDomNodes($contentCrawler,'//div[@class="google-auto-placed ap_container"]');
+        $this->removeDomNodes($contentCrawler, '//div[@class="sharedaddy sd-sharing-enabled"]');
+        $this->removeDomNodes($contentCrawler, '//div[@class="google-auto-placed ap_container"]');
+        $this->removeDomNodes($contentCrawler, '//noscript');
 
         $this->purifyNewsPostContent($contentCrawler);
 
         $newsPostItemDTOList = $this->parseNewsPostContent($contentCrawler, $previewNewsDTO);
 
         return $this->factoryNewsPost($previewNewsDTO, $newsPostItemDTOList);
+    }
+
+    protected function getImageLinkFromNode(DOMElement $node): string
+    {
+        if ($node->hasAttribute('data-orig-file')) {
+            $src = $node->getAttribute('data-orig-file');
+            if ($src !== '' && $src !== null) {
+                return $src;
+            }
+        }
+
+        return $node->getAttribute('src');
     }
 }
