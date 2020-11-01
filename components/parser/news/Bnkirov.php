@@ -87,10 +87,13 @@ class Bnkirov extends Aleks007smolBaseParser implements ParserInterface
             } catch (Exception $exception) {
                 $enclosure = null;
             }
+
+            $description = self::prepareDescription($node->filter('description')->text());
+
             $newPost = new NewsPost(
                 self::class,
                 $node->filter('title')->text(),
-                self::prepareDescription($node->filter('description')->text()),
+                $description ?: 'description',
                 self::stringToDateTime($node->filter('pubDate')->text()),
                 $node->filter('link')->text(),
                 $enclosure ? self::prepareImage($enclosure) : null
@@ -114,6 +117,18 @@ class Bnkirov extends Aleks007smolBaseParser implements ParserInterface
                     $createDate = (new Crawler($newsContent))->filter('.c-date')->text();
                     $newPost->createDate = DateTime::createFromFormat('d.m.Y H:i O', $createDate . ' +0800')
                         ->setTimezone(new DateTimeZone('UTC'));
+                }
+
+                if ($newPost->description == 'description' || $newPost->description == '') {
+                    /**
+                     * Описание новости
+                     */
+                    $description = (new Crawler($newsContent))->filter('.new--body__text-title b');
+                    if ($description->count()) {
+                        if ($description->text()) {
+                            $newPost->description = $description->text();
+                        }
+                    }
                 }
 
                 /**
@@ -317,10 +332,9 @@ class Bnkirov extends Aleks007smolBaseParser implements ParserInterface
 
         if ($newPost->description == 'description' || $newPost->description == '') {
             if (!empty($nodeSentences)) {
-                $newPost->description = self::prepareDescription(implode('. ', $nodeSentences));
+                $newPost->description = $nodeSentences[0] . '.';
             }
-
-            return;
+            unset($nodeSentences[0]);
         }
 
         $intersect = array_intersect($nodeSentences, $descriptionSentences);
