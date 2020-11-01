@@ -3,6 +3,7 @@
 namespace app\components\parser\news;
 
 use app\components\helper\nai4rus\AbstractBaseParser;
+use app\components\helper\nai4rus\NewsPostItemDTO;
 use app\components\helper\nai4rus\PreviewNewsDTO;
 use app\components\parser\NewsPost;
 use DateTimeImmutable;
@@ -68,7 +69,7 @@ class UfaCityNewsParser extends AbstractBaseParser
         $newsPage = $this->getPageContent($uri);
 
         $newsPageCrawler = new Crawler($newsPage);
-        $newsPostCrawler = $newsPageCrawler;
+        $newsPostCrawler = $newsPageCrawler->filterXPath('//section[contains(@class,"b-post")]');
 
         $image = null;
         $mainImageCrawler = $newsPageCrawler->filterXPath('//div[@itemtype="http://schema.org/ImageObject"]/img')->first();
@@ -80,11 +81,24 @@ class UfaCityNewsParser extends AbstractBaseParser
         }
 
         $contentCrawler = $newsPostCrawler->filterXPath('//div[contains(@class,"b-post__text")]');
-        $this->removeDomNodes($contentCrawler,'//div[contains(@class,"video_advert")]');
+        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"video_advert")]');
 
         $this->purifyNewsPostContent($contentCrawler);
 
         $newsPostItemDTOList = $this->parseNewsPostContent($contentCrawler, $previewNewsItem);
+
+        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"b-post__text")]');
+
+        $sliderImages = [];
+        $newsPostCrawler->filterXPath('//div[contains(@class,"b-gallery__slide")]/img')
+            ->each(function (Crawler $crawler) use (&$sliderImages) {
+                $src = $crawler->attr('src');
+                if ($src !== null && $src !== '') {
+                    $sliderImages[] = NewsPostItemDTO::createImageItem(UriResolver::resolve($src, $this->getSiteUrl()));
+                }
+            });
+
+        $newsPostItemDTOList = array_merge($newsPostItemDTOList, $sliderImages);
 
         return $this->factoryNewsPost($previewNewsItem, $newsPostItemDTOList);
     }
