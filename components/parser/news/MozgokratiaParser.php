@@ -79,7 +79,7 @@ class MozgokratiaParser extends AbstractBaseParser
             $previewNewsItem->setImage(UriResolver::resolve($image, $uri));
         }
 
-        $contentCrawler = $newsPostCrawler->filterXPath('//div[contains(@class,"post-content")]');
+        $contentCrawler = $newsPostCrawler->filterXPath('//div[contains(@class,"entry-video")] | //div[contains(@class,"post-content")]');
         $this->removeDomNodes($contentCrawler,'//h4[contains(text(),"Поделиться ссылкой:")]/following-sibling::*');
         $this->removeDomNodes($contentCrawler,'//h4[contains(text(),"Поделиться ссылкой:")]');
 
