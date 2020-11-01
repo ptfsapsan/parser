@@ -49,6 +49,7 @@ class FishnetRuParser extends AbstractBaseParser
 
             $publishedAtString = $newsPreview->filterXPath('//pubDate')->text();
             $publishedAt = DateTimeImmutable::createFromFormat(DATE_RFC1123, $publishedAtString);
+            $publishedAt = $publishedAt->setDate($publishedAt->format('Y') + 2000, $publishedAt->format('m'), $publishedAt->format('d'));
             $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
 
             $image = null;
