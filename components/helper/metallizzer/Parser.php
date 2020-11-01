@@ -426,22 +426,10 @@ class Parser
         }
 
         $quote = $node->filter($this->glued['quote'])->first();
-        $pairs = [
-            '/<\s*\/?\s*br\s*>/i'                         => PHP_EOL,
-            '/(\s*\/\s*(li|div|p)\s*>)(<\s*(\2)(\s|>))/i' => '\\1'.PHP_EOL.'\\3',
-        ];
-
-        if ($html = $quote->html()) {
-            $text = strip_tags(preg_replace(array_keys($pairs), array_values($pairs), $html));
-        } else {
-            $text = $quote->text(null, false);
-        }
-
-        $text = Text::normalizeWhitespace($text);
 
         return [
             'type'        => NewsPostItem::TYPE_QUOTE,
-            'text'        => $text,
+            'text'        => Text::normalizeWhitespace($quote->text(null, false)),
             'image'       => null,
             'link'        => null,
             'headerLevel' => null,
