@@ -88,6 +88,7 @@ class BiworkParser extends AbstractBaseParser
         $contentCrawler = $newsPostCrawler;
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"news--col-1")]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"b-article__")]');
+        $this->removeDomNodes($contentCrawler, '//h1');
 
         $this->purifyNewsPostContent($contentCrawler);
 
