@@ -3,10 +3,13 @@
 namespace app\components\parser\news;
 
 use app\components\helper\nai4rus\AbstractBaseParser;
+use app\components\helper\nai4rus\NewsPostItemDTO;
 use app\components\helper\nai4rus\PreviewNewsDTO;
 use app\components\parser\NewsPost;
 use DateTimeImmutable;
 use DateTimeZone;
+use DOMElement;
+use DOMNode;
 use RuntimeException;
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\DomCrawler\UriResolver;
@@ -48,12 +51,9 @@ class KuzkomParser extends AbstractBaseParser
             $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$previewNewsDTOList) {
                 $title = $newsPreview->filterXPath('//a')->text();
                 $uri = UriResolver::resolve($newsPreview->filterXPath('//a')->attr('href'), $this->getSiteUrl());
-                $publishedAtString = $newsPreview->filterXPath('//b')->text();
-                $timezone = new DateTimeZone('Europe/Moscow');
-                $publishedAt = DateTimeImmutable::createFromFormat('d.m.Y', $publishedAtString, $timezone);
-                $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
                 $description = null;
-                $previewNewsDTOList[] = new PreviewNewsDTO($this->encodeUri($uri), $publishedAtUTC, $title, $description);
+                $previewNewsDTOList[] = new PreviewNewsDTO($this->encodeUri($uri), null, $title,
+                    $description);
             });
         }
 
@@ -81,15 +81,107 @@ class KuzkomParser extends AbstractBaseParser
             $previewNewsDTO->setImage($this->encodeUri($image));
         }
 
-        $previewNewsDTO->setDescription(null);
+        $publishedAtString = $newsPageCrawler->filterXPath('//p[contains(@class,"news-date")]')->text();
+        $publishedAtString = $this->translateDateToEng($publishedAtString);
+        $timezone = new DateTimeZone('Asia/Novokuznetsk');
+        $publishedAt = DateTimeImmutable::createFromFormat('d F Y \| H:i:s', $publishedAtString, $timezone);
+        $previewNewsDTO->setPublishedAt($publishedAt->setTimezone(new DateTimeZone('UTC')));
 
         $contentCrawler = $newsPostCrawler;
-        $this->removeDomNodes($contentCrawler,'//div[@id="post-info"]');
+        $this->removeDomNodes($contentCrawler, '//div[@id="post-info"]');
 
         $this->purifyNewsPostContent($contentCrawler);
 
         $newsPostItemDTOList = $this->parseNewsPostContent($contentCrawler, $previewNewsDTO);
 
         return $this->factoryNewsPost($previewNewsDTO, $newsPostItemDTOList);
+    }
+
+    protected function searchImageNewsItem(DOMNode $node, PreviewNewsDTO $newsPostDTO): ?NewsPostItemDTO
+    {
+        $isPicture = $this->isPictureType($node);
+
+        if (!$node instanceof DOMElement || (!$this->isImageType($node) && !$isPicture)) {
+            return null;
+        }
+
+        $imageLink = $this->getImageLinkFromNode($node);
+
+        if ($isPicture) {
+            if ($this->getNodeStorage()->contains($node->parentNode)) {
+                throw new RuntimeException('Тег уже сохранен');
+            }
+
+            $pictureCrawler = new Crawler($node->parentNode);
+            $imgCrawler = $pictureCrawler->filterXPath('//img');
+
+            if ($imgCrawler->count()) {
+                $imageLink = $imgCrawler->first()->attr('src');
+            }
+        }
+
+        $parentNode = $node->parentNode;
+        if ($parentNode->tagName === 'a' && $parentNode->hasAttribute('data-fancybox')) {
+            $src = $parentNode->getAttribute('href');
+            if ($src !== '' && $src !== null) {
+                $imageLink = $src;
+            }
+        }
+
+        if ($imageLink === '' || mb_stripos($imageLink, 'data:') === 0) {
+            return null;
+        }
+
+        $imageLink = UriResolver::resolve($imageLink, $newsPostDTO->getUri());
+        if ($imageLink === null) {
+            return null;
+        }
+
+        $alt = $node->getAttribute('alt');
+        $alt = $alt !== '' ? $alt : null;
+
+        $newsPostItem = NewsPostItemDTO::createImageItem($imageLink, $alt);
+
+        if ($isPicture) {
+            $this->getNodeStorage()->removeAll($this->getNodeStorage());
+            $this->getNodeStorage()->attach($node->parentNode, $newsPostItem);
+        }
+
+        return $newsPostItem;
+    }
+
+    protected function isLink(DOMNode $node): bool
+    {
+        if($node instanceof DOMElement && $node->hasAttribute('data-fancybox')){
+            return false;
+        }
+
+        return parent::isLink($node);
+    }
+
+    private function translateDateToEng(string $date)
+    {
+        $date = mb_strtolower($date);
+
+        $monthRegex = [
+            '/янв[\S.]*/iu' => 'January',
+            '/фев[\S.]*/iu' => 'February',
+            '/мар[\S.]*/iu' => 'March',
+            '/апр[\S.]*/iu' => 'April',
+            '/май[\S.]*/iu' => 'May',
+            '/июн[\S.]*/iu' => 'June',
+            '/июл[\S.]*/iu' => 'July',
+            '/авг[\S.]*/iu' => 'August',
+            '/сен[\S.]*/iu' => 'September',
+            '/окт[\S.]*/iu' => 'October',
+            '/ноя[\S.]*/iu' => 'November',
+            '/дек[\S.]*/iu' => 'December'
+        ];
+
+        foreach ($monthRegex as $regex => $enMonth) {
+            $date = preg_replace($regex, $enMonth, $date);
+        }
+
+        return $date;
     }
 }
