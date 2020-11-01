@@ -17,6 +17,13 @@ class OneYarTvParser extends AbstractBaseParser
     public const USER_ID = 2;
     public const FEED_ID = 2;
 
+    public static function run(): array
+    {
+        $parser = new static();
+
+        return $parser->parse(0, 50);
+    }
+
     protected function getSiteUrl(): string
     {
         return 'https://1yar.tv';
