@@ -2,6 +2,7 @@
 
 namespace app\components\parser\news;
 
+use app\components\helper\metallizzer\Text;
 use app\components\helper\nai4rus\AbstractBaseParser;
 use app\components\helper\nai4rus\PreviewNewsDTO;
 use app\components\parser\NewsPost;
@@ -16,6 +17,11 @@ class MM21Parser extends AbstractBaseParser
 {
     public const USER_ID = 2;
     public const FEED_ID = 2;
+
+    protected function getSiteUrl(): string
+    {
+        return 'http://21mm.ru/';
+    }
 
     protected function getPreviewNewsDTOList(int $minNewsCount = 10, int $maxNewsCount = 100): array
     {
@@ -40,60 +46,20 @@ class MM21Parser extends AbstractBaseParser
             $previewNewsXPath = '//ul[@class="diary-list "]//li[@class="diary-item"]';
             $previewNewsCrawler = $previewNewsCrawler->filterXPath($previewNewsXPath);
 
-            $previewNewsCrawler->each(
-                function (Crawler $newsPreview) use (&$previewNewsDTOList) {
-                    $titleCrawler = $newsPreview->filterXPath('//a[@class="diary-item-link"]');
-                    $title = $titleCrawler->text();
-                    $uri = UriResolver::resolve($titleCrawler->attr('href'), $this->getSiteUrl());
+            $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$previewNewsDTOList) {
+                $title = $newsPreview->filter('.diary-item-link .diary-item-name')->text();
+                $uri = UriResolver::resolve($newsPreview->filter('.diary-item-link')->attr('href'), $this->getSiteUrl());
 
-                    $publishedAtString = $newsPreview->filterXPath('//span[@class="most-popular__date"]')->text();
-                    $publishedAtString = explode(' ', $publishedAtString);
-                    $this->convertStringMonthToNumber($publishedAtString[1]);
-                    $publishedAtString[1] = $this->convertStringMonthToNumber($publishedAtString[1]);
-                    //[1] - day // [2] - month // [3] - year
-                    $publishedAtString = $publishedAtString[0] . ' ' . $publishedAtString[1] . ' ' . $publishedAtString[2];
-                    $timezone = new DateTimeZone('Europe/Moscow');
-                    $publishedAt = DateTimeImmutable::createFromFormat('d m Y', $publishedAtString, $timezone);
-                    $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
+                $publishedAtString = Text::trim($this->normalizeSpaces($newsPreview->filterXPath('//span[@class="most-popular__date"]')->text()));
+                $publishedAtString .= ' ' . Text::trim($this->normalizeSpaces($newsPreview->filterXPath('//span[@class="most-popular__time"]')->text()));
+                $publishedAt = $this->replacePublishedAt($publishedAtString);
 
-                    $description = null;
-                    $previewNewsDTOList[] = new PreviewNewsDTO(
-                        $this->encodeUri($uri),
-                        $publishedAtUTC,
-                        $title,
-                        $description
-                    );
-                }
-            );
+                $previewNewsDTOList[] = new PreviewNewsDTO($uri, $publishedAt, $title);
+            });
         }
 
         $previewNewsDTOList = array_slice($previewNewsDTOList, 0, $maxNewsCount);
         return $previewNewsDTOList;
-    }
-
-    protected function getSiteUrl(): string
-    {
-        return 'http://21mm.ru/';
-    }
-
-    public function convertStringMonthToNumber($stringMonth): int
-    {
-        $stringMonth = strtolower($stringMonth);
-        $monthsList = [
-            "января" => 1,
-            "февраля" => 2,
-            "марта" => 3,
-            "апреля" => 4,
-            "мая" => 5,
-            "июня" => 6,
-            "июля" => 7,
-            "августа" => 8,
-            "сентября" => 9,
-            "октября" => 10,
-            "ноября" => 11,
-            "декабря" => 12,
-        ];
-        return $monthsList[$stringMonth];
     }
 
     protected function parseNewsPage(PreviewNewsDTO $previewNewsDTO): NewsPost
@@ -104,26 +70,30 @@ class MM21Parser extends AbstractBaseParser
         $newsPage = $this->getPageContent($uri);
 
         $newsPageCrawler = new Crawler($newsPage);
-        $newsPostCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"article-text article-detail-text")]');
+        $description = $this->getDescriptionFromContentText($newsPageCrawler);
+        $contentCrawler = $newsPageCrawler->filter('.article-detail-text');
 
-        $mainImageCrawler = $newsPostCrawler->filterXPath('//img')->first();
+        $mainImageCrawler = $contentCrawler->filterXPath('//img[1]')->first();
         if ($this->crawlerHasNodes($mainImageCrawler)) {
             $image = $mainImageCrawler->attr('src');
-            $this->removeDomNodes($newsPostCrawler, '//img[1]');
+            $this->removeDomNodes($contentCrawler, '//img[1]');
         }
         if ($image !== null && $image !== '') {
             $image = UriResolver::resolve($image, $uri);
-            $previewNewsDTO->setImage($this->encodeUri($image));
+            $previewNewsDTO->setImage($image);
         }
 
-        $previewNewsDTO->setDescription(null);
-        $contentCrawler = $newsPostCrawler->filterXPath('//div[@class="detail-text-div"]');
+        if ($description && $description !== '') {
+            $previewNewsDTO->setDescription($description);
+        }
+
+        $contentCrawler = $contentCrawler->filterXPath('//*[@itemprop="articleBody"]');
+
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"mobile-slider")]');
-        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"google-auto-placed ap_container")]');
+        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"google-auto-placed")]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"ya-share2")]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"content-block")]');
         $this->removeDomNodes($contentCrawler, '//div[@class="articles-links-add"]');
-        $this->removeDomNodes($contentCrawler, '//p[1]');
 
         $this->removeDomNodes($contentCrawler, '//span[@itemprop="name"]');
         $this->removeDomNodes($newsPageCrawler, '//p[contains(@class,"element-invisible no-mobile")]');
@@ -133,5 +103,46 @@ class MM21Parser extends AbstractBaseParser
         $newsPostItemDTOList = $this->parseNewsPostContent($contentCrawler, $previewNewsDTO);
 
         return $this->factoryNewsPost($previewNewsDTO, $newsPostItemDTOList);
+    }
+
+    private function getDescriptionFromContentText(Crawler $crawler): ?string
+    {
+        $descriptionCrawler = $crawler->filterXPath('//div[contains(@class,"article-epilog")]');
+
+        if ($this->crawlerHasNodes($descriptionCrawler)) {
+            $descriptionText = Text::trim($this->normalizeSpaces($descriptionCrawler->text()));
+
+            if ($descriptionText) {
+                $this->removeDomNodes($crawler, '//div[contains(@class,"article-epilog")]');
+                return $descriptionText;
+            }
+        }
+
+        return null;
+    }
+
+    private function replacePublishedAt(string $publishedAtString): DateTimeImmutable
+    {
+        $publishedAtString = mb_strtolower($publishedAtString);
+        $monthsList = [
+            1 => "января",
+            2 => "февраля",
+            3 => "марта",
+            4 => "апреля",
+            5 => "мая",
+            6 => "июня",
+            7 => "июля",
+            8 => "августа",
+            9 => "сентября",
+            10 => "октября",
+            11 => "ноября",
+            12 => "декабря",
+        ];
+
+        $publishedAtString = str_replace($monthsList, array_keys($monthsList), $publishedAtString);
+
+        $timezone = new DateTimeZone('Europe/Moscow');
+        $publishedAt = DateTimeImmutable::createFromFormat('d m Y H:i', $publishedAtString, $timezone);
+        return $publishedAt->setTimezone(new DateTimeZone('UTC'));
     }
 }
