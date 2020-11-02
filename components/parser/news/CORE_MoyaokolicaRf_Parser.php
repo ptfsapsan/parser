@@ -17,7 +17,7 @@ namespace app\components\parser\news;
 use fingli\ParserCore\ParserCore;
 use app\components\parser\ParserInterface;
 
-// part 2 approved roman
+// part 3 approved rmn
 class CORE_MoyaokolicaRf_Parser extends ParserCore implements ParserInterface
 {
     const USER_ID = 2;
@@ -142,7 +142,7 @@ class CORE_MoyaokolicaRf_Parser extends ParserCore implements ParserInterface
                 // игнорируемые css-селекторы
                 // (можно через запятую)
                 // (опционально)
-                'ignore-selectors'    => '[itemprop=articleBody] > p:first-child',
+                'ignore-selectors'    => '',
             ]
         ];
 
