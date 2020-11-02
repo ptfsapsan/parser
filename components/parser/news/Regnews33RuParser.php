@@ -25,7 +25,7 @@ class Regnews33RuParser extends MediasferaNewsParser implements ParserInterface
     public const USER_ID = 2;
     public const FEED_ID = 2;
 
-    public const NEWS_LIMIT = 2;
+    public const NEWS_LIMIT = 100;
 
     public const SITE_URL = 'https://regnews33.ru/';
     public const NEWSLIST_URL = 'https://regnews33.ru/';
