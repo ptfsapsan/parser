@@ -166,7 +166,13 @@ class KlopsParser implements ParserInterface
                 /** @var DOMNode $bodyNode */
                 foreach ($bodyContainer->children() as $bodyNode) {
                     $node = new Crawler($bodyNode);
-
+                    if ($node->matches("div") && !empty(trim($node->text(), "\xC2\xA0"))) {
+                        $node->children("p")->each(function (Crawler $pnode) use ($post){
+                            if (!empty(trim($pnode->text(), "\xC2\xA0"))) {
+                                self::addText($post, $pnode->text());
+                            }
+                        });
+                    }
                     if ($node->matches("p") && !empty(trim($node->text(), "\xC2\xA0"))) {
                         self::addText($post, $node->text());
                         continue;
