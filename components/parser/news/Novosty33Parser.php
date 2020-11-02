@@ -139,6 +139,9 @@ class Novosty33Parser implements ParserInterface
         foreach ($body->children() as $bodyNode) {
             $node = new Crawler($bodyNode);
 
+            if(mb_stripos($node->text(), "Поделиться:")){
+                break;
+            }
             if ($node->matches("p") && $node->filter("iframe")->count() !== 0) {
                 $videoContainer = $node->filter("iframe");
                 if ($videoContainer->count() !== 0) {
@@ -193,6 +196,11 @@ class Novosty33Parser implements ParserInterface
                     self::addImage($post, $src);
                 }
             });
+        }
+
+
+        if(empty($post->description)){
+            $post->description = $post->title;
         }
     }
 
