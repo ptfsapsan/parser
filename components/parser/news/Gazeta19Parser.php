@@ -120,7 +120,7 @@ class Gazeta19Parser implements ParserInterface
             throw new Exception("Could not parse date string");
         }
 
-        $dateString = date("Y") . "-" . self::MONTHS[$dateArr[1]] . "-" . $dateArr[0] . " " . date("H:i:s") . " +07:00";
+        $dateString = date("Y") . "-" . self::MONTHS[$dateArr[1]] . "-" . $dateArr[0] . " " . $dateArr[2] . " +07:00";
         $createDate = new DateTime($dateString);
         $createDate->setTimezone(new DateTimeZone("UTC"));
 
