@@ -79,6 +79,9 @@ class DglRuParser extends AbstractBaseParser
         $newsPageCrawler = new Crawler($newsPage);
 
         $contentCrawler = $newsPageCrawler->filter('.article-full');
+        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"ya-market-place")]');
+        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"ya-market-search-string")]');
+        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"article-vrezka")]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"ads-block")]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"hide-on-mobile")]');
         $this->removeDomNodes($contentCrawler, '//a[contains(@class,"carousel-wrapper")]');
@@ -115,6 +118,12 @@ class DglRuParser extends AbstractBaseParser
         $newsPostItemDTOList = $this->parseNewsPostContent($contentCrawler, $previewNewsDTO);
 
         return $this->factoryNewsPost($previewNewsDTO, $newsPostItemDTOList);
+    }
+
+    protected function purifyNewsPostContent(Crawler $contentCrawler): void
+    {
+        $this->removeDomNodes($contentCrawler, '//a[starts-with(@href, "javascript")]');
+        $this->removeDomNodes($contentCrawler, '//script | //video | //style | //form');
     }
 
     protected function searchImageNewsItem(DOMNode $node, PreviewNewsDTO $newsPostDTO): ?NewsPostItemDTO
