@@ -21,7 +21,7 @@ use Symfony\Component\DomCrawler\Crawler;
 /**
  * @fullrss
  */
-class VolgogradTodayRuParser extends MediasferaNewsParser implements ParserInterface
+class VolgogradTodayParser extends MediasferaNewsParser implements ParserInterface
 {
     public const USER_ID = 2;
     public const FEED_ID = 2;
