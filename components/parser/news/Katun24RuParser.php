@@ -30,6 +30,7 @@ class Katun24RuParser extends MediasferaNewsParser implements ParserInterface
     public const SITE_URL = 'https://katun24.ru/';
     public const NEWSLIST_URL = 'https://katun24.ru/k24-news';
 
+    public const TIMEZONE = '+0700';
     public const DATEFORMAT = 'd m Y, H:i';
 
     public const NEWSLIST_POST =  '#block-system-main .view-content > div';
