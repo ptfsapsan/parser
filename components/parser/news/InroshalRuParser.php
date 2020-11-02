@@ -37,8 +37,8 @@ class InroshalRuParser extends MediasferaNewsParser implements ParserInterface
     public const NEWSLIST_TITLE = '.news-itm__title';
     public const NEWSLIST_LINK =  '.news-itm__title a';
     public const NEWSLIST_DATE =  '.news-itm__date';
-    public const NEWSLIST_IMAGE = '.news-itm__img img';
 
+    public const ARTICLE_IMAGE = '.b-page__main .b-page__image img';
     public const ARTICLE_DESC =  '.b-page__main .b-page__start';
     public const ARTICLE_GALLERY =  '.b-page__main .photo_gallery_container';
     public const ARTICLE_TEXT =  '.b-page__main .b-page__content';
@@ -67,7 +67,6 @@ class InroshalRuParser extends MediasferaNewsParser implements ParserInterface
             self::$post->title = self::getNodeData('text', $node, self::NEWSLIST_TITLE);
             self::$post->original = self::getNodeLink('href', $node, self::NEWSLIST_LINK);
             self::$post->createDate = self::getNodeDate('text', $node, self::NEWSLIST_DATE);
-            self::$post->image = self::getNodeImage('src', $node, self::NEWSLIST_IMAGE);
 
             $articleContent = self::getPage(self::$post->original);
 
@@ -76,6 +75,7 @@ class InroshalRuParser extends MediasferaNewsParser implements ParserInterface
                 $articleCrawler = new Crawler($articleContent);
 
                 self::$post->description = self::getNodeData('text', $articleCrawler, self::ARTICLE_DESC);
+                self::$post->image = self::getNodeImage('src', $articleCrawler, self::ARTICLE_IMAGE);
 
                 if($articleCrawler->filter(self::ARTICLE_GALLERY)->count()) {
                     self::parse($articleCrawler->filter(self::ARTICLE_GALLERY));
@@ -113,15 +113,22 @@ class InroshalRuParser extends MediasferaNewsParser implements ParserInterface
         $replace = [
             'янв.' => '01',
             'фев.' => '02',
+            'февр.' => '02',
             'мар.' => '03',
+            'марта' => '03',
             'апр.' => '04',
             'мая.' => '05',
+            'мая' => '05',
             'июн.' => '06',
+            'июня' => '06',
             'июл.' => '07',
+            'июля' => '07',
             'авг.' => '08',
             'сен.' => '09',
+            'сент.' => '09',
             'окт.' => '10',
             'ноя.' => '11',
+            'нояб.' => '11',
             'дек.' => '12',
         ];
 
