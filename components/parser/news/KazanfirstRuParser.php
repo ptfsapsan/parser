@@ -44,6 +44,9 @@ class KazanfirstRuParser extends MediasferaNewsParser implements ParserInterface
 
     public const ARTICLE_BREAKPOINTS = [
         'class' => [
+            'jp-my-controls' => false,
+            'jp-video-play' => false,
+
             'horiz-banner' => false,
             'banners-aside__item' => false,
             'banner-adfox-rendering' => false,
@@ -62,6 +65,7 @@ class KazanfirstRuParser extends MediasferaNewsParser implements ParserInterface
         ],
         'id' => [
             'unit_96628' => false,
+            'jp_poster_0' => false,
         ],
         'href' => [
             'https://smi2.ru/' => false,
@@ -118,6 +122,12 @@ class KazanfirstRuParser extends MediasferaNewsParser implements ParserInterface
                 return;
             }
         }
+
+//        if($node->nodeName() == 'div') {
+//            if(strpos($node->attr('class'), 'video-container') !== false) {
+//                return;
+//            }
+//        }
 
         parent::parseNode($node);
     }
