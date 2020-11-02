@@ -19,7 +19,7 @@ use app\components\parser\ParserInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
 /**
- * @fullrss
+ * @rss_html
  */
 class ProvinceRuSmolenskParser extends MediasferaNewsParser implements ParserInterface
 {
@@ -41,6 +41,7 @@ class ProvinceRuSmolenskParser extends MediasferaNewsParser implements ParserInt
     public const NEWSLIST_CONTENT = '//yandex:full-text';
     public const NEWSLIST_IMG = '//image';
 
+    public const ARTICLE_IMAGE = '.itemImageBlock .itemImage img';
     public const ARTICLE_BREAKPOINTS = [];
 
     protected static NewsPostWrapper $post;
@@ -71,6 +72,15 @@ class ProvinceRuSmolenskParser extends MediasferaNewsParser implements ParserInt
             $contentCrawler = new Crawler('<body><div>' . $content . '</div></body>');
 
             self::parse($contentCrawler->filter('body > div'));
+
+            $articleContent = self::getPage(self::$post->original);
+
+            if (!empty($articleContent)) {
+
+                $articleCrawler = new Crawler($articleContent);
+
+                self::$post->image = self::getNodeImage('src', $articleCrawler, self::ARTICLE_IMAGE) ?? self::$post->image;
+            }
 
             $newsPost = self::$post->getNewsPost();
 
