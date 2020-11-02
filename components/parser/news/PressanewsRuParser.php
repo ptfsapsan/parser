@@ -25,18 +25,20 @@ class PressanewsRuParser extends MediasferaNewsParser implements ParserInterface
     public const USER_ID = 2;
     public const FEED_ID = 2;
 
-    public const NEWS_LIMIT = 2;
+    public const NEWS_LIMIT = 100;
 
     public const SITE_URL = 'https://pressanews.ru/';
     public const NEWSLIST_URL = 'https://pressanews.ru/';
 
     public const DATEFORMAT = 'Y-m-d\TH:i:sP';
 
-    public const NEWSLIST_POST = '.content-column .listing article.type-post';
-    public const NEWSLIST_TITLE = '.title';
-    public const NEWSLIST_LINK = '.title a';
-    public const NEWSLIST_DATE = '.time .post-published';
-    public const NEWSLIST_IMAGE = '.img-holder';
+    public const ATTR_IMAGE = 'data-lazy-src';
+
+    public const NEWSLIST_POST = '.content-area .site-main article.type-post';
+    public const NEWSLIST_TITLE = '.entry-title';
+    public const NEWSLIST_LINK = '.entry-title a';
+    public const NEWSLIST_DATE = '.entry-date';
+    public const NEWSLIST_IMAGE = '.post-thumbnail img';
 
     public const ARTICLE_DESC = '.post .entry-content p:first-of-type';
     public const ARTICLE_TEXT =  '.post .entry-content';
@@ -46,10 +48,8 @@ class PressanewsRuParser extends MediasferaNewsParser implements ParserInterface
             'toc_container' => false,
         ],
         'class' => [
-            'bs-irp' => false,
-        ],
-        'text' => [
-            'Источник' => false,
+            'addtoany_share_save_container' => true,
+            'yarpp-related' => true,
         ],
     ];
 
@@ -70,7 +70,7 @@ class PressanewsRuParser extends MediasferaNewsParser implements ParserInterface
             self::$post->title = self::getNodeData('text', $node, self::NEWSLIST_TITLE);
             self::$post->original = self::getNodeLink('href', $node, self::NEWSLIST_LINK);
             self::$post->createDate = self::getNodeDate('datetime', $node, self::NEWSLIST_DATE);
-            self::$post->image = self::getNodeImage('data-src', $node, self::NEWSLIST_IMAGE);
+            self::$post->image = self::getNodeImage('data-lazy-src', $node, self::NEWSLIST_IMAGE);
 
             $articleContent = self::getPage(self::$post->original);
 
@@ -87,5 +87,20 @@ class PressanewsRuParser extends MediasferaNewsParser implements ParserInterface
         });
 
         return $posts;
+    }
+
+
+    protected static function parseNode(Crawler $node, ?string $filter = null): void
+    {
+        $node = static::filterNode($node, $filter);
+
+        if($node->nodeName() == 'p') {
+            $text = trim($node->text());
+            if(strpos($text, 'Понравилась статья? Поделитесь с друзьями!') === 0) {
+                return;
+            }
+        }
+
+        parent::parseNode($node);
     }
 }
