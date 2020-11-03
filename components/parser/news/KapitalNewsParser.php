@@ -148,7 +148,11 @@ class KapitalNewsParser implements ParserInterface
             foreach ($hatulNode->childNodes as $bodyNode) {
                 $node = new Crawler($bodyNode);
 
-                if ($bodyNode->nodeName === "#text" && !empty(trim($bodyNode->nodeValue, " \n\r\xC2\xA0"))) {
+                if(mb_stripos(trim($node->text(), " \xC2\xA0"), "..") === 0){
+                    break;
+                }
+
+                if ($bodyNode->nodeName === "#text" && !empty(trim($bodyNode->nodeValue, " .\n\r\xC2\xA0"))) {
                     if (empty($post->description)) {
                         $post->description = Helper::prepareString(trim($bodyNode->nodeValue));
                     } else {
@@ -157,7 +161,7 @@ class KapitalNewsParser implements ParserInterface
                     continue;
                 }
 
-                if ($node->matches("p") && !empty(trim($node->text(), "\xC2\xA0"))) {
+                if ($node->matches("p") && !empty(trim($node->text(), " .\xC2\xA0"))) {
                     if (empty($post->description)) {
                         $post->description = Helper::prepareString($node->text());
                     } else {
@@ -197,7 +201,7 @@ class KapitalNewsParser implements ParserInterface
                         self::addVideo($post, $videoContainer->attr("src"));
                     }
                 }
-                if ( !empty(trim($node->text(), "\xC2\xA0"))) {
+                if ( !empty(trim($node->text(), " .\xC2\xA0"))) {
                     if (empty($post->description)) {
                         $post->description = Helper::prepareString($node->text());
                     } else {
