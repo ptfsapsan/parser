@@ -43,6 +43,10 @@ class OsnovaNewsParser extends AbstractBaseParser
             }
 
             $previewNewsCrawler = $previewNewsCrawler->filter('._news .no-gutters > .no-gutters > div');
+            if ($previewNewsCrawler->text() === 'Публикаций не найдено') {
+                $subDay++;
+                continue;
+            }
 
             $time = null;
             $title = null;
