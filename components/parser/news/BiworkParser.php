@@ -3,6 +3,7 @@
 namespace app\components\parser\news;
 
 use app\components\helper\nai4rus\AbstractBaseParser;
+use app\components\helper\nai4rus\NewsPostItemDTO;
 use app\components\helper\nai4rus\PreviewNewsDTO;
 use app\components\parser\NewsPost;
 use DateTimeImmutable;
@@ -27,7 +28,7 @@ class BiworkParser extends AbstractBaseParser
         $previewList = [];
         $pageNumber = 1;
 
-        while (count($previewList) < $maxNewsCount){
+        while (count($previewList) < $maxNewsCount) {
             $url = "/news?view=_news_simple&page={$pageNumber}";
             $uriPreviewPage = UriResolver::resolve($url, $this->getSiteUrl());
 
@@ -45,11 +46,11 @@ class BiworkParser extends AbstractBaseParser
 
             $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$previewList) {
                 $titleCrawler = $newsPreview->filterXPath('//h2/parent::a');
-                $uri = UriResolver::resolve($titleCrawler->attr('href'),$this->getSiteUrl());
+                $uri = UriResolver::resolve($titleCrawler->attr('href'), $this->getSiteUrl());
 
                 $timezone = new DateTimeZone('Asia/Krasnoyarsk');
                 $publishedAtString = $newsPreview->filterXPath('//time')->text();
-                $publishedAt = DateTimeImmutable::createFromFormat('H:i, d.m.Y', $publishedAtString,$timezone);
+                $publishedAt = DateTimeImmutable::createFromFormat('H:i, d.m.Y', $publishedAtString, $timezone);
                 $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
 
                 $preview = null;
@@ -81,9 +82,19 @@ class BiworkParser extends AbstractBaseParser
         if ($this->crawlerHasNodes($mainImageCrawler)) {
             $image = $mainImageCrawler->attr('content');
         }
-        if ($image !== null && $image !== '') {
+        if ($image !== null && $image !== '' && !$this->crawlerHasNodes($newsPostCrawler->filterXPath('//div[contains(@class,"b-article__slider-container")]'))) {
             $previewNewsItem->setImage(UriResolver::resolve($image, $uri));
         }
+
+        $images = [];
+        $imagesXpath = '//div[contains(@class,"b-article__slider-container")]//a[contains(@class,"b-article__slider-item")]/img';
+        $newsPostCrawler->filterXPath($imagesXpath)->each(function (Crawler $crawler) use (&$images) {
+            $src = $crawler->attr('src');
+            if ($src !== '' && $src !== null) {
+                $images[] = NewsPostItemDTO::createImageItem(UriResolver::resolve($src, $this->getSiteUrl()));
+            }
+        });
+
 
         $contentCrawler = $newsPostCrawler;
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"news--col-1")]');
@@ -93,6 +104,7 @@ class BiworkParser extends AbstractBaseParser
         $this->purifyNewsPostContent($contentCrawler);
 
         $newsPostItemDTOList = $this->parseNewsPostContent($contentCrawler, $previewNewsItem);
+        $newsPostItemDTOList = array_merge($images, $newsPostItemDTOList);
 
         return $this->factoryNewsPost($previewNewsItem, $newsPostItemDTOList);
     }
