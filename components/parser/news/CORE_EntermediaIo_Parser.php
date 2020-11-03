@@ -17,7 +17,7 @@ namespace app\components\parser\news;
 use fingli\ParserCore\ParserCore;
 use app\components\parser\ParserInterface;
 
-// CORE_XXX_Parser -> необходимо заменить на актуальное название парсера (так как называется ваш файл)
+// part 3 approved by rmn
 class CORE_EntermediaIo_Parser extends ParserCore implements ParserInterface
 {
     const USER_ID = 2;
@@ -38,7 +38,7 @@ class CORE_EntermediaIo_Parser extends ParserCore implements ParserInterface
 
             // максимальное количество новостей, берушихся с витрины
             // (опционально)
-                       'itemsLimit' => 1,
+            //            'itemsLimit' => 1,
 
             // настройки сайта
             'site'    => [
@@ -101,7 +101,7 @@ class CORE_EntermediaIo_Parser extends ParserCore implements ParserInterface
 
                 // css селектор для даты элемента (относительно элемента)
                 // (заполняется только, если отсутствует в карточке)
-                'element-date'        => 'pubDate',
+                //                'element-date'        => 'pubDate',
             ],
 
             // настройки витрины (режим HTML)
@@ -137,7 +137,7 @@ class CORE_EntermediaIo_Parser extends ParserCore implements ParserInterface
 
                 // css селектор для даты элемента (относительно элемента)
                 // (заполняется только, если отсутствует в карточке)
-                'element-date'        => '.timedate',
+                //                'element-date'        => '.timedate',
             ],
 
             // настройка карточки элемента
@@ -152,15 +152,15 @@ class CORE_EntermediaIo_Parser extends ParserCore implements ParserInterface
                 // css-селектор для основного текста
                 // (для заполнения модели NewsPostItem)
                 // (обязательный)
-                'element-text'        => '.stk-grid-col',
+                'element-text'        => '.post-container .stk-grid',
 
                 // css-селектор для получения даты создания новости
                 // (заполняется только, если отсутствует в витрине)
-                'element-date'        => '.date-news',
+                'element-date'        => '.article-date a',
 
                 // css селектор для описания элемента (относительно элемента)
                 // (заполняется только, если отсутствует в витрине)
-                'element-description' => '.title-category',
+                'element-description' => '.post-container .stk-grid p:first-child',
 
                 // css селектор для получения картинки
                 // !должен содержать конечный аттрибут src! (например: img.main-image[src])
@@ -175,7 +175,7 @@ class CORE_EntermediaIo_Parser extends ParserCore implements ParserInterface
                 // игнорируемые css-селекторы (будут вырезаться из результата)
                 // (можно через запятую)
                 // (опционально)
-                'ignore-selectors'    => '',
+                'ignore-selectors'    => '.post-container .stk-grid p:first-child',
             ]
         ];
 
