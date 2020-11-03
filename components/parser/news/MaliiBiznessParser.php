@@ -155,7 +155,7 @@ class MaliiBiznessParser implements ParserInterface
                 break;
             }
             if ($node->matches("p") && !empty(trim($node->text(), "\xC2\xA0"))) {
-                if (empty($post->description)) {
+                if (empty($post->description) && mb_stripos($node->text(), "Фото: ") !== 0) {
                     $post->description = Helper::prepareString($node->text());
                 } else {
                     self::addText($post, $node->text());
@@ -243,25 +243,6 @@ class MaliiBiznessParser implements ParserInterface
         return preg_replace_callback('/[^\x21-\x7f]/', function ($match) {
             return rawurlencode($match[0]);
         }, $content);
-    }
-
-
-    /**
-     * @param NewsPost $post
-     * @param string   $content
-     * @param int      $level
-     */
-    private static function addHeader(NewsPost $post, string $content, int $level): void
-    {
-        $post->addItem(
-            new NewsPostItem(
-                NewsPostItem::TYPE_HEADER,
-                $content,
-                null,
-                null,
-                $level,
-                null
-            ));
     }
 
     /**
