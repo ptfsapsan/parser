@@ -33,6 +33,8 @@ class PsyhRuParser extends MediasferaNewsParser implements ParserInterface
 
     public const DATEFORMAT = 'D, d M Y H:i:s O';
 
+    public const ATTR_IMAGE = 'data-src';
+
     public const NEWSLIST_POST = '//rss/channel/item';
     public const NEWSLIST_TITLE = '//title';
     public const NEWSLIST_LINK = '//link';
@@ -75,7 +77,7 @@ class PsyhRuParser extends MediasferaNewsParser implements ParserInterface
 
             if (!empty($articleContent)) {
                 $articleCrawler = new Crawler($articleContent);
-                self::$post->image = self::getNodeImage('src', $articleCrawler, self::ARTICLE_IMAGE);
+                self::$post->image = self::getNodeImage('data-src', $articleCrawler, self::ARTICLE_IMAGE);
             }
 
             self::parse($contentCrawler->filter('body > div'));
