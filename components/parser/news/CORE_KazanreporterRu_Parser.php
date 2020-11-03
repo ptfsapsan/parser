@@ -17,7 +17,7 @@ namespace app\components\parser\news;
 use fingli\ParserCore\ParserCore;
 use app\components\parser\ParserInterface;
 
-// part 2 approved alex
+// part 3 approved by rmn
 class CORE_KazanreporterRu_Parser extends ParserCore implements ParserInterface
 {
     const USER_ID = 2;
