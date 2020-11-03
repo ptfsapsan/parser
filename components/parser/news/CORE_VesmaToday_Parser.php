@@ -17,7 +17,7 @@ namespace app\components\parser\news;
 use fingli\ParserCore\ParserCore;
 use app\components\parser\ParserInterface;
 
-// part 2 approved alex
+// part 3 approved by rmn
 class CORE_VesmaToday_Parser extends ParserCore implements ParserInterface
 {
     const USER_ID = 2;
@@ -45,7 +45,7 @@ class CORE_VesmaToday_Parser extends ParserCore implements ParserInterface
             // в остальных случаях жестко задается ядром
             //
             // не забывайте отключать лимит при сдаче парсера!
-                    //    'itemsLimit' => 1,
+            //    'itemsLimit' => 1,
 
             // настройки сайта
             'site'    => [
@@ -88,37 +88,37 @@ class CORE_VesmaToday_Parser extends ParserCore implements ParserInterface
             'list'    => [
                 // URL где находится витрина
                 // (обязательный)
-                'url'                 => 'https://vesma.today/news/',
+                'url'                 => '/news',
 
                 // css селектор для контейнера витрины
                 // (обязательный)
                 'container'           => '.news__list1',
 
-                    // css селектор для элемента витрины (относительно контейнера)
-                    // (обязательный)
-                    'element'             => '.content-pad',
+                // css селектор для элемента витрины (относительно контейнера)
+                // (обязательный)
+                'element'             => '.content-pad',
 
-                        // ** дальнейшие css-селекторы указываются относительно element
+                // ** дальнейшие css-селекторы указываются относительно element
 
-                        // css селектор для ссылки на элемент !должен содержать конечный аттрибут href!
-                        // (обязательный + должен быть обязательный атрибут, где хранится ссылка)
-                        'element-link'        => '.news__list1_title a[href]',
+                // css селектор для ссылки на элемент !должен содержать конечный аттрибут href!
+                // (обязательный + должен быть обязательный атрибут, где хранится ссылка)
+                'element-link'        => '.news__list1_title a[href]',
 
-                        // css селектор для названия элемента
-                        // (опционально)
-                        'element-title'       => '.news__list1_title a',
+                // css селектор для названия элемента
+                // (опционально)
+                'element-title'       => '.news__list1_title a',
 
-                        // css селектор для описания элемента
-                        // (опционально)
-                        'element-description' => '.news__list1_short',
+                // css селектор для описания элемента
+                // (опционально)
+                'element-description' => '.news__list1_short',
 
-                        // css селектор !должен содержать конечный аттрибут src! для картинки элемента
-                        // (опционально)
-                        'element-image'       => '.news__list1_picture_pic[style]',
+                // css селектор !должен содержать конечный аттрибут src! для картинки элемента
+                // (опционально)
+                'element-image'       => '.news__list1_picture_pic[style]',
 
-                        // css селектор для даты элемента
-                        // (опционально)
-                        'element-date'        => '.news__list1_date[datetime]',
+                // css селектор для даты элемента
+                // (опционально)
+                'element-date'        => '.news__list1_date[datetime]',
             ],
 
             // настройка карточки элемента
@@ -130,39 +130,42 @@ class CORE_VesmaToday_Parser extends ParserCore implements ParserInterface
                 // (обязательный)
                 'container'           => '#layout__container_9',
 
-                    // ** дальнейшие css-селекторы указываются относительно container
+                // ** дальнейшие css-селекторы указываются относительно container
 
-                    // css-селектор для основного текста * - данные внутри (картинки, ссылки) парсятся автоматически
-                    // (можно несколько через запятую, если есть разные шаблоны новости)
-                    // (обязательный)
-                    'element-text'        => '.layout__box',
+                // css-селектор для основного текста * - данные внутри (картинки, ссылки) парсятся автоматически
+                // (можно несколько через запятую, если есть разные шаблоны новости)
+                // (обязательный)
+                //                'element-text'        => '.layout__box',
+                'element-text'        => 'article',
 
-                    // css-селектор даты создания новости
-                    // (опционально)
-                    'element-date'        => '',
+                // css-селектор даты создания новости
+                // (опционально)
+                'element-date'        => '',
 
-                    // css селектор для описания элемента
-                    // (опционально)
-                    'element-description' => '',
+                // css селектор для описания элемента
+                // (опционально)
+                'element-description' => '#layout__container_9 article > h3:first-child',
 
-                    // css селектор для получения картинки
-                    // !должен содержать конечный аттрибут src! (например: img.main-image[src])
-                    // (опционально)
-                    'element-image'       => 'a img[src]',
+                // css селектор для получения картинки
+                // !должен содержать конечный аттрибут src! (например: img.main-image[src])
+                // (опционально)
+                //                'element-image'       => '#widget_13 a[href]',
 
-                    // css-селектор для цитаты
-                    // (если не заполнено, то по умолчанию берутся теги: blockquote и q)
-                    // (опционально)
-                    'element-quote'       => 'h3 em',
+                // css-селектор для цитаты
+                // (если не заполнено, то по умолчанию берутся теги: blockquote и q)
+                // (опционально)
+                'element-quote'       => 'h3 em',
 
                 // игнорируемые css-селекторы (будут вырезаться из результата)
                 // (можно несколько через запятую)
                 // (опционально)
-                'ignore-selectors'    => '.news__list1_date, #widget_15, #widget_14',
+                'ignore-selectors'    => '#layout__container_9 article > h3:first-child, .news__list1_date, #widget_15, #widget_14',
 
                 // css-селекторы которые будут вставлятся в начало текста новости element-text (селекторы ищутся от корня)
                 // (опционально)
                 'element-text-before' => '',
+
+                'element-text-after' => '#layout__container_9 article:not(:first-child)',
             ]
         ];
 
