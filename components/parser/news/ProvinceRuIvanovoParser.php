@@ -41,6 +41,7 @@ class ProvinceRuIvanovoParser extends MediasferaNewsParser implements ParserInte
     public const NEWSLIST_CONTENT = '//yandex:full-text';
     public const NEWSLIST_IMG = '//image';
 
+    public const ARTICLE_IMAGE = '.itemImageBlock .itemImage img';
     public const ARTICLE_BREAKPOINTS = [];
 
     protected static NewsPostWrapper $post;
@@ -71,6 +72,19 @@ class ProvinceRuIvanovoParser extends MediasferaNewsParser implements ParserInte
             $contentCrawler = new Crawler('<body><div>' . $content . '</div></body>');
 
             self::parse($contentCrawler->filter('body > div'));
+
+            $articleContent = self::getPage(self::$post->original);
+
+            if (!empty($articleContent)) {
+
+                $articleCrawler = new Crawler($articleContent);
+
+                $image = self::getNodeImage('src', $articleCrawler, self::ARTICLE_IMAGE);
+
+                if($image) {
+                    self::$post->image = $image;
+                }
+            }
 
             $newsPost = self::$post->getNewsPost();
 
