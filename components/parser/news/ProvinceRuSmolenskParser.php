@@ -79,7 +79,11 @@ class ProvinceRuSmolenskParser extends MediasferaNewsParser implements ParserInt
 
                 $articleCrawler = new Crawler($articleContent);
 
-                self::$post->image = self::getNodeImage('src', $articleCrawler, self::ARTICLE_IMAGE) ?? self::$post->image;
+                $image = self::getNodeImage('src', $articleCrawler, self::ARTICLE_IMAGE);
+
+                if($image) {
+                    self::$post->image = $image;
+                }
             }
 
             $newsPost = self::$post->getNewsPost();
