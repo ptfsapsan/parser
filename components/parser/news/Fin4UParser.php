@@ -141,6 +141,7 @@ class Fin4UParser implements ParserInterface
 
         $createDate = DateTime::createFromFormat("d.m.Y H:i:s P", trim($dateString[0]) . ":00 +03:00");
         $createDate->setTimezone(new DateTimeZone("UTC"));
+        $post->createDate = $createDate;
 
         $body = $crawler->filter("div#content div.text p");
         if ($body->count() !== 1) {
