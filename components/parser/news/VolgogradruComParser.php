@@ -4,8 +4,10 @@ namespace app\components\parser\news;
 
 use app\components\helper\metallizzer\Text;
 use app\components\helper\nai4rus\AbstractBaseParser;
+use app\components\helper\nai4rus\NewsPostItemDTO;
 use app\components\helper\nai4rus\PreviewNewsDTO;
 use app\components\parser\NewsPost;
+use app\components\parser\NewsPostItem;
 use DateTimeImmutable;
 use DateTimeZone;
 use RuntimeException;
@@ -107,8 +109,21 @@ class VolgogradruComParser extends AbstractBaseParser
         $this->purifyNewsPostContent($contentCrawler);
 
         $newsPostItemDTOList = $this->parseNewsPostContent($contentCrawler, $previewNewsDTO);
+        /** @var NewsPostItemDTO $item */
+        foreach ($newsPostItemDTOList as $key => $item) {
+            $item->setText(str_replace('b>', '', $item->getText()));
+            if ($item->getType() === NewsPostItem::TYPE_TEXT && !$item->getText()) {
+                unset($newsPostItemDTOList[$key]);
+            }
+        }
 
         return $this->factoryNewsPost($previewNewsDTO, $newsPostItemDTOList);
+    }
+
+    protected function purifyNewsPostContent(Crawler $contentCrawler): void
+    {
+        $this->removeDomNodes($contentCrawler, '//a[starts-with(@href, "javascript")]');
+        $this->removeDomNodes($contentCrawler, '//script | //video | //style | //form');
     }
 
     private function getDescriptionFromContentText(Crawler $crawler): ?string
