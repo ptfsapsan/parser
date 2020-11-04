@@ -3,6 +3,7 @@
 namespace app\components\parser\news;
 
 use app\components\Helper;
+use app\components\helper\aayaami\DOMNodeRecursiveIterator;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
@@ -15,19 +16,22 @@ use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\DomCrawler\UriResolver;
 
 /**
- * News parser from site https://anna-news.info/
+ * News parser from site http://osvita-kp.org.ua/
  * @author jcshow
  */
-class AnnaNewsParser implements ParserInterface
+class OsvitaKpParser implements ParserInterface
 {
     public const USER_ID = 2;
 
     public const FEED_ID = 2;
 
-    public const SITE_URL = 'https://anna-news.info';
+    public const SITE_URL = 'http://osvita-kp.org.ua';
 
     /** @var array */
     protected static $parsedEntities = ['a', 'img', 'blockquote', 'iframe', 'video'];
+
+    /** @var array */
+    protected static $sentenceEndSymbols = ['.', '!', '?'];
 
     /** @var int */
     protected static $parsedCount = 0;
@@ -37,7 +41,7 @@ class AnnaNewsParser implements ParserInterface
      */
     public static function run(): array
     {
-        return self::getNewsData(5);
+        return self::getNewsData();
     }
 
     /**
@@ -56,22 +60,19 @@ class AnnaNewsParser implements ParserInterface
         $pageNum = 1;
         $posts = [];
         while (self::$parsedCount < $limit) {
-            /** Get RSS news list */
+            /** Get news list */
             $curl = Helper::getCurl();
-            do {
-                $newsList = $curl->get(static::SITE_URL . "/feed?paged=$pageNum");
-            } while (is_bool($newsList));
+            $newsList = $curl->get(static::SITE_URL . "/feed?paged=$pageNum");
+            if ($curl->getInfo()['http_code'] === 404) {
+                break;
+            }
 
-            /** Parse news from RSS */
+            /** Parse news from page html */
             $newsListCrawler = new Crawler($newsList);
             $news = $newsListCrawler->filterXPath('//item');
 
             foreach ($news as $item) {
-                try {
-                    $post = self::getPostDetail($item);
-                } catch (Exception $e) {
-                    continue;
-                }
+                $post = self::getPostDetail($item);
 
                 $posts[] = $post;
                 self::$parsedCount++;
@@ -106,24 +107,16 @@ class AnnaNewsParser implements ParserInterface
         $createdAt = $createdAt->format('c');
 
         /** Detail page parser creation */
-        $curl = Helper::getCurl();
-        $curlResult = $curl->get($link);
-        $crawler = new Crawler($curlResult);
-
+        $descriptionHtml = $itemCrawler->filterXPath('//content:encoded')->getNode(0);
+        $crawler = new Crawler($descriptionHtml->textContent);
+        
         self::removeNodes($crawler, '
-            //comment() | //br | //hr | //script | //style | //head | //header | //link | //meta
+            //comment() | //br | //hr | //script | //style | //head | //link | //meta | //form | //amp-ad
         ');
-        self::removeNodes($crawler, '//article[contains(@class,"article")]//h1[contains(@class,"article__title")]');
-        self::removeNodes($crawler, '//article[contains(@class,"article")]//div[contains(@class,"article__top")]');
-        self::removeNodes($crawler, '//article[contains(@class,"article")]//div[contains(@class,"article__text")]/following-sibling::*[1]');
 
         //Get image if exists
         $picture = null;
-        $imageBlock = $crawler->filterXPath('
-            //article[contains(@class,"article")]
-            //div[contains(@class, "article__photo")]
-            //img[1]
-        ')->getNode(0);
+        $imageBlock = $crawler->filterXPath('//img[1]')->getNode(0);
         if (! empty($imageBlock) === true) {
             $picture = self::cleanUrl($imageBlock->getAttribute('src'));
             if (! preg_match('/http[s]?/', $picture)) {
@@ -133,26 +126,25 @@ class AnnaNewsParser implements ParserInterface
         }
 
         /** Get description */
-        //:NOTE some extremely bad formatted <p></p> tags can't be dealed by Xpath
-        $description = '';
-        while ($description === '') {
-            $descriptionBlock = $crawler->filterXpath('
-                //article[contains(@class,"article")]
-                //div[contains(@class, "article__text")]
-                //p[normalize-space(.//text())]
-                //text()[not(.="")]
-            ')->getNode(0);
-            $description = self::cleanText($descriptionBlock->textContent);
-            $descriptionBlock->parentNode->removeChild($descriptionBlock);
+        $description = [];
+        $nodeIterator = new DOMNodeRecursiveIterator($crawler->getNode(0)->childNodes);
+        foreach ($nodeIterator->getRecursiveIterator() as $node) {
+            $text = self::cleanText($node->textContent);
+            $description[] = $text;
+            if (! empty($node->textContent)) {
+                $node->parentNode->removeChild($node);
+            }
+            if (in_array(substr($text, -1), self::$sentenceEndSymbols)) {
+                break;
+            }
         }
+        $description = implode(' ', $description);
 
         /** @var NewsPost */
         $post = new NewsPost(static::class, $title, $description, $createdAt, $link, $picture);
 
-        $detailPage = $crawler->filterXPath('//article[contains(@class,"article")]')->getNode(0);
-
         // parse detail page for texts
-        foreach ($detailPage->childNodes as $node) {
+        foreach ($crawler->getNode(0)->childNodes as $node) {
             self::parseNode($post, $node);
         }
 
@@ -188,8 +180,6 @@ class AnnaNewsParser implements ParserInterface
                 $imageLink = UriResolver::resolve($imageLink, static::SITE_URL);
             }
 
-            $imageLink = UriResolver::resolve($imageLink, static::SITE_URL);
-
             $post->addItem(new NewsPostItem(NewsPostItem::TYPE_IMAGE, $node->getAttribute('alt'), $imageLink));
             return;
         }
@@ -208,7 +198,9 @@ class AnnaNewsParser implements ParserInterface
                 if (preg_match('/vk\.com/', $link)) {
                     $link = preg_replace('/^(\/\/)(.*)/', 'https://$2', html_entity_decode($link));
                 }
-                $post->addItem(new NewsPostItem(NewsPostItem::TYPE_LINK, null, null, $link));
+                if (filter_var($link, FILTER_VALIDATE_URL)) {
+                    $post->addItem(new NewsPostItem(NewsPostItem::TYPE_LINK, null, null, $link));
+                }
             }
             return;
         }
@@ -237,11 +229,6 @@ class AnnaNewsParser implements ParserInterface
         if (self::isText($node)) {
             if ($skipText === false && self::hasText($node)) {
                 $textContent = self::cleanText($node->textContent);
-                if (strlen($post->description) >= strlen($textContent)) {
-                    if (preg_match('/' . preg_quote($textContent, '/') . '/', $post->description)) {
-                        return;
-                    }
-                }
 
                 if (self::hasActualText($textContent) === true) {
                     $post->addItem(new NewsPostItem(NewsPostItem::TYPE_TEXT, $textContent));
@@ -262,11 +249,6 @@ class AnnaNewsParser implements ParserInterface
         //Get entire node text if we not need to parse any special entities, go recursive otherwise
         if ($skipText === false && $needRecursive === false) {
             $textContent = self::cleanText($node->textContent);
-            if (strlen($post->description) >= strlen($textContent)) {
-                if (preg_match('/' . preg_quote($textContent, '/') . '/', $post->description)) {
-                    return;
-                }
-            }
 
             if (self::hasActualText($textContent) === true) {
                 $post->addItem(new NewsPostItem(NewsPostItem::TYPE_TEXT, $textContent));
@@ -320,7 +302,7 @@ class AnnaNewsParser implements ParserInterface
      */
     protected static function hasActualText(?string $text): bool
     {
-        return trim($text, "⠀ \t\n\r\0\x0B\xC2\xA0") !== '';
+        return preg_replace('/[^а-яА-Яa-zA-Z]+/', '', trim($text, "⠀ \t\n\r\0\x0B\xC2\xA0")) !== '';
     }
 
     /**
