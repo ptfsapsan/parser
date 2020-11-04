@@ -37,7 +37,7 @@ class AnnaNewsParser implements ParserInterface
      */
     public static function run(): array
     {
-        return self::getNewsData();
+        return self::getNewsData(5);
     }
 
     /**
