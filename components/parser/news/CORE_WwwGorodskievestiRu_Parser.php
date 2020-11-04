@@ -17,7 +17,7 @@ namespace app\components\parser\news;
 use fingli\ParserCore\ParserCore;
 use app\components\parser\ParserInterface;
 
-// CORE_XXX_Parser -> необходимо заменить на актуальное название парсера (так как называется ваш файл)
+// part 3 approved by rmn
 class CORE_WwwGorodskievestiRu_Parser extends ParserCore implements ParserInterface
 {
     const USER_ID = 2;
@@ -93,27 +93,27 @@ class CORE_WwwGorodskievestiRu_Parser extends ParserCore implements ParserInterf
                 // (обязательный)
                 'element'             => 'rss > channel > item',
 
-                    // ** дальнейшие css-селекторы указываются относительно element
+                // ** дальнейшие css-селекторы указываются относительно element
 
-                    // css селектор для названия элемента
-                    // (обязательный)
-                    'element-title'       => 'title',
+                // css селектор для названия элемента
+                // (обязательный)
+                'element-title'       => 'title',
 
-                    // css селектор для ссылки
-                    // (обязательный)
-                    'element-link'        => 'link',
+                // css селектор для ссылки
+                // (обязательный)
+                'element-link'        => 'link',
 
-                    // css селектор для описания элемента
-                    // (опционально)
-                    'element-description' => 'description',
+                // css селектор для описания элемента
+                // (опционально)
+                'element-description' => 'description',
 
-                    // css селектор для картинки элемента
-                    // (опционально)
-                    'element-image'       => '',
+                // css селектор для картинки элемента
+                // (опционально)
+                'element-image'       => '',
 
-                    // css селектор для даты элемента
-                    // (опционально)
-                    'element-date'        => 'pubDate',
+                // css селектор для даты элемента
+                // (опционально)
+                'element-date'        => 'pubDate',
             ],
 
             // настройка карточки элемента
@@ -125,39 +125,40 @@ class CORE_WwwGorodskievestiRu_Parser extends ParserCore implements ParserInterf
                 // (обязательный)
                 'container'           => 'article.post',
 
-                    // ** дальнейшие css-селекторы указываются относительно container
+                // ** дальнейшие css-селекторы указываются относительно container
 
-                    // css-селектор для основного текста * - данные внутри (картинки, ссылки) парсятся автоматически
-                    // (можно несколько через запятую, если есть разные шаблоны новости)
-                    // (обязательный)
-                    'element-text'        => '.entry-content',
+                // css-селектор для основного текста * - данные внутри (картинки, ссылки) парсятся автоматически
+                // (можно несколько через запятую, если есть разные шаблоны новости)
+                // (обязательный)
+                'element-text'        => '.entry-content',
 
-                    // css-селектор даты создания новости
-                    // (опционально)
-                    'element-date'        => '',
+                // css-селектор даты создания новости
+                // (опционально)
+                'element-date'        => '',
 
-                    // css селектор для описания элемента
-                    // (опционально)
-                    'element-description' => '',
+                // css селектор для описания элемента
+                // (опционально)
+                'element-description' => '',
 
-                    // css селектор для получения картинки
-                    // !должен содержать конечный аттрибут src! (например: img.main-image[src])
-                    // (опционально)
-                    'element-image'       => 'figure img[src]',
+                // css селектор для получения картинки
+                // !должен содержать конечный аттрибут src! (например: img.main-image[src])
+                // (опционально)
+                'element-image'       => 'figure img[src]',
 
-                    // css-селектор для цитаты
-                    // (если не заполнено, то по умолчанию берутся теги: blockquote и q)
-                    // (опционально)
-                    'element-quote'       => '',
+                // css-селектор для цитаты
+                // (если не заполнено, то по умолчанию берутся теги: blockquote и q)
+                // (опционально)
+                'element-quote'       => '',
 
                 // игнорируемые css-селекторы (будут вырезаться из результата)
                 // (можно несколько через запятую)
                 // (опционально)
-                'ignore-selectors'    => '.custom-sht',
+                'ignore-selectors'    => '.custom-sht, figcaption',
 
                 // css-селекторы которые будут вставлятся в начало текста новости element-text (селекторы ищутся от корня)
                 // (опционально)
-                'element-text-before' => '',
+                //                'element-text-before' => '',
+                'element-text-after'  => '.gallery img.attachment-full',
             ]
         ];
 
