@@ -66,7 +66,7 @@ class TvRbsmiRuParser implements ParserInterface
 
         self::$posts[] = (new Parser())->fill(
             $post,
-            $page->filterXpath('//div[@class="pin"]/node()')
+            $page->filterXpath('//div[@class="pin"]/node()[not(starts-with(normalize-space(), "Подробнее - https://vk.com/tuimazirb"))]')
         );
     }
 
