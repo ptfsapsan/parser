@@ -22,7 +22,7 @@ class Trud58Parser implements ParserInterface
 
     const FEED_SRC = "/news.rss";
     const LIMIT = 100;
-
+    const EMPTY_DESCRIPTION = "empty";
 
     /**
      * @return array
@@ -85,7 +85,7 @@ class Trud58Parser implements ParserInterface
 
         $title = $entityData->filter("title")->text();
         $original = $entityData->filter("link")->text();
-        $description = $entityData->filter("description")->text();
+        $description = self::EMPTY_DESCRIPTION;
 
         $createDate = new DateTime($entityData->filterXPath("item/pubDate")->text() . "+03:00");
         $createDate->setTimezone(new DateTimeZone("UTC"));
@@ -112,7 +112,9 @@ class Trud58Parser implements ParserInterface
     private static function inflatePostContent(NewsPost $post, $curl)
     {
         $url = $post->original;
-
+        if($post->description === self::EMPTY_DESCRIPTION){
+            $post->description = "";
+        }
         $pageData = $curl->get($url);
         if (empty($pageData)) {
             throw new Exception("Получен пустой ответ от страницы новости: " . $url);
@@ -145,9 +147,10 @@ class Trud58Parser implements ParserInterface
             }
 
             if (!empty(trim($node->text(), "\xC2\xA0"))) {
-                $cleanText = str_ireplace($post->description, "", $node->text());
-                if (!empty($cleanText)) {
-                    self::addText($post, $cleanText);
+                if(empty($post->description)){
+                    $post->description = Helper::prepareString($node->text());
+                }else{
+                    self::addText($post, $node->text());
                 }
             }
 
