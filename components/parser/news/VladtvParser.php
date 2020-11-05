@@ -35,6 +35,7 @@ class VladtvParser extends AbstractBaseParser
             throw new RuntimeException('Не удалось получить достаточное кол-во новостей', null, $exception);
         }
 
+        dd($previewNewsCrawler->html());
         $previewNewsCrawler = $previewNewsCrawler->filterXPath('//item');
         if($previewNewsCrawler->count() < $minNewsCount){
             throw new RuntimeException('Не удалось получить достаточное кол-во новостей');
