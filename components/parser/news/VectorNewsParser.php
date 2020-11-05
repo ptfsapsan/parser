@@ -90,7 +90,7 @@ class VectorNewsParser implements ParserInterface
 
         $original = self::ROOT_SRC . self::normalizeUrl($postData->filter("div.n-jstats-link-wrap a")->attr("href"));
 
-        $dateString = $postData->filter("div.n-jstats-date")->text() . " " . date("H:i:s") . "+06:00";
+        $dateString = $postData->filter("div.n-jstats-date")->text() . " " . date("H:i:s") . "+00:00";
         $createDate = DateTime::createFromFormat("d.m.Y H:i:s P", $dateString);
         if ($createDate === false) {
             throw new Exception("Could not parser date");
