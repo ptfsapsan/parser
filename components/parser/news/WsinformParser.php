@@ -71,15 +71,12 @@ class WsinformParser extends AbstractBaseParser
         $publishedAt = DateTimeImmutable::createFromFormat('d.m.Y', trim($publishedAtString),$timezone);
         $previewNewsItem->setPublishedAt($publishedAt->setTimezone(new DateTimeZone('UTC')));
 
-
-
-
         $this->removeDomNodes($newsPostCrawler, '//div[contains(@class,"zakladkiinit")]/parent::*/following-sibling::*');
         $this->removeDomNodes($newsPostCrawler, '//div[contains(@class,"zakladkiinit")]/parent::*');
         $this->removeDomNodes($newsPostCrawler, '//h4[contains(@class,"date")]/preceding-sibling::*');
         $this->removeDomNodes($newsPostCrawler, '//h4[contains(@class,"date")]');
 
-        $contentCrawler = $newsPostCrawler->filterXPath('//td');
+        $contentCrawler = $newsPostCrawler->filterXPath('//tr')->first();
 
         $this->purifyNewsPostContent($contentCrawler);
 
