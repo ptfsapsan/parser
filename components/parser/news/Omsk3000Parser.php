@@ -177,25 +177,10 @@ class Omsk3000Parser implements ParserInterface
             }
 
             if ($node->matches("p") && !empty(trim($node->text(), "\xC2\xA0"))) {
-                foreach ($node->getNode(0)->childNodes as $pNode) {
-                    if ($pNode->nodeName === "#text" && !empty(trim($pNode->nodeValue, " \n\r\xC2\xA0"))) {
-                        if (empty($post->description)) {
-                            $post->description = Helper::prepareString(trim($pNode->nodeValue));
-                        } else {
-                            self::addText($post, trim($pNode->nodeValue));
-                        }
-                        continue;
-                    }
-
-                    $cr = new Crawler($pNode);
-                    if (!empty(trim($cr->text(), "\xC2\xA0"))) {
-                        if (empty($post->description)) {
-                            $post->description = Helper::prepareString($cr->text());
-                        } else {
-                            self::addText($post, $cr->text());
-                        }
-                        continue;
-                    }
+                if(empty($post->description)){
+                    $post->description = Helper::prepareString($node->text());
+                }else{
+                    self::addText($post, $node->text());
                 }
                 continue;
             }
