@@ -2,6 +2,7 @@
 
 namespace app\components\parser\news;
 
+use app\components\Helper;
 use app\components\helper\nai4rus\AbstractBaseParser;
 use app\components\helper\nai4rus\PreviewNewsDTO;
 use app\components\parser\NewsPost;
@@ -35,9 +36,8 @@ class VladtvParser extends AbstractBaseParser
             throw new RuntimeException('Не удалось получить достаточное кол-во новостей', null, $exception);
         }
 
-        dd($previewNewsCrawler->html());
         $previewNewsCrawler = $previewNewsCrawler->filterXPath('//item');
-        if($previewNewsCrawler->count() < $minNewsCount){
+        if ($previewNewsCrawler->count() < $minNewsCount) {
             throw new RuntimeException('Не удалось получить достаточное кол-во новостей');
         }
 
@@ -85,7 +85,8 @@ class VladtvParser extends AbstractBaseParser
 
         $contentCrawler = $newsPostCrawler->filterXPath('//div[contains(@class,"panel-body")]');
 
-        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"img_block")]/preceding-sibling::* | //div[contains(@class,"img_block")]');
+        $this->removeDomNodes($contentCrawler,
+            '//div[contains(@class,"img_block")]/preceding-sibling::* | //div[contains(@class,"img_block")]');
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"row")]');
 
         $this->purifyNewsPostContent($contentCrawler);
@@ -93,5 +94,23 @@ class VladtvParser extends AbstractBaseParser
         $newsPostItemDTOList = $this->parseNewsPostContent($contentCrawler, $previewNewsItem);
 
         return $this->factoryNewsPost($previewNewsItem, $newsPostItemDTOList);
+    }
+
+    protected function getPageContent(string $uri): string
+    {
+        $encodedUri = Helper::encodeUrl($uri);
+        $content = $this->getCurl()->get($encodedUri);
+        $this->checkResponseCode($this->getCurl());
+
+        if (str_contains($content, 'bpc=')) {
+            preg_match('/bpc=[^;]*/iu', $content, $matches);
+            $cookie = 'Cookie: ' . array_shift($matches);
+
+            $this->getCurl()->setHeader(CURLOPT_HTTPHEADER, $cookie);
+            $content = $this->getCurl()->get($encodedUri);
+            $this->checkResponseCode($this->getCurl());
+        }
+
+        return $this->decodeGZip($content);
     }
 }
