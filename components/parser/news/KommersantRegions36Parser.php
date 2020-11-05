@@ -35,23 +35,22 @@ class KommersantRegions36Parser extends MediasferaNewsParser implements ParserIn
 
     public const ATTR_IMAGE = 'data-lazyimage-src';
 
-    public const MAINPOST_TITLE = 'article.uho_main .uho_main__text h4.uho_main__name';
     public const MAINPOST_LINK =  'article.uho_main .uho_main__text h4.uho_main__name a';
     public const MAINPOST_IMG =   'article.uho_main .uho_main__photo img';
 
     public const NEWSLIST_POST =  '.b-indetail .indetail__item .uho_norm';
-    public const NEWSLIST_TITLE = '.uho__name.uho_norm__name';
     public const NEWSLIST_LINK =  '.uho__name.uho_norm__name a';
     public const NEWSLIST_IMG =   '.uho__photo img';
 
+    public const ARTICLE_TITLE = 'article.b-article .article_name';
+    public const ARTICLE_DESC =  'article.b-article .article_subheader';
     public const ARTICLE_DATE =  'article.b-article meta[itemprop="datePublished"]';
-    public const ARTICLE_DESC =  'article.b-article .article_text_wrapper .b-article__intro';
     public const ARTICLE_TEXT =  'article.b-article .article_text_wrapper';
 
 
     public const ARTICLE_BREAKPOINTS = [
         'class' => [
-            'b-article__intro' => false,
+//            'b-article__intro' => false,
             'document_authors' => true,
         ]
     ];
@@ -70,7 +69,6 @@ class KommersantRegions36Parser extends MediasferaNewsParser implements ParserIn
         self::$post = new NewsPostWrapper();
         self::$post->isPrepareItems = false;
 
-        self::$post->title = self::getNodeData('text', $listCrawler, self::MAINPOST_TITLE);
         self::$post->original = self::getNodeLink('href', $listCrawler, self::MAINPOST_LINK);
         self::$post->image = self::getNodeImage('data-lazyimage-src', $listCrawler, self::MAINPOST_IMG);
 
@@ -80,6 +78,7 @@ class KommersantRegions36Parser extends MediasferaNewsParser implements ParserIn
 
             $articleCrawler = new Crawler($articleContent);
 
+            self::$post->title = self::getNodeData('text', $articleCrawler, self::ARTICLE_TITLE);
             self::$post->description = self::getNodeData('text', $articleCrawler, self::ARTICLE_DESC);
 
             $date = str_replace('00:00:00+03:00', date('H:i:sP'), self::getNodeData('content', $articleCrawler, self::ARTICLE_DATE));
@@ -99,17 +98,16 @@ class KommersantRegions36Parser extends MediasferaNewsParser implements ParserIn
             self::$post = new NewsPostWrapper();
             self::$post->isPrepareItems = false;
 
-            self::$post->title = self::getNodeData('text', $node, self::NEWSLIST_TITLE);
             self::$post->original = self::getNodeLink('href', $node, self::NEWSLIST_LINK);
             self::$post->image = self::getNodeImage('data-lazyimage-src', $node, self::NEWSLIST_IMG);
 
             $articleContent = self::getPage(self::$post->original);
 
-
             if (!empty($articleContent)) {
 
                 $articleCrawler = new Crawler($articleContent);
 
+                self::$post->title = self::getNodeData('text', $articleCrawler, self::ARTICLE_TITLE);
                 self::$post->description = self::getNodeData('text', $articleCrawler, self::ARTICLE_DESC);
 
                 $date = str_replace('00:00:00+03:00', date('H:i:sP'),self::getNodeData('content', $articleCrawler, self::ARTICLE_DATE));
