@@ -13,21 +13,21 @@ use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\DomCrawler\UriResolver;
 use Throwable;
 
-class GpvnParser extends AbstractBaseParser
+class VestiYaroslavlParser extends AbstractBaseParser
 {
     public const USER_ID = 2;
     public const FEED_ID = 2;
 
     protected function getSiteUrl(): string
     {
-        return 'https://gpvn.ru';
+        return 'https://vesti-yaroslavl.ru/';
     }
 
     protected function getPreviewNewsDTOList(int $minNewsCount = 10, int $maxNewsCount = 100): array
     {
         $previewNewsDTOList = [];
 
-        $uriPreviewPage = UriResolver::resolve("/news/feed", $this->getSiteUrl());
+        $uriPreviewPage = UriResolver::resolve("/yandeks-novosti", $this->getSiteUrl());
 
         try {
             $previewNewsContent = $this->getPageContent($uriPreviewPage);
@@ -66,25 +66,27 @@ class GpvnParser extends AbstractBaseParser
         $newsPage = $this->getPageContent($uri);
 
         $newsPageCrawler = new Crawler($newsPage);
-        $newsPostCrawler = $newsPageCrawler->filterXPath('//div[@class="entry-content"][1]');
+        $newsPostCrawler = $newsPageCrawler->filterXPath('//div[@class="itemBody"]');
 
-        $mainImageCrawler = $newsPostCrawler->filterXPath('//img[1]');
+        $mainImageCrawler = $newsPostCrawler->filterXPath('//img')->first();
         if ($this->crawlerHasNodes($mainImageCrawler)) {
             $image = $mainImageCrawler->attr('src');
+            $this->removeDomNodes($newsPostCrawler, '//img[1]');
         }
         if ($image !== null && $image !== '') {
             $image = UriResolver::resolve($image, $uri);
             $previewNewsDTO->setImage(Helper::encodeUrl($image));
         }
 
-        $descriptionCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"entry-summary")]');
-        if ($this->crawlerHasNodes($descriptionCrawler) && $descriptionCrawler->text() !== '') {
-            $previewNewsDTO->setDescription($descriptionCrawler->text());
+        $description = null;
+        if($description && $description !== ''){
+            $previewNewsDTO->setDescription($description);
         }
 
-        $contentCrawler = $newsPostCrawler;
+        $contentCrawler = $newsPostCrawler->filterXPath('//div[@class="itemFullText"]');
 
-        $this->removeDomNodes($contentCrawler, '//div[@class="post-ratings"]');
+        $this->removeDomNodes($contentCrawler, '//script | //video');
+        $this->removeDomNodes($contentCrawler, '//table');
 
         $this->purifyNewsPostContent($contentCrawler);
 

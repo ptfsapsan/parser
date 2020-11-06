@@ -13,21 +13,21 @@ use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\DomCrawler\UriResolver;
 use Throwable;
 
-class GpvnParser extends AbstractBaseParser
+class Stolica24Parser extends AbstractBaseParser
 {
     public const USER_ID = 2;
     public const FEED_ID = 2;
 
     protected function getSiteUrl(): string
     {
-        return 'https://gpvn.ru';
+        return 'https://stolitca24.ru';
     }
 
     protected function getPreviewNewsDTOList(int $minNewsCount = 10, int $maxNewsCount = 100): array
     {
         $previewNewsDTOList = [];
 
-        $uriPreviewPage = UriResolver::resolve("/news/feed", $this->getSiteUrl());
+        $uriPreviewPage = UriResolver::resolve("/news/rss/", $this->getSiteUrl());
 
         try {
             $previewNewsContent = $this->getPageContent($uriPreviewPage);
@@ -38,13 +38,13 @@ class GpvnParser extends AbstractBaseParser
             }
         }
 
-        $previewNewsCrawler = $previewNewsCrawler->filterXPath('//item');
+        $previewNewsCrawler = $previewNewsCrawler->filterXPath('//default:item');
 
         $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$previewList) {
-            $title = $newsPreview->filterXPath('//title')->text();
-            $uri = $newsPreview->filterXPath('//link')->text();
+            $title = $newsPreview->filterXPath('//default:title')->text();
+            $uri = $newsPreview->filterXPath('//default:link')->text();
 
-            $publishedAtString = $newsPreview->filterXPath('//pubDate')->text();
+            $publishedAtString = $newsPreview->filterXPath('//default:pubDate')->text();
             $publishedAt = DateTimeImmutable::createFromFormat('D, d M Y H:i:s O', $publishedAtString);
             $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
 
@@ -66,26 +66,26 @@ class GpvnParser extends AbstractBaseParser
         $newsPage = $this->getPageContent($uri);
 
         $newsPageCrawler = new Crawler($newsPage);
-        $newsPostCrawler = $newsPageCrawler->filterXPath('//div[@class="entry-content"][1]');
+        $newsPostCrawler = $newsPageCrawler->filterXPath('//div[@class="detail-entry"]');
 
         $mainImageCrawler = $newsPostCrawler->filterXPath('//img[1]');
         if ($this->crawlerHasNodes($mainImageCrawler)) {
             $image = $mainImageCrawler->attr('src');
+            $this->removeDomNodes($newsPostCrawler,'//img[1]');
         }
         if ($image !== null && $image !== '') {
             $image = UriResolver::resolve($image, $uri);
             $previewNewsDTO->setImage(Helper::encodeUrl($image));
         }
 
-        $descriptionCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"entry-summary")]');
+        $descriptionCrawler = $newsPostCrawler->filterXPath('//div[contains(@class,"detail-entry__lid")]');
         if ($this->crawlerHasNodes($descriptionCrawler) && $descriptionCrawler->text() !== '') {
             $previewNewsDTO->setDescription($descriptionCrawler->text());
         }
 
-        $contentCrawler = $newsPostCrawler;
+        $contentCrawler = $newsPostCrawler->filterXPath('//div[@class="detail-entry__text"]');
 
-        $this->removeDomNodes($contentCrawler, '//div[@class="post-ratings"]');
-
+        $this->removeDomNodes($contentCrawler, '//*/following-sibling::text()[contains(., "Фото:")]');
         $this->purifyNewsPostContent($contentCrawler);
 
         $newsPostItemDTOList = $this->parseNewsPostContent($contentCrawler, $previewNewsDTO);

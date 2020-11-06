@@ -13,21 +13,21 @@ use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\DomCrawler\UriResolver;
 use Throwable;
 
-class GpvnParser extends AbstractBaseParser
+class RegCommentParser extends AbstractBaseParser
 {
     public const USER_ID = 2;
     public const FEED_ID = 2;
 
     protected function getSiteUrl(): string
     {
-        return 'https://gpvn.ru';
+        return 'http://regcomment.ru/';
     }
 
     protected function getPreviewNewsDTOList(int $minNewsCount = 10, int $maxNewsCount = 100): array
     {
         $previewNewsDTOList = [];
 
-        $uriPreviewPage = UriResolver::resolve("/news/feed", $this->getSiteUrl());
+        $uriPreviewPage = UriResolver::resolve("/feed/", $this->getSiteUrl());
 
         try {
             $previewNewsContent = $this->getPageContent($uriPreviewPage);
@@ -66,30 +66,40 @@ class GpvnParser extends AbstractBaseParser
         $newsPage = $this->getPageContent($uri);
 
         $newsPageCrawler = new Crawler($newsPage);
-        $newsPostCrawler = $newsPageCrawler->filterXPath('//div[@class="entry-content"][1]');
+        $newsPostCrawler = $newsPageCrawler->filterXPath('//article[contains(@class,"post mass single")]');
+        $this->removeDomNodes($newsPageCrawler, '//div[@id="mistape_dialog"]');
 
-        $mainImageCrawler = $newsPostCrawler->filterXPath('//img[1]');
+        $mainImageCrawler = $newsPageCrawler->filterXPath('//meta[@property="og:image"]')->first();
         if ($this->crawlerHasNodes($mainImageCrawler)) {
-            $image = $mainImageCrawler->attr('src');
+            $image = $mainImageCrawler->attr('content');
+            $this->removeDomNodes($newsPostCrawler, '//img[1]');
         }
         if ($image !== null && $image !== '') {
             $image = UriResolver::resolve($image, $uri);
             $previewNewsDTO->setImage(Helper::encodeUrl($image));
         }
 
-        $descriptionCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"entry-summary")]');
-        if ($this->crawlerHasNodes($descriptionCrawler) && $descriptionCrawler->text() !== '') {
-            $previewNewsDTO->setDescription($descriptionCrawler->text());
-        }
+        $previewNewsDTO->setDescription(null);
 
-        $contentCrawler = $newsPostCrawler;
 
-        $this->removeDomNodes($contentCrawler, '//div[@class="post-ratings"]');
+        $contentCrawler = $newsPostCrawler->filterXPath('//div[contains(@class,"content")]');
+
+        $this->removeDomNodes($contentCrawler, '//a[starts-with(@href, "javascript")]');
+        $this->removeDomNodes($contentCrawler, '//section[@class="related"] | //section[@class="related"]//following-sibling::*');
+        $this->removeDomNodes($contentCrawler, '//section[contains(@class,"times-post-share-buttons")]');
+        $this->removeDomNodes($contentCrawler, '//script | //video');
+        $this->removeDomNodes($contentCrawler, '//table');
 
         $this->purifyNewsPostContent($contentCrawler);
 
         $newsPostItemDTOList = $this->parseNewsPostContent($contentCrawler, $previewNewsDTO);
 
         return $this->factoryNewsPost($previewNewsDTO, $newsPostItemDTOList);
+    }
+
+    protected function normalizeSpaces(string $string): string
+    {
+        $string = preg_replace('/[\r\n\pC]/u', '', $string);
+        return preg_replace('/(\s+|⠀+)/u', ' ', $string);
     }
 }
