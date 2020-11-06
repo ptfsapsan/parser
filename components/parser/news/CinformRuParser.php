@@ -2,6 +2,7 @@
 
 namespace app\components\parser\news;
 
+use app\components\helper\metallizzer\Text;
 use app\components\helper\nai4rus\AbstractBaseParser;
 use app\components\helper\nai4rus\PreviewNewsDTO;
 use app\components\parser\NewsPost;
@@ -12,20 +13,22 @@ use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\DomCrawler\UriResolver;
 use Throwable;
 
-class PrometheusRuParser extends AbstractBaseParser
+class CinformRuParser extends AbstractBaseParser
 {
     public const USER_ID = 2;
     public const FEED_ID = 2;
 
     protected function getSiteUrl(): string
     {
-        return 'https://prometheus.ru/';
+        return 'http://www.cinform.ru/';
     }
+
 
     protected function getPreviewNewsDTOList(int $minNewsCount = 10, int $maxNewsCount = 100): array
     {
         $previewList = [];
-        $uriPreviewPage = UriResolver::resolve('/feed', $this->getSiteUrl());
+
+        $uriPreviewPage = UriResolver::resolve('/?ui=desktop', $this->getSiteUrl());
 
         try {
             $previewNewsContent = $this->getPageContent($uriPreviewPage);
@@ -36,17 +39,13 @@ class PrometheusRuParser extends AbstractBaseParser
             }
         }
 
-        $previewNewsCrawler = $previewNewsCrawler->filterXPath('//item');
+        $previewNewsCrawler = $previewNewsCrawler->filter('.ja-bullettin li a.mostread');
 
         $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$previewList) {
-            $title = $newsPreview->filterXPath('//title')->text();
-            $uri = $newsPreview->filterXPath('//link')->text();
+            $title = Text::trim($this->normalizeSpaces($newsPreview->text()));
+            $uri = UriResolver::resolve($newsPreview->attr('href'), $this->getSiteUrl());
 
-            $publishedAtString = $newsPreview->filterXPath('//pubDate')->text();
-            $publishedAt = DateTimeImmutable::createFromFormat(DATE_RFC1123, $publishedAtString);
-            $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
-
-            $previewList[] = new PreviewNewsDTO($uri, $publishedAtUTC, $title);
+            $previewList[] = new PreviewNewsDTO($uri, null, $title);
         });
 
         $previewList = array_slice($previewList, 0, $maxNewsCount);
@@ -63,29 +62,11 @@ class PrometheusRuParser extends AbstractBaseParser
 
         $newsPageCrawler = new Crawler($newsPage);
 
-        $image = null;
+        $publishedAtString = Text::trim($this->normalizeSpaces($newsPageCrawler->filter('.createdate')->text()));
+        $publishedAt = DateTimeImmutable::createFromFormat('d.m.Y H:i', $publishedAtString, new DateTimeZone('Europe/Moscow'));
+        $previewNewsDTO->setPublishedAt($publishedAt->setTimezone(new DateTimeZone('UTC')));
 
-        $mainImageCrawler = $newsPageCrawler->filterXPath('//div[contains(@id,"post-media")]/img');
-        if ($this->crawlerHasNodes($mainImageCrawler)) {
-            $image = $mainImageCrawler->attr('src');
-            $this->removeDomNodes($newsPageCrawler, '//div[contains(@id,"post-media")]');
-        }
-
-        if ($image !== null && $image !== '') {
-            $image = $this->encodeUri(UriResolver::resolve($image, $this->getSiteUrl()));
-            $previewNewsDTO->setImage($image);
-        }
-
-        $contentCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"single-blog-content")]');
-
-        $descriptionCrawler = $contentCrawler->filterXPath('//p[1]/strong');
-        if ($this->crawlerHasNodes($descriptionCrawler) && $text = $descriptionCrawler->text()) {
-            $description = $text;
-            $this->removeDomNodes($contentCrawler, '//p[1]/strong');
-        }
-
-        $this->removeDomNodes($contentCrawler, '//div[contains(@class,"telegram-subscribe")]');
-        $this->removeDomNodes($contentCrawler, '//*[contains(@class,"twitter-tweet")]');
+        $contentCrawler = $newsPageCrawler->filter('.article-content');
 
         if ($description && $description !== '') {
             $previewNewsDTO->setDescription($description);
