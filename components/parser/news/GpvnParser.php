@@ -77,7 +77,10 @@ class GpvnParser extends AbstractBaseParser
             $previewNewsDTO->setImage(Helper::encodeUrl($image));
         }
 
-        $previewNewsDTO->setDescription(null);
+        $descriptionCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"entry-summary")]');
+        if ($this->crawlerHasNodes($descriptionCrawler) && $descriptionCrawler->text() !== '') {
+            $previewNewsDTO->setDescription($descriptionCrawler->text());
+        }
 
         $contentCrawler = $newsPostCrawler;
 
