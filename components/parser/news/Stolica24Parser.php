@@ -13,21 +13,21 @@ use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\DomCrawler\UriResolver;
 use Throwable;
 
-class KanzoriParser extends AbstractBaseParser
+class Stolica24Parser extends AbstractBaseParser
 {
     public const USER_ID = 2;
     public const FEED_ID = 2;
 
     protected function getSiteUrl(): string
     {
-        return 'https://kanzori.ru/';
+        return 'https://stolitca24.ru';
     }
 
     protected function getPreviewNewsDTOList(int $minNewsCount = 10, int $maxNewsCount = 100): array
     {
         $previewNewsDTOList = [];
 
-        $uriPreviewPage = UriResolver::resolve("/feed", $this->getSiteUrl());
+        $uriPreviewPage = UriResolver::resolve("/news/rss/", $this->getSiteUrl());
 
         try {
             $previewNewsContent = $this->getPageContent($uriPreviewPage);
@@ -38,13 +38,13 @@ class KanzoriParser extends AbstractBaseParser
             }
         }
 
-        $previewNewsCrawler = $previewNewsCrawler->filterXPath('//item');
+        $previewNewsCrawler = $previewNewsCrawler->filterXPath('//default:item');
 
         $previewNewsCrawler->each(function (Crawler $newsPreview) use (&$previewList) {
-            $title = $newsPreview->filterXPath('//title')->text();
-            $uri = $newsPreview->filterXPath('//link')->text();
+            $title = $newsPreview->filterXPath('//default:title')->text();
+            $uri = $newsPreview->filterXPath('//default:link')->text();
 
-            $publishedAtString = $newsPreview->filterXPath('//pubDate')->text();
+            $publishedAtString = $newsPreview->filterXPath('//default:pubDate')->text();
             $publishedAt = DateTimeImmutable::createFromFormat('D, d M Y H:i:s O', $publishedAtString);
             $publishedAtUTC = $publishedAt->setTimezone(new DateTimeZone('UTC'));
 
@@ -66,30 +66,26 @@ class KanzoriParser extends AbstractBaseParser
         $newsPage = $this->getPageContent($uri);
 
         $newsPageCrawler = new Crawler($newsPage);
-        $newsPostCrawler = $newsPageCrawler->filterXPath('//div[contains(@class,"main-post-content")]');
+        $newsPostCrawler = $newsPageCrawler->filterXPath('//div[@class="detail-entry"]');
 
-        $mainImageCrawler = $newsPostCrawler->filterXPath('//div[contains(@class,"post-thumbnail")]/a')->first();
+        $mainImageCrawler = $newsPostCrawler->filterXPath('//img[1]');
         if ($this->crawlerHasNodes($mainImageCrawler)) {
-            $image = $mainImageCrawler->attr('href');
+            $image = $mainImageCrawler->attr('src');
+            $this->removeDomNodes($newsPostCrawler,'//img[1]');
         }
         if ($image !== null && $image !== '') {
-            $previewNewsDTO->setImage(UriResolver::resolve($image, $uri));
+            $image = UriResolver::resolve($image, $uri);
+            $previewNewsDTO->setImage(Helper::encodeUrl($image));
         }
 
-        $descriptionCrawler = $newsPostCrawler->filterXPath('//div[contains(@class,"desc")]');
+        $descriptionCrawler = $newsPostCrawler->filterXPath('//div[contains(@class,"detail-entry__lid")]');
         if ($this->crawlerHasNodes($descriptionCrawler) && $descriptionCrawler->text() !== '') {
             $previewNewsDTO->setDescription($descriptionCrawler->text());
         }
 
+        $contentCrawler = $newsPostCrawler->filterXPath('//div[@class="detail-entry__text"]');
 
-        $contentCrawler = $newsPostCrawler->filterXPath('//div[contains(@class,"post-detail")]');
-
-        $this->removeDomNodes($contentCrawler,'//div[contains(@class,"mobile-slider")]');
-        $this->removeDomNodes($contentCrawler,'//div[contains(@class,"post-thumbnail")]');
-        $this->removeDomNodes($contentCrawler,'//div[contains(@class,"addtoany_share_save_container")]//following-sibling::*');
-        $this->removeDomNodes($contentCrawler,'//div[contains(@class,"addtoany_share_save_container")]');
-
-
+        $this->removeDomNodes($contentCrawler, '//*/following-sibling::text()[contains(., "Фото:")]');
         $this->purifyNewsPostContent($contentCrawler);
 
         $newsPostItemDTOList = $this->parseNewsPostContent($contentCrawler, $previewNewsDTO);
