@@ -148,7 +148,10 @@ class KapitalNewsParser implements ParserInterface
             foreach ($hatulNode->childNodes as $bodyNode) {
                 $node = new Crawler($bodyNode);
 
-                if(mb_stripos(trim($node->text(), " \xC2\xA0"), "..") === 0){
+                if(
+                    mb_stripos(trim($node->text(), " \xC2\xA0"), "..") === 0
+                    && mb_strlen(trim($node->text(), " \xC2\xA0")) < 3
+                ){
                     break;
                 }
 
@@ -161,7 +164,8 @@ class KapitalNewsParser implements ParserInterface
                     continue;
                 }
 
-                if ($node->matches("p") && !empty(trim($node->text(), " .\xC2\xA0"))) {
+                if ($node->matches("p, span") && !empty(trim($node->text(), " .\xC2\xA0"))) {
+
                     if (empty($post->description)) {
                         $post->description = Helper::prepareString($node->text());
                     } else {
