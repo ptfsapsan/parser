@@ -137,15 +137,25 @@ class ExemplaireParser implements ParserInterface
 
         $content = $crawler->filter("div.main-container section");
 
+        $picHolder = $crawler->filter("div.field-type-image div.field-item div.tgf-slides img");
+        if($picHolder->count() !== 0){
+            $picHolder->each(function (Crawler $picNode) use ($post){
+                if($post->image === null){
+                    $post->image = self::normalizeUrl($picNode->attr("src"));
+                }else{
+                    self::addImage($post, self::normalizeUrl($picNode->attr("src")));
+                }
+            });
+
+        }
+
 
         $body = $content->filter("div.field-name-body div.field-item")->children("p, blockquote");
         if($body->count() === 0){
             throw new Exception("Не найден блок новости в полученой странице: " . $url);
         }
         $body->each(function (Crawler $node) use ($post) {
-            if (empty(trim($node->text(), "\xC2\xA0"))) {
-                return;
-            }
+
 
             if ($node->matches("blockquote") && !empty(trim($node->text(), "\xC2\xA0"))) {
                 self::addQuote($post, $node->text());
@@ -154,7 +164,7 @@ class ExemplaireParser implements ParserInterface
             if($node->matches("p")){
                 if ($node->children("img")->count() != 0) {
                     self::addImage($post, self::ROOT_SRC . $node->children("img")->attr("src"));
-                } else{
+                } elseif(!empty(trim($node->text(), "\xC2\xA0"))){
                     if (empty($post->description)) {
                         $post->description = Helper::prepareString($node->text());
                     }else{
@@ -174,6 +184,18 @@ class ExemplaireParser implements ParserInterface
         if($body->count() !== 0){
             self::addText($post, $body->text());
         }
+    }
+
+    /**
+     * @param string $content
+     *
+     * @return string
+     */
+    protected static function normalizeUrl(string $content)
+    {
+        return preg_replace_callback('/[^\x21-\x7f]/', function ($match) {
+            return rawurlencode($match[0]);
+        }, $content);
     }
 
     /**
@@ -200,8 +222,6 @@ class ExemplaireParser implements ParserInterface
      */
     protected static function addImage(NewsPost $post, string $content): void
     {
-        print_r($content);
-        print_r("\n");
         $post->addItem(
             new NewsPostItem(
                 NewsPostItem::TYPE_IMAGE,
