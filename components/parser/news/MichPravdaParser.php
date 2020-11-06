@@ -89,20 +89,13 @@ class MichPravdaParser extends AbstractBaseParser
         $newsPageCrawler = new Crawler($newsPage);
         $newsPostCrawler = $newsPageCrawler->filterXPath('//section[@id="block-system-main"]');
 
-        $mainImageCrawler = $newsPageCrawler->filterXPath('//meta[@property="og:image"]')->first();
-        if ($this->crawlerHasNodes($mainImageCrawler)) {
-            $image = $mainImageCrawler->attr('content');
-            $this->removeDomNodes($newsPostCrawler,'//img[1]');
-        }
-        if ($image !== null && $image !== '') {
-            $image = UriResolver::resolve($image, $uri);
-            $previewNewsDTO->setImage($this->encodeUri($image));
+        $descriptionCrawler = $newsPostCrawler->filterXPath('//div[contains(@class,"field-name-field-announcement")]');
+        if ($this->crawlerHasNodes($descriptionCrawler) && $descriptionCrawler->text() !== '') {
+            $previewNewsDTO->setDescription($descriptionCrawler->text());
         }
 
-        $previewNewsDTO->setDescription(null);
-
-
-        $contentCrawler = $newsPostCrawler->filterXPath('//div[contains(@class,"field field-name-body field-type-text")]')->first();
+        $contentXpath = '//div[contains(@class,"tgf-slide-item")] | //div[contains(@class,"field field-name-body field-type-text")]';
+        $contentCrawler = $newsPostCrawler->filterXPath($contentXpath);
         $this->removeDomNodes($contentCrawler, '//div[contains(@class,"mobile-slider")]');
 
         $this->purifyNewsPostContent($contentCrawler);
