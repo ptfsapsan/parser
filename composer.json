@@ -17,7 +17,8 @@
     "symfony/css-selector": "^5.1",
     "ext-zlib": "*",
     "ext-json": "*",
-    "fingli/parser-core": "dev-main"
+    "fingli/parser-core": "dev-main",
+    "ext-curl": "*"
   },
   "config": {
     "process-timeout": 1800,
