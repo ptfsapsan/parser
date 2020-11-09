@@ -57,14 +57,14 @@ class VoronezhMediaParser implements ParserInterface
                 $parser = self::getParser($original, $curl);
                 $basic = $parser->find('td.basic');
                 $basic->find('.sign')->remove();
-                $p = $basic->find('p.sign')->text();
-                $createDate = str_replace(',', '', substr($p, -17));
+                $createDate = $item->find('td p')->get(0)->firstChild->textContent;
+                $createDate = date('d.m.Y H:i:s', self::getTimestampFromString($createDate));
                 $description = $basic->find('h1')->text();
                 if (empty($description)) {
                     $description = $basic->find('p:first')->text();
                 }
                 $images = [];
-                $imgs = $basic->find('p img');
+                $imgs = $basic->find('p img:gt(0)');
                 if (count($imgs)) {
                     foreach ($imgs as $img) {
                         $src = $img->getAttribute('src');
@@ -124,5 +124,78 @@ class VoronezhMediaParser implements ParserInterface
         $content = $curl->get(Helper::prepareUrl($link));
 
         return PhpQuery::newDocument($content);
+    }
+
+    private static function getTimestampFromString(string $time): string
+    {
+        if (!preg_match('/^(\d+) (\w+) (\d+), (\d+):(\d+)$/ui', trim($time), $matches)) {
+            return time();
+        }
+        switch ($matches[2]) {
+            case 'янв':
+            case 'январь':
+            case 'января':
+                $month = '01';
+                break;
+            case 'фев':
+            case 'февраль':
+            case 'февраля':
+                $month = '02';
+                break;
+            case 'мар':
+            case 'март':
+            case 'марта':
+                $month = '03';
+                break;
+            case 'апр':
+            case 'апрель':
+            case 'апреля':
+                $month = '04';
+                break;
+            case 'май':
+            case 'мая':
+                $month = '05';
+                break;
+            case 'июн':
+            case 'июнь':
+            case 'июня':
+                $month = '06';
+                break;
+            case 'июл':
+            case 'июль':
+            case 'июля':
+                $month = '07';
+                break;
+            case 'авг':
+            case 'август':
+            case 'августа':
+                $month = '08';
+                break;
+            case 'сен':
+            case 'сентябрь':
+            case 'сентября':
+                $month = '09';
+                break;
+            case 'окт':
+            case 'октябрь':
+            case 'октября':
+                $month = '10';
+                break;
+            case 'ноя':
+            case 'ноябрь':
+            case 'ноября':
+                $month = '11';
+                break;
+            case 'дек':
+            case 'декабрь':
+            case 'декабря':
+                $month = '12';
+                break;
+            default:
+                $month = '01';
+        }
+        $time = strtotime(sprintf('%d-%d-%d %d:%d:00', $matches[3], $month, $matches[1], $matches[4], $matches[5]));
+
+        return $time ?? time();
     }
 }
