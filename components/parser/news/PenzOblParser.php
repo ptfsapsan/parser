@@ -129,7 +129,7 @@ class PenzOblParser implements ParserInterface
             return;
         }
         $href = $item->find('a')->attr('href');
-        if (empty($href) || strpos($href, 'mailto:') !== false) {
+        if (empty($href) || strpos($href, 'mailto:') !== false || $href == self::$mainImageSrc) {
             return;
         }
         $post->addItem(
