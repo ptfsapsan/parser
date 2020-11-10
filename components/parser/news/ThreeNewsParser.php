@@ -47,8 +47,9 @@ class ThreeNewsParser implements ParserInterface
                 $title = trim($item->find('title')->text());
                 $original = $item->find('link')->text();
                 $createDate = date('d.m.Y H:i:s', strtotime($item->find('pubDate')->text()));
-                $description = $item->find('description')->text();
                 $originalParser = self::getParser($original, $curl);
+                $description = $originalParser->find('.td-post-content p:first')->text();
+                $description = empty($description) ? $title : $description;
                 $image = $originalParser->find('.td-post-content p img:first')->attr('src');
                 $image = sprintf('%s%s', self::DOMAIN, $image);
                 $image = filter_var($image, FILTER_VALIDATE_URL) ? $image : null;
@@ -80,7 +81,7 @@ class ThreeNewsParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.td-post-content p');
+        $paragraphs = $parser->find('.td-post-content p:gt(0)');
         $paragraphs->find('img:first')->remove();
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
