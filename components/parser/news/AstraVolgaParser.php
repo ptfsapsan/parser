@@ -46,8 +46,9 @@ class AstraVolgaParser implements ParserInterface
                 $title = trim($item->find('title')->text());
                 $original = $item->find('link')->text();
                 $createDate = date('d.m.Y H:i:s', strtotime($item->find('pubDate')->text()));
-                $description = trim(strip_tags($item->find('description')->text()));
                 $originalParser = self::getParser($original, $curl);
+                $description = trim($originalParser->find('.entry-content p strong:first')->text());
+                $description = empty($description) ? $title : $description;
                 $image = $originalParser->find('.post-gallery img')->attr('src');
                 if (empty($image)) {
                     $image = null;
@@ -81,6 +82,7 @@ class AstraVolgaParser implements ParserInterface
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
         $paragraphs = $parser->find('.entry-content p');
+        $paragraphs->find('strong:first')->remove();
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 self::setImage($paragraph, $post);
