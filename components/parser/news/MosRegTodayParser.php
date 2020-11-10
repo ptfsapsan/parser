@@ -21,6 +21,7 @@ class MosRegTodayParser implements ParserInterface
 
     private const LINK = 'https://mosregtoday.ru/news/feed/';
     private const DOMAIN = 'https://mosregtoday.ru';
+    private const TIMEZONE = '+0300';
 
     public static function run(): array
     {
@@ -41,7 +42,7 @@ class MosRegTodayParser implements ParserInterface
                 $original = $a->attr('href');
                 $original = sprintf('%s%s', self::DOMAIN, $original);
                 $originalParser = self::getParser($original, $curl);
-                $createDate = $item->attr('data-date');
+                $createDate = sprintf('%s %s', $item->attr('data-date'), self::TIMEZONE);
                 $createDate = date('d.m.Y H:i:s', strtotime($createDate));
                 $image = $originalParser->find('.viewport .slide')->attr('style');
                 $start = strpos($image, 'https://');
