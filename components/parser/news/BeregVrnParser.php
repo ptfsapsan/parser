@@ -52,7 +52,7 @@ class BeregVrnParser implements ParserInterface
                 $d = explode(' / ', $createDate);
                 $createDate = sprintf('%d.%d.%d %s', $d[0], $d[1], $d[2], date('H:i:s'));
                 $originalParser = self::getParser($original, $curl);
-                $description = $originalParser->find('#content p strong:first')->text();
+                $description = $originalParser->find('#content p:first')->text();
                 $description = empty($description) ? $title : $description;
                 $image = $item->find('table.intr td.image img')->attr('src');
                 $image = empty($image) ? null : sprintf('%s/%s', self::DOMAIN, $image);
@@ -85,7 +85,7 @@ class BeregVrnParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('#content p');
+        $paragraphs = $parser->find('#content p:gt(0)');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 self::setImage($paragraph, $post);
