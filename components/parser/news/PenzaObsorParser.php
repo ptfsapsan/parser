@@ -22,6 +22,7 @@ class PenzaObsorParser implements ParserInterface
     private const LINK = 'https://penzaobzor.ru/feed/';
     private const DOMAIN = 'https://penzaobzor.ru';
     private const COUNT = 10;
+    private const TIMEZONE = '+0300';
 
     /**
      * @return array
@@ -42,7 +43,9 @@ class PenzaObsorParser implements ParserInterface
                 $item = PhpQuery::pq($item);
                 $title = trim($item->find('title')->text());
                 $original = $item->find('link')->text();
-                $createDate = date('d.m.Y H:i:s', strtotime($item->find('pubDate')->text()));
+                $createDate = $item->find('pubDate')->text();
+                $createDate = sprintf('%s%s', substr($createDate, 0, -5), self::TIMEZONE);
+                $createDate = date('d.m.Y H:i:s', strtotime($createDate));
                 $originalParser = self::getParser($original, $curl);
                 $description = trim($originalParser->find('.entry-content > p:first')->text());
                 $description = empty($description) ? $title : $description;
