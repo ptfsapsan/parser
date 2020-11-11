@@ -20,6 +20,8 @@ class Ngs24Parser implements ParserInterface
 
     private const LINK = 'https://ngs24.ru/';
     private const DOMAIN = 'https://ngs24.ru';
+    private const TIMEZONE = '+0300';
+    private static $mainImageSrc = null;
 
     public static function run(): array
     {
@@ -40,8 +42,10 @@ class Ngs24Parser implements ParserInterface
                 $original = sprintf('%s%s', self::DOMAIN, $original);
                 $originalParser = self::getParser($original, $curl);
                 $createDate = $originalParser->find('div[itemprop="datePublished"]')->attr('datetime');
-                $createDate = date('d.m.Y H:i:s', strtotime($createDate));
+                $createDate = date('d.m.Y H:i:s', strtotime(sprintf('%s %s', $createDate, self::TIMEZONE)));
                 $image = $originalParser->find('picture img')->attr('src');
+                $image = empty($image) ? null : $image;
+                self::$mainImageSrc = $image;
                 $description = $originalParser->find('p[itemprop="alternativeHeadline"]')->text();
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
@@ -72,16 +76,14 @@ class Ngs24Parser implements ParserInterface
         if (count($images)) {
             foreach ($images as $img) {
                 $src = $img->getAttribute('src');
-                if (!empty($src)) {
-                    if (filter_var($src, FILTER_VALIDATE_URL)) {
-                        $post->addItem(
-                            new NewsPostItem(
-                                NewsPostItem::TYPE_IMAGE,
-                                null,
-                                $src,
-                            )
-                        );
-                    }
+                if (!empty($src) && self::$mainImageSrc != $src) {
+                    $post->addItem(
+                        new NewsPostItem(
+                            NewsPostItem::TYPE_IMAGE,
+                            null,
+                            $src,
+                        )
+                    );
                 }
             }
         }
