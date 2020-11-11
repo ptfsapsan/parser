@@ -43,15 +43,14 @@ class NgParser implements ParserInterface
                         case 'link':
                             $original = trim($childNode->nextSibling->textContent);
                             break;
-                        case 'description':
-                            $description = trim($childNode->textContent);
-                            break;
                         case 'pubdate':
                             $createDate = date('d.m.Y H:i:s', strtotime($childNode->textContent));
                             break;
                     }
                 }
                 $originalParser = self::getParser($original, $curl);
+                $description = $originalParser->find('.news_detail_content p:first')->text();
+                $description = empty($description) ? $title : $description;
                 $image = $originalParser->find('.news_detail_content img:first')->attr('src');
                 $image = empty($image) ? null : sprintf('%s%s', self::DOMAIN, $image);
                 try {
@@ -80,7 +79,7 @@ class NgParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.news_detail_content p');
+        $paragraphs = $parser->find('.news_detail_content p:gt(0)');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 $text = trim($paragraph->textContent);
