@@ -8,6 +8,7 @@ use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
+use DOMElement;
 use Exception;
 use linslin\yii2\curl\Curl;
 use PhpQuery\PhpQuery;
@@ -69,8 +70,12 @@ class ChuvPortalParser implements ParserInterface
         $paragraphs = $parser->find('.post-content > div:eq(1) p');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
-                $text = trim($paragraph->textContent);
-                if (!empty($text)) {
+                self::setImage($paragraph, $post);
+                self::setLink($paragraph, $post);
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
+                if (!empty($text) && strpos($text, 'Источник:') === false) {
                     $post->addItem(
                         new NewsPostItem(
                             NewsPostItem::TYPE_TEXT,
@@ -80,41 +85,48 @@ class ChuvPortalParser implements ParserInterface
                 }
             }
         }
-        $images = $parser->find('.post-content > div:eq(1) img');
-        if (count($images)) {
-            foreach ($images as $img) {
-                $src = $img->getAttribute('src');
-                if (!empty($src)) {
-                    if (filter_var($src, FILTER_VALIDATE_URL)) {
-                        $post->addItem(
-                            new NewsPostItem(
-                                NewsPostItem::TYPE_IMAGE,
-                                null,
-                                $src,
-                            )
-                        );
-                    }
-                }
-            }
-        }
-        $links = $parser->find('.post-content > div:eq(1) p a');
-        if (count($links)) {
-            foreach ($links as $link) {
-                $href = $link->getAttribute('href');
-                if (!empty($href)) {
-                    $post->addItem(
-                        new NewsPostItem(
-                            NewsPostItem::TYPE_LINK,
-                            null,
-                            null,
-                            $href,
-                        )
-                    );
-                }
-            }
-        }
 
         return $post;
     }
 
+    private static function setImage(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $src = $item->find('img')->attr('src');
+        if (empty($src)) {
+            return;
+        }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_IMAGE,
+                null,
+                $src,
+            )
+        );
+    }
+
+    private static function setLink(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $href = $item->find('a')->attr('href');
+        if (empty($href)) {
+            return;
+        }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_LINK,
+                null,
+                null,
+                $href,
+            )
+        );
+    }
 }
