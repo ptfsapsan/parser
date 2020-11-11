@@ -22,6 +22,7 @@ class TrueInformParser implements ParserInterface
     private const LINK = 'http://trueinform.ru/Laid.html';
     private const DOMAIN = 'http://trueinform.ru';
     private const COUNT = 10;
+    private static $mainImageSrc = null;
 
     /**
      * @return array
@@ -49,10 +50,11 @@ class TrueInformParser implements ParserInterface
                 $original = $a->attr('href');
                 $original = sprintf('%s/%s', self::DOMAIN, $original);
                 $title = $a->attr('title');
-                $image = $a->find('img')->attr('src');
-                $image = sprintf('%s/%s', self::DOMAIN, $image);
-                $description = trim($a->next('p.simple')->text());
                 $originalParser = self::getParser($original, $curl);
+                $image = $originalParser->find('h2')->parent()->find('p:not(.author) img:first')->attr('src');
+                $image = empty($image) ? null : $image;
+                self::$mainImageSrc = $image;
+                $description = trim($a->next('p.simple')->text());
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
@@ -86,8 +88,10 @@ class TrueInformParser implements ParserInterface
             foreach ($paragraphs as $paragraph) {
                 self::setImage($paragraph, $post);
                 self::setLink($paragraph, $post);
+                self::setYoutube($paragraph, $post);
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
@@ -110,7 +114,7 @@ class TrueInformParser implements ParserInterface
             return;
         }
         $src = $item->find('img')->attr('src');
-        if (empty($src)) {
+        if (empty($src) || self::$mainImageSrc == $src) {
             return;
         }
         if (strpos($src, 'http') === false) {
@@ -136,12 +140,40 @@ class TrueInformParser implements ParserInterface
         if (empty($href)) {
             return;
         }
+        if (strpos($href, 'http') === false) {
+            $href = sprintf('%s%s', self::DOMAIN, $href);
+        }
         $post->addItem(
             new NewsPostItem(
                 NewsPostItem::TYPE_LINK,
                 null,
                 null,
                 $href,
+            )
+        );
+    }
+
+    private static function setYoutube(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $src = $item->find('iframe')->attr('src');
+        $pos = strpos($src, 'youtube.com/embed/');
+        if (empty($src) || $pos === false) {
+            return;
+        }
+        $code = substr($src, ($pos + 18), 11);
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_VIDEO,
+                null,
+                null,
+                null,
+                null,
+                $code,
             )
         );
     }
