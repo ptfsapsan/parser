@@ -47,8 +47,8 @@ class PenzOblParser implements ParserInterface
                 $title = trim($item->find('title')->text());
                 $original = $item->find('link')->text();
                 $createDate = date('d.m.Y H:i:s', strtotime($item->find('pubDate')->text()));
-                $description = trim(strip_tags($item->find('description')->text()));
                 $originalParser = self::getParser($original, $curl);
+                $description = trim($originalParser->find('article.post p:first')->text());
                 $image = $originalParser->find('article img:first')->attr('src');
                 $image = filter_var($image, FILTER_VALIDATE_URL) ? $image : null;
                 self::$mainImageSrc = $image;
@@ -80,7 +80,7 @@ class PenzOblParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('article.post p');
+        $paragraphs = $parser->find('article.post p:gt(0)');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 self::setImage($paragraph, $post);
