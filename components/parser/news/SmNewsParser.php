@@ -38,8 +38,9 @@ class SmNewsParser implements ParserInterface
                 $original = trim($item->find('link')->text());
                 $createDate = $item->find('pubDate')->text();
                 $createDate = date('d.m.Y H:i:s', strtotime($createDate));
-                $description = trim(strip_tags($item->find('description')->text()));
                 $originalParser = self::getParser($original, $curl);
+                $description = trim($originalParser->find('.news__preview:first')->text());
+                $description = empty($description) ? $title : $description;
                 $image = $originalParser->find('.news__image img')->attr('src');
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
@@ -66,14 +67,19 @@ class SmNewsParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.post:first > p, .wp-caption.aligncenter');
+        $paragraphs = $parser->find('.post:first');
+        $paragraphs->find('script')->remove();
         $paragraphs->find('.wp-caption-text')->remove();
         $paragraphs->find('script')->remove();
         if (count($paragraphs)) {
-            foreach ($paragraphs as $paragraph) {
-                self::setImage($paragraph, $post);
-                self::setLink($paragraph, $post);
-                $text = trim($paragraph->textContent);
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                if ($paragraph instanceof DOMElement) {
+                    self::setImage($paragraph, $post);
+                    self::setLink($paragraph, $post);
+                }
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
@@ -128,5 +134,4 @@ class SmNewsParser implements ParserInterface
             )
         );
     }
-
 }
