@@ -42,8 +42,9 @@ class ChelTvParser implements ParserInterface
                 $original = trim($item->find('link')->text());
                 $createDate = $item->find('pubDate')->text();
                 $createDate = date('d.m.Y H:i:s', strtotime($createDate));
-                $description = trim(strip_tags($item->find('description')->text()));
                 $originalParser = self::getParser($original, $curl);
+                $description = trim($originalParser->find('[itemprop=articleBody] p:first')->text());
+                $description = empty($description) ? $title : $description;
                 $image = $originalParser->find('[itemprop=articleBody] img:first')->attr('src');
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
@@ -70,12 +71,14 @@ class ChelTvParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('[itemprop=articleBody] p');
+        $paragraphs = $parser->find('[itemprop=articleBody] p:gt(0)');
         $paragraphs->find('iframe')->remove();
         $paragraphs->find('script')->remove();
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
-                $text = trim($paragraph->textContent);
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
