@@ -46,13 +46,15 @@ class Plus50Parser implements ParserInterface
                 $createDate = $item->find('.news-inner .news-date:last')->text();
                 $createDate = sprintf('%s %s', trim($createDate), date('H:i:s'));
                 $title = $item->find('a.news-title')->text();
-                $description = $item->find('div.news-text')->text();
+                $originalParser = self::getParser($original, $curl);
+                $description = $originalParser->find('.news-section .frame p:first')->text();
+                $description = empty($description) ? $title : $description;
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
                     continue;
                 }
-                $posts[] = self::setOriginalData($original, $curl, $post);
+                $posts[] = self::setOriginalData($originalParser, $post);
             }
         }
 
@@ -78,24 +80,19 @@ class Plus50Parser implements ParserInterface
     }
 
     /**
-     * @param string $original
-     * @param Curl $curl
+     * @param PhpQueryObject $parser
      * @param NewsPost $post
      * @return NewsPost
-     * @throws Exception
      */
-    private static function setOriginalData(string $original, Curl $curl, NewsPost $post): NewsPost
+    private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        if (empty($original)) {
-            return $post;
-        }
-        $parser = self::getParser($original, $curl);
-
         // text
-        $p = $parser->find('.news-section .frame p');
+        $p = $parser->find('.news-section .frame p:gt(0)');
         if (count($p)) {
             foreach ($p as $item) {
-                $text = trim($item->textContent);
+                $text = htmlentities($item->textContent);
+                $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
