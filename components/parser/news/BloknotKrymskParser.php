@@ -38,9 +38,9 @@ class BloknotKrymskParser implements ParserInterface
                 $title = $a->text();
                 $original = $a->attr('href');
                 $original = sprintf('%s%s', self::DOMAIN, $original);
-                $image = $item->find('img.preview_picture')->attr('src');
-                $image = empty($image) ? null : sprintf('http:%s', $image);
                 $originalParser = self::getParser($original, $curl);
+                $image = $originalParser->find('.news-picture img')->attr('src');
+                $image = empty($image) ? null : sprintf('http:%s', $image);
                 $createDate = $originalParser->find('.news-item-info span.news-date-time')->text();
                 $createDate = sprintf('%s%s', trim($createDate), ':00');
                 $description = $originalParser->find('#news-text p:first')->text();
