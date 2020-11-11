@@ -39,11 +39,9 @@ class CrimeaRiaParser implements ParserInterface
                 $original = sprintf('%s%s', self::DOMAIN, $original);
                 $title = trim($item->find('a .b-list__item-title')->text());
                 $image = $item->find('.b-list__item-img img')->attr('src');
-                $description = $item->find('.b-list__item-announce')->text();
                 $originalParser = self::getParser($original, $curl);
-                if (empty($description)) {
-                    $description = $originalParser->find('.b-article__body p:first')->text();
-                }
+                $description = $originalParser->find('.b-article__body p:first')->text();
+                $description = empty($description) ? $title : $description;
                 $time = $item->find('.b-list__item-time')->text();
                 $date = $item->find('.b-list__item-date')->text();
                 $createDate = sprintf('%s %s:00', $date, $time);
@@ -72,12 +70,14 @@ class CrimeaRiaParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.b-article__body p');
+        $paragraphs = $parser->find('.b-article__body p:gt(0)');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 self::setImage($paragraph, $post);
                 self::setLink($paragraph, $post);
-                $text = trim($paragraph->textContent);
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
