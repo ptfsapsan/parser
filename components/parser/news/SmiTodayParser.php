@@ -43,7 +43,8 @@ class SmiTodayParser implements ParserInterface
                 $time = trim($item->find('.short-data')->text());
                 $createDate = sprintf('%s %s:00', $date, $time);
                 $image = null;
-                $description = $title;
+                $description = $originalParser->find('.newful')->text();
+                $description = empty($description) ? $title : $description;
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
@@ -70,17 +71,6 @@ class SmiTodayParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-
-
-        $text = $parser->find('.newful')->text();
-        if (!empty($text)) {
-            $post->addItem(
-                new NewsPostItem(
-                    NewsPostItem::TYPE_TEXT,
-                    trim($text),
-                )
-            );
-        }
         $images = $parser->find('.newful img');
         if (count($images)) {
             foreach ($images as $img) {
