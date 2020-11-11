@@ -8,6 +8,7 @@ use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
+use DOMElement;
 use Exception;
 use linslin\yii2\curl\Curl;
 use PhpQuery\PhpQuery;
@@ -42,10 +43,10 @@ class EaDailyParser implements ParserInterface
                 $title = trim($item->find('title')->text());
                 $original = trim($item->find('link')->text());
                 $createDate = $item->find('pubDate')->text();
-                $description = trim(($item->find('description')->text()));
-                $description = str_replace('...', '', $description);
-                $createDate = date('d.m.Y H:i:s', strtotime($createDate));
                 $originalParser = self::getParser($original, $curl);
+                $description = trim($originalParser->find('.news-text-body p.lead')->text());
+                $description = empty($description) ? $title : $description;
+                $createDate = date('d.m.Y H:i:s', strtotime($createDate));
                 $image = $originalParser->find('figure.oneimage img:first')->attr('src');
                 if (strpos($image, '//') === 0) {
                     $image = sprintf('https:%s', $image);
@@ -80,23 +81,15 @@ class EaDailyParser implements ParserInterface
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
         $body = $parser->find('.news-text-body');
-        $header = $body->find('p.lead')->text();
-        if (!empty($header)) {
-            $post->addItem(
-                new NewsPostItem(
-                    NewsPostItem::TYPE_HEADER,
-                    trim($header),
-                    null,
-                    null,
-                    1,
-                )
-            );
-        }
         $body->find('p.lead')->remove();
         $paragraphs = $body->find('p');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
-                $text = trim($paragraph->textContent);
+                self::setImage($paragraph, $post);
+                self::setLink($paragraph, $post);
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
@@ -107,45 +100,54 @@ class EaDailyParser implements ParserInterface
                 }
             }
         }
-        $images = $paragraphs->find('img');
-        if (count($images)) {
-            foreach ($images as $img) {
-                $src = $img->getAttribute('src');
-                if (!empty($src)) {
-                    $src = sprintf('https:%s', $src);
-                    if (filter_var($src, FILTER_VALIDATE_URL)) {
-                        $post->addItem(
-                            new NewsPostItem(
-                                NewsPostItem::TYPE_IMAGE,
-                                null,
-                                $src,
-                            )
-                        );
-                    }
-                }
-            }
-        }
-        $links = $paragraphs->find('a');
-        if (count($links)) {
-            foreach ($links as $link) {
-                $href = $link->getAttribute('href');
-                if (!empty($href)) {
-                    if (strpos($href, 'http') === false) {
-                        $href = sprintf('%s%s', self::DOMAIN, $href);
-                    }
-                    $post->addItem(
-                        new NewsPostItem(
-                            NewsPostItem::TYPE_LINK,
-                            null,
-                            null,
-                            $href,
-                        )
-                    );
-                }
-            }
-        }
 
         return $post;
     }
 
+    private static function setImage(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $src = $item->find('img')->attr('src');
+        if (empty($src)) {
+            return;
+        }
+        if (strpos($src, 'http') === false) {
+            $src = strpos($src, '//') === 0 ? sprintf('https:%s', $src) : sprintf('%s%s', self::DOMAIN, $src);
+        }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_IMAGE,
+                null,
+                $src,
+            )
+        );
+    }
+
+    private static function setLink(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $href = $item->find('a')->attr('href');
+        if (empty($href)) {
+            return;
+        }
+        if (strpos($href, 'http') === false) {
+            $href = strpos($href, '//') === 0 ? sprintf('https:%s', $href) : sprintf('%s%s', self::DOMAIN, $href);
+        }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_LINK,
+                null,
+                null,
+                $href,
+            )
+        );
+    }
 }
