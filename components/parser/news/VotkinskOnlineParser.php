@@ -22,6 +22,7 @@ class VotkinskOnlineParser implements ParserInterface
     private const LINK = 'http://votkinskonline.ru/rss';
     private const DOMAIN = 'http://votkinskonline.ru';
     private const COUNT = 10;
+    private const TIMEZONE = '+0300';
 
     /**
      * @return array
@@ -49,9 +50,10 @@ class VotkinskOnlineParser implements ParserInterface
                 $title = $a->text();
                 $original = sprintf('%s%s', self::DOMAIN, $a->attr('href'));
                 $createDate = strip_tags($item->find('pubDate')->text());
-                $description = trim(strip_tags($item->find('description')->text()));
-                $description = str_replace('...', '', $description);
+                $createDate = date('d.m.Y H:i:s', strtotime(sprintf('%s %s', $createDate, self::TIMEZONE)));
                 $originalParser = self::getParser($original, $curl);
+                $description = trim($originalParser->find('p.MsoNormal:first')->text());
+                $description = empty($description) ? $title : $description;
                 $image = $originalParser->find('li.gallery-slide a')->attr('href');
                 $image = filter_var($image, FILTER_VALIDATE_URL) ? $image : null;
                 try {
@@ -89,6 +91,7 @@ class VotkinskOnlineParser implements ParserInterface
                 self::setLink($paragraph, $post);
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
