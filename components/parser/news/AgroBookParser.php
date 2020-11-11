@@ -22,6 +22,7 @@ class AgroBookParser implements ParserInterface
     private const LINK = 'https://agrobook.ru/';
     private const DOMAIN = 'https://agrobook.ru';
     private const COUNT = 10;
+    private const TIMEZONE = '+0300';
 
     /**
      * @return array
@@ -56,9 +57,10 @@ class AgroBookParser implements ParserInterface
                 $createDate = $footer->text();
                 $createDate = str_replace(' - ', '', $createDate);
                 $createDate = mb_substr($createDate, 4);
-                $description = $item->find('.field-item p')->text();
-                $image = $item->find('.field-item img')->attr('src');
+                $createDate = date('d.m.Y H:i:s', strtotime(sprintf('%s %s', $createDate, self::TIMEZONE)));
                 $originalParser = self::getParser($original, $curl);
+                $description = $originalParser->find('.field.field-name-body .field-item p:first')->text();
+                $image = $item->find('.field-item img')->attr('src');
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
@@ -87,7 +89,7 @@ class AgroBookParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.field.field-name-body .field-item p');
+        $paragraphs = $parser->find('.field.field-name-body .field-item p:gt(0)');
         $paragraphs->find('script')->remove();
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
@@ -95,6 +97,7 @@ class AgroBookParser implements ParserInterface
                 self::setLink($paragraph, $post);
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
