@@ -48,10 +48,11 @@ class NewsMentParser implements ParserInterface
                 $original = $a->attr('href');
                 $createDate = $item->find('.entry-date')->attr('datetime');
                 $createDate = date('d.m.Y H:i:s', strtotime($createDate));
-                $description = $item->find('.entry-article-part.entry-article-body p')->text();
-                $description = str_replace('…', '', $description);
-                $image = $item->find('.entry-thumbnail img')->attr('src');
                 $originalParser = self::getParser($original, $curl);
+                $description = $originalParser->find('.entry-content.entry--item > p:first')->text();
+                $description = empty($description) ? $title : $description;
+                $image = $originalParser->find('.entry-thumbnail.has-thumb img')->attr('src');
+                $image = empty($image) ? null : $image;
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
@@ -80,7 +81,7 @@ class NewsMentParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.entry-content.entry--item > p');
+        $paragraphs = $parser->find('.entry-content.entry--item > p:gt(0)');
         $paragraphs->find('script')->remove();
         $paragraphs->find('em')->remove();
         if (count($paragraphs)) {
@@ -89,6 +90,7 @@ class NewsMentParser implements ParserInterface
                 self::setLink($paragraph, $post);
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
