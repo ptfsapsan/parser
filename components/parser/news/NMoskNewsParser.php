@@ -22,7 +22,7 @@ class NMoskNewsParser implements ParserInterface
     private const LINK = 'http://www.nmosknews.ru/';
     private const DOMAIN = 'http://www.nmosknews.ru';
     private const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36 Edg/86.0.622.38';
-
+    private const TIMEZONE = '+0300';
 
     public static function run(): array
     {
@@ -42,13 +42,13 @@ class NMoskNewsParser implements ParserInterface
                 $title = $a->text();
                 $original = $a->attr('href');
                 $original = sprintf('%s%s', self::DOMAIN, $original);
-                $image = $item->find('.list_img a')->attr('style');
-                $image = str_replace(['background-image: url(\'', '\');'], '', $image);
-                $image = empty($image) ? null : sprintf('%s%s', self::DOMAIN, $image);
+                $originalParser = self::getParser($original, $curl);
+                $image = $originalParser->find('.content_field.news-view > img')->attr('src');
+                $image = empty($image) ? null : $image;
                 $createDate = $item->find('.date nobr')->text();
                 $createDate = str_replace(['Сегодня', 'Вчера'], [date('d.m.Y'), date('d.m.Y', strtotime('-1day'))], $createDate);
+                $createDate = date('d.m.Y H:i:s', strtotime(sprintf('%s %s', $createDate, self::TIMEZONE)));
                 $description = trim($item->find('p')->text());
-                $originalParser = self::getParser($original, $curl);
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
