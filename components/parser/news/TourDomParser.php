@@ -38,8 +38,9 @@ class TourDomParser implements ParserInterface
                 $original = trim($item->find('link')->text());
                 $createDate = $item->find('pubDate')->text();
                 $createDate = date('d.m.Y H:i:s', strtotime($createDate));
-                $description = trim(strip_tags($item->find('description')->text()));
                 $originalParser = self::getParser($original, $curl);
+                $description = trim($originalParser->find('article p:first')->text());
+                $description = empty($description) ? $title : $description;
                 $image = $originalParser->find('.article__img img:first')->attr('src');
                 $image = empty($image) ? null : sprintf('%s%s', self::DOMAIN, $image);
                 try {
@@ -67,7 +68,7 @@ class TourDomParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('article p');
+        $paragraphs = $parser->find('article p:gt(0)');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 $text = trim($paragraph->textContent);
@@ -87,15 +88,13 @@ class TourDomParser implements ParserInterface
                 $src = $img->getAttribute('src');
                 if (!empty($src)) {
                     $src = sprintf('%s%s', self::DOMAIN, $src);
-                    if (filter_var($src, FILTER_VALIDATE_URL)) {
-                        $post->addItem(
-                            new NewsPostItem(
-                                NewsPostItem::TYPE_IMAGE,
-                                null,
-                                $src,
-                            )
-                        );
-                    }
+                    $post->addItem(
+                        new NewsPostItem(
+                            NewsPostItem::TYPE_IMAGE,
+                            null,
+                            $src,
+                        )
+                    );
                 }
             }
         }
@@ -118,5 +117,4 @@ class TourDomParser implements ParserInterface
 
         return $post;
     }
-
 }
