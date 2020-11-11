@@ -22,6 +22,7 @@ class VGorodeKiroveParser implements ParserInterface
     private const LINK = 'https://vgorodekirove.ru/news';
     private const DOMAIN = 'https://vgorodekirove.ru';
     private const COUNT = 10;
+    private const TIMEZONE = '+0300';
 
     /**
      * @return array
@@ -83,12 +84,14 @@ class VGorodeKiroveParser implements ParserInterface
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
         $paragraphs = $parser->find('.user_content p');
+        $paragraphs->find('span:first')->remove();
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 self::setImage($paragraph, $post);
                 self::setLink($paragraph, $post);
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
@@ -215,7 +218,7 @@ class VGorodeKiroveParser implements ParserInterface
             default:
                 $month = '01';
         }
-        $time = strtotime(sprintf('%d-%d-%d %d:%d:00', $matches[1], $month, date('Y'), $matches[3], $matches[4]));
+        $time = strtotime(sprintf('%d-%d-%d %d:%d:00 %s', $matches[1], $month, date('Y'), $matches[3], $matches[4], self::TIMEZONE));
 
         return $time ?? time();
     }
