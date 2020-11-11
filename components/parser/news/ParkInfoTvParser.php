@@ -70,7 +70,9 @@ class ParkInfoTvParser implements ParserInterface
         $paragraphs = $parser->find('.text-inner:gt(0):not(:last) p');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
-                $text = trim($paragraph->textContent);
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
