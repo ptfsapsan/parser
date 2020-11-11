@@ -21,6 +21,7 @@ class VologdaPoiskParser implements ParserInterface
 
     private const LINK = 'https://vologda-poisk.ru/news';
     private const DOMAIN = 'https://vologda-poisk.ru';
+    private const TIMEZONE = '+0300';
 
     public static function run(): array
     {
@@ -40,9 +41,9 @@ class VologdaPoiskParser implements ParserInterface
                 $original = $a->attr('href');
                 $originalParser = self::getParser($original, $curl);
                 $createDate = $originalParser->find('span[itemprop=datePublished]')->attr('content');
-                $createDate = date('d.m.Y H:i:s', strtotime($createDate));
-                $image = $item->find('img.list-images')->attr('src');
-                $image = sprintf('%s%s', self::DOMAIN, $image);
+                $createDate = date('d.m.Y H:i:s', strtotime(sprintf('%s %s', $createDate, self::TIMEZONE)));
+                $image = $originalParser->find('.image-container img')->attr('src');
+                $image = empty($image) ? null : sprintf('%s%s', self::DOMAIN, $image);
                 $description = trim($originalParser->find('div[itemprop=articleBody] p:first')->text());
                 $description = str_replace('&nbsp; ', '', $description);
                 $description = empty($description) ? $title : $description;
@@ -71,12 +72,14 @@ class VologdaPoiskParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('div[itemprop=articleBody] p');
+        $paragraphs = $parser->find('div[itemprop=articleBody] p:gt(0)');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 self::setImage($paragraph, $post);
                 self::setLink($paragraph, $post);
-                $text = trim($paragraph->textContent);
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
