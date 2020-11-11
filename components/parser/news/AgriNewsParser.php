@@ -78,14 +78,17 @@ class AgriNewsParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('[itemprop=articleBody] p');
+        $paragraphs = $parser->find('[itemprop=articleBody]');
         $paragraphs->find('em')->remove();
         if (count($paragraphs)) {
-            foreach ($paragraphs as $paragraph) {
-                self::setImage($paragraph, $post);
-                self::setLink($paragraph, $post);
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                if ($paragraph instanceof DOMElement) {
+                    self::setImage($paragraph, $post);
+                    self::setLink($paragraph, $post);
+                }
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
