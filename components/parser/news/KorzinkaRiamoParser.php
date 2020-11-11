@@ -44,8 +44,6 @@ class KorzinkaRiamoParser implements ParserInterface
                 } catch (Exception $e) {
                     continue;
                 }
-                $image = $item->attr('image');
-                $image = sprintf('%s%s', self::DOMAIN, $image);
                 $a = $item->find('h4.card--title a');
                 $title = trim($a->text());
                 $original = $a->attr('href');
@@ -59,6 +57,8 @@ class KorzinkaRiamoParser implements ParserInterface
                     $createDate = date('d.m.Y H:i:s', self::getTimestampFromString($createDate));
                 }
                 $originalParser = self::getParser($original, $curl);
+                $image = $originalParser->find('.photo-box--in img')->attr('src');
+                $image = empty($image) ? null : sprintf('%s%s', self::DOMAIN, $image);
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
@@ -94,6 +94,7 @@ class KorzinkaRiamoParser implements ParserInterface
                 self::setLink($paragraph, $post);
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
@@ -154,7 +155,7 @@ class KorzinkaRiamoParser implements ParserInterface
 
     private static function getTimestampFromString(string $time): string
     {
-        if (!preg_match('/^(\d+) (\w+) (\d+):(\d+)$/ui', trim($time), $matches)) {
+        if (!preg_match('/^(\d+) (\w+)\W+(\d+):(\d+)$/ui', trim($time), $matches)) {
             return time();
         }
         switch ($matches[2]) {
