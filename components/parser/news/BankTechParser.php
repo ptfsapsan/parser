@@ -8,6 +8,7 @@ use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
+use DOMElement;
 use Exception;
 use linslin\yii2\curl\Curl;
 use PhpQuery\PhpQuery;
@@ -20,6 +21,7 @@ class BankTechParser implements ParserInterface
     const FEED_ID = 2;
 
     private const LINK = 'https://banktech.ru/news/';
+    private const TIMEZONE = '+0300';
 
     /**
      * @return array
@@ -53,11 +55,7 @@ class BankTechParser implements ParserInterface
             } catch (Exception $e) {
                 continue;
             }
-
-
-                self::getItemText($detail, $post);
-                self::getItemImages($detail, $post);
-                self::getItemLinks($detail, $post);
+            self::getItemText($detail, $post);
 
             $posts[] = $post;
         }
@@ -85,7 +83,11 @@ class BankTechParser implements ParserInterface
         $paragraphs = $detail->find('p');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
-                $text = $paragraph->textContent;
+                self::setImage($paragraph, $post);
+                self::setLink($paragraph, $post);
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
@@ -99,46 +101,46 @@ class BankTechParser implements ParserInterface
         }
     }
 
-    private static function getItemImages(PhpQueryObject $detail, NewsPost $post)
+
+    private static function setImage(DOMElement $paragraph, NewsPost $post)
     {
-        $images = $detail->find('p img:gt(0)');
-        if (!count($images)) {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
             return;
         }
-        foreach ($images as $image) {
-            $src = $image->getAttribute('src');
-            if (!empty($src)) {
-                $post->addItem(
-                    new NewsPostItem(
-                        NewsPostItem::TYPE_IMAGE,
-                        null,
-                        $src,
-                    )
-                );
-
-            }
+        $src = $item->find('img')->attr('src');
+        if (empty($src)) {
+            return;
         }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_IMAGE,
+                null,
+                $src,
+            )
+        );
     }
 
-    private static function getItemLinks(PhpQueryObject $detail, NewsPost $post)
+    private static function setLink(DOMElement $paragraph, NewsPost $post)
     {
-        $links = $detail->find('p a');
-        if (!count($links)) {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
             return;
         }
-        foreach ($links as $link) {
-            $href = $link->getAttribute('href');
-            if (!empty($href) && filter_var($href, FILTER_VALIDATE_URL)) {
-                $post->addItem(
-                    new NewsPostItem(
-                        NewsPostItem::TYPE_LINK,
-                        null,
-                        null,
-                        $href,
-                    )
-                );
-            }
+        $href = $item->find('a')->attr('href');
+        if (empty($href)) {
+            return;
         }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_LINK,
+                null,
+                null,
+                $href,
+            )
+        );
     }
 
     private static function getTimestampFromString(string $time): int
@@ -209,7 +211,7 @@ class BankTechParser implements ParserInterface
             default:
                 $month = '01';
         }
-        $time = strtotime(sprintf('%d-%d-%d %d:%d', $matches[3], $month, $matches[1], $matches[4], $matches[5]));
+        $time = strtotime(sprintf('%d-%d-%d %d:%d %s', $matches[3], $month, $matches[1], $matches[4], $matches[5], self::TIMEZONE));
 
         return $time ?? time();
     }
