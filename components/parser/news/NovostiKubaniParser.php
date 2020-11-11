@@ -19,6 +19,7 @@ class NovostiKubaniParser implements ParserInterface
     const FEED_ID = 2;
 
     private const LINK = 'http://novostikubani.ru';
+    private const TIMEZONE = '+0300';
 
     /**
      * @return array
@@ -41,6 +42,7 @@ class NovostiKubaniParser implements ParserInterface
             $title = $textDif[1];
             $dateDif = explode(' - ', $text);
             $createDate = str_replace(',', '', current($dateDif));
+            $createDate = date('d.m.Y H:i:s', strtotime(sprintf('%s %s', $createDate, self::TIMEZONE)));
             $original = $it->find('a')->attr('href') ?? '';
             $originalParser = self::getParser($original, $curl);
             $description = $originalParser->find('.article_odin1 p:first')->text();
@@ -76,7 +78,9 @@ class NovostiKubaniParser implements ParserInterface
         $paragraphs = $detail->find('p:gt(0):not(.wp-caption-text)');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
-                $text = $paragraph->textContent;
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
