@@ -72,7 +72,6 @@ class MoeOnlineParser implements ParserInterface
         $paragraphs = $parser->find('.font_os.app_in_text p');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
-                self::setImage($paragraph, $post);
                 self::setLink($paragraph, $post);
                 $text = trim($paragraph->textContent);
                 if (!empty($text)) {
@@ -87,30 +86,6 @@ class MoeOnlineParser implements ParserInterface
         }
 
         return $post;
-    }
-
-    private static function setImage(DOMElement $paragraph, NewsPost $post)
-    {
-        try {
-            $item = PhpQuery::pq($paragraph);
-        } catch (Exception $e) {
-            return;
-        }
-        $src = $item->find('img')->attr('src');
-        if (empty($src)) {
-            return;
-        }
-        if (strpos($src, 'http') === false) {
-            $src = sprintf('%s%s', self::DOMAIN, $src);
-        }
-        $src = sprintf('%s%s', self::DOMAIN, $src);
-        $post->addItem(
-            new NewsPostItem(
-                NewsPostItem::TYPE_IMAGE,
-                null,
-                $src,
-            )
-        );
     }
 
     private static function setLink(DOMElement $paragraph, NewsPost $post)
