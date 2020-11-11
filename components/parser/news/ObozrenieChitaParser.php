@@ -22,6 +22,7 @@ class ObozrenieChitaParser implements ParserInterface
     private const LINK = 'http://obozrenie-chita.ru/rubric/35';
     private const DOMAIN = 'http://obozrenie-chita.ru';
     private const COUNT = 10;
+    private const TIMEZONE = '+0300';
 
     /**
      * @return array
@@ -53,7 +54,8 @@ class ObozrenieChitaParser implements ParserInterface
                 $originalParser = self::getParser($original, $curl);
                 $date = $originalParser->find('.single-article-datetime .date')->text();
                 $time = $originalParser->find('.single-article-datetime .time')->text();
-                $createDate = sprintf('%s %s:00', trim($date), trim($time));
+                $createDate = sprintf('%s %s:00 %s', trim($date), trim($time), self::TIMEZONE);
+                $createDate = date('d.m.Y H:i:s', strtotime($createDate));
                 $description = $originalParser->find('.ctext p b:first')->text();
                 $description = empty($description) ? $title : $description;
                 try {
@@ -84,7 +86,9 @@ class ObozrenieChitaParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.ctext p:first > span > span');
+        $paragraphs = $parser->find('.ctext');
+        $paragraphs->find('b:first')->remove();
+        $paragraphs = $paragraphs->find('p:first > span > span');
         if (count($paragraphs)) {
             foreach (current($paragraphs->get())->childNodes as $paragraph) {
                 if ($paragraph instanceof DOMElement) {
@@ -93,6 +97,7 @@ class ObozrenieChitaParser implements ParserInterface
                 }
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
