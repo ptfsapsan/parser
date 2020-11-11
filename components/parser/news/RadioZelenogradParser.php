@@ -8,6 +8,7 @@ use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
+use DOMElement;
 use Exception;
 use linslin\yii2\curl\Curl;
 use PhpQuery\PhpQuery;
@@ -70,10 +71,14 @@ class RadioZelenogradParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.text p:gt(0)');
+        $paragraphs = $parser->find('.text');
         if (count($paragraphs)) {
-            foreach ($paragraphs as $paragraph) {
-                $text = trim($paragraph->textContent);
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                self::setImage($paragraph, $post);
+                self::setLink($paragraph, $post);
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
@@ -84,42 +89,51 @@ class RadioZelenogradParser implements ParserInterface
                 }
             }
         }
-        $images = $parser->find('.text img');
-        if (count($images)) {
-            foreach ($images as $img) {
-                $src = $img->getAttribute('src');
-                if (!empty($src)) {
-                    $src = sprintf('%s%s', self::DOMAIN, $src);
-                    if (filter_var($src, FILTER_VALIDATE_URL)) {
-                        $post->addItem(
-                            new NewsPostItem(
-                                NewsPostItem::TYPE_IMAGE,
-                                null,
-                                $src,
-                            )
-                        );
-                    }
-                }
-            }
-        }
-        $links = $parser->find('.text a');
-        if (count($links)) {
-            foreach ($links as $link) {
-                $href = $link->getAttribute('href');
-                if (!empty($href) && filter_var($href, FILTER_VALIDATE_URL)) {
-                    $post->addItem(
-                        new NewsPostItem(
-                            NewsPostItem::TYPE_LINK,
-                            null,
-                            null,
-                            $href,
-                        )
-                    );
-                }
-            }
-        }
 
         return $post;
     }
 
+    private static function setImage(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $src = $item->find('img')->attr('src');
+        if (empty($src)) {
+            return;
+        }
+        if (strpos($src, 'http') === false) {
+            $src = sprintf('%s%s', self::DOMAIN, $src);
+        }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_IMAGE,
+                null,
+                $src,
+            )
+        );
+    }
+
+    private static function setLink(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $href = $item->find('a')->attr('href');
+        if (empty($href)) {
+            return;
+        }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_LINK,
+                null,
+                null,
+                $href,
+            )
+        );
+    }
 }
