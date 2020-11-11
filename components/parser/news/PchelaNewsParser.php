@@ -21,6 +21,7 @@ class PchelaNewsParser implements ParserInterface
 
     private const LINK = 'https://pchela.news/';
     private const COUNT = 10;
+    private const TIMEZONE = '+0300';
 
     /**
      * @return array
@@ -46,13 +47,15 @@ class PchelaNewsParser implements ParserInterface
                 $a = $item->find('a.news-link');
                 $title = trim($item->find('.news-feed__description')->text());
                 $original = $a->attr('href');
-                $image = $item->find('img.news-feed__img')->attr('src');
                 $createDate = $item->find('time.news-feed__date')->text();
                 $createDate = str_replace('Сегодня', date('d.m.Y'), $createDate);
                 $createDate = str_replace('Вчера', date('d.m.Y', strtotime('-1 day')), $createDate);
+                $createDate = date('d.m.Y H:i:s', strtotime(sprintf('%s %s', $createDate, self::TIMEZONE)));
                 $originalParser = self::getParser($original, $curl);
                 $description = $originalParser->find('h5.news-detail__subtitle')->text();
                 $description = empty($description) ? $title : $description;
+                $image = $originalParser->find('img.news-detail__img')->attr('src');
+                $image = empty($image) ? null : $image;
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
@@ -88,6 +91,7 @@ class PchelaNewsParser implements ParserInterface
                 self::setLink($paragraph, $post);
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
