@@ -51,6 +51,7 @@ class RealnoeVremyaParser implements ParserInterface
                 $image = sprintf('%s%s', self::DOMAIN, $image);
                 $image = str_replace('lazy.', '', $image);
                 $description = trim($originalParser->find('.detailCont article p:first')->text());
+                $description = empty($description) ? $title : $description;
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
@@ -76,7 +77,7 @@ class RealnoeVremyaParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.detailCont article p');
+        $paragraphs = $parser->find('.detailCont article p:gt(0)');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 self::setImage($paragraph, $post);
@@ -129,6 +130,9 @@ class RealnoeVremyaParser implements ParserInterface
         $href = $item->find('a')->attr('href');
         if (empty($href)) {
             return;
+        }
+        if (strpos($href, 'http') === false) {
+            $href = sprintf('%s%s', self::DOMAIN, $href);
         }
         $post->addItem(
             new NewsPostItem(
