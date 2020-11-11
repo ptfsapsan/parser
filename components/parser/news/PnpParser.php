@@ -72,20 +72,7 @@ class PnpParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.js-mediator-article');
-        $header = $paragraphs->find('p:first b')->text();
-        if (!empty($header)) {
-            $post->addItem(
-                new NewsPostItem(
-                    NewsPostItem::TYPE_HEADER,
-                    trim($header),
-                    null,
-                    null,
-                    1,
-                )
-            );
-        }
-        $paragraphs = empty($header) ? $paragraphs->find('p'): $paragraphs->find('p:gt(0)');
+        $paragraphs = $parser->find('.js-mediator-article p');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 $text = trim($paragraph->textContent);
