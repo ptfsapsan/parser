@@ -65,7 +65,7 @@ class RtRbcParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.article__text.article__text_free p');
+        $paragraphs = $parser->find('.article__text.article__text_free p:gt(0)');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 self::setImage($paragraph, $post);
