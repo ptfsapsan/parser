@@ -46,9 +46,9 @@ class NovostiSaratovaParser implements ParserInterface
                 $title = trim($item->find('title')->text());
                 $original = $item->find('link')->text();
                 $createDate = date('d.m.Y H:i:s', strtotime($item->find('pubDate')->text()));
-                $description = trim(strip_tags($item->find('description')->text()));
                 $originalParser = self::getParser($original, $curl);
-                $image = $originalParser->find('img.entry-thumb')->attr('src');
+                $description = trim($originalParser->find('.td-post-content p:first')->text());
+                $image = $originalParser->find('.td-post-featured-image img')->attr('src');
                 if (empty($image)) {
                     $image = null;
                 }
@@ -80,11 +80,10 @@ class NovostiSaratovaParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.td-post-content p');
+        $paragraphs = $parser->find('.td-post-content p:gt(0)');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 self::setImage($paragraph, $post);
-                self::setLink($paragraph, $post);
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;','',$text));
                 if (!empty($text)) {
@@ -117,27 +116,6 @@ class NovostiSaratovaParser implements ParserInterface
                 NewsPostItem::TYPE_IMAGE,
                 null,
                 $src,
-            )
-        );
-    }
-
-    private static function setLink(DOMElement $paragraph, NewsPost $post)
-    {
-        try {
-            $item = PhpQuery::pq($paragraph);
-        } catch (Exception $e) {
-            return;
-        }
-        $href = $item->find('a')->attr('href');
-        if (empty($href)) {
-            return;
-        }
-        $post->addItem(
-            new NewsPostItem(
-                NewsPostItem::TYPE_LINK,
-                null,
-                null,
-                $href,
             )
         );
     }
