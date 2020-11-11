@@ -66,26 +66,15 @@ class CenterGradParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $header = $parser->find('.entry-content h2')->text();
-        if (!empty($header)) {
-            $post->addItem(
-                new NewsPostItem(
-                    NewsPostItem::TYPE_HEADER,
-                    trim($header),
-                    null,
-                    null,
-                    2,
-                )
-            );
-        }
-
         $paragraphs = $parser->find('.entry-content p');
         $paragraphs->find('script')->remove();
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 self::setImage($paragraph, $post);
                 self::setLink($paragraph, $post);
-                $text = trim($paragraph->textContent);
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
