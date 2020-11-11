@@ -47,8 +47,9 @@ class SkoropapaParser implements ParserInterface
                 $title = trim($item->find('title')->text());
                 $original = $item->find('link')->text();
                 $createDate = date('d.m.Y H:i:s', strtotime($item->find('pubDate')->text()));
-                $description = trim(strip_tags($item->find('description')->text()));
                 $originalParser = self::getParser($original, $curl);
+                $description = trim($originalParser->find('.entry-content > p:first')->text());
+                $description = empty($description) ? $title : $description;
                 $image = $originalParser->find('.entry-featuredImg img')->attr('src');
                 $image = filter_var($image, FILTER_VALIDATE_URL) ? $image : null;
                 try {
@@ -79,13 +80,14 @@ class SkoropapaParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.entry-content > p');
+        $paragraphs = $parser->find('.entry-content > p:gt(0)');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 self::setImage($paragraph, $post);
                 self::setLink($paragraph, $post);
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
