@@ -43,7 +43,7 @@ class ChelyabinskNewsParser implements ParserInterface
                 $createDate = trim($item->getElementsByTagName('pubdate')->item(0)->textContent);
                 $createDate = date('d.m.Y H:i:s', strtotime($createDate));
                 $originalParser = self::getParser2($original, $curl);
-                $description = trim($item->getElementsByTagName('description')->item(0)->textContent);
+                $description = trim($originalParser->find('[itemprop=articleBody] p:first')->text());
                 $description = str_replace('...', '', $description);
                 $description = empty($description) ? $originalParser->find('[itemprop=articleBody] p:first')->text() : $description;
                 $description = empty($description) ? $title : $description;
@@ -92,13 +92,14 @@ class ChelyabinskNewsParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('[itemprop=articleBody] p');
+        $paragraphs = $parser->find('[itemprop=articleBody] p:gt(0)');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 self::setImage($paragraph, $post);
                 self::setLink($paragraph, $post);
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
