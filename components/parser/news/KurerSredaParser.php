@@ -20,6 +20,7 @@ class KurerSredaParser implements ParserInterface
 
     private const LINK = 'https://kurer-sreda.ru/vse_novosti';
     private const DOMAIN = 'https://kurer-sreda.ru';
+    private const TIMEZONE = '+0300';
 
     public static function run(): array
     {
@@ -39,11 +40,11 @@ class KurerSredaParser implements ParserInterface
                 $original = $a->attr('href');
                 $createDate = $item->find('.news-t4__date')->text();
                 $d = explode(' ', $createDate);
-                $createDate = sprintf('%s %s:00', $d[1], $d[0]);
+                $createDate = sprintf('%s %s:00 %s', $d[1], $d[0], self::TIMEZONE);
+                $createDate = date('d.m.Y H:i:s', strtotime($createDate));
                 $originalParser = self::getParser($original, $curl);
-                $image = $item->find('figure.image')->attr('style');
-                $image = str_replace(['background: url(', ');background-size: cover;background-repeat: no-repeat;'], '', $image);
-                $image = sprintf('%s%s', self::DOMAIN, $image);
+                $image = $originalParser->find('figure.image.article-media__art img')->attr('src');
+                $image = empty($image) ? null : $image;
                 $a = $item->find('.news-t4__body a');
                 $a->find('span')->remove();
                 $description = trim($a->text());
