@@ -53,7 +53,7 @@ class ArsVestParser implements ParserInterface
                 $originalParser = self::getParser($original, $curl);
                 $image = $originalParser->find('.article .text img:first')->attr('src');
                 $image = empty($image) ? null : $image;
-                $description = $originalParser->find('.article .text p strong:first')->text();
+                $description = $originalParser->find('.article .text p:first')->text();
                 $description = empty($description) ? $title : $description;
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
@@ -83,13 +83,14 @@ class ArsVestParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.article .text p');
+        $paragraphs = $parser->find('.article .text p:gt(0)');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 self::setImage($paragraph, $post);
                 self::setLink($paragraph, $post);
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
