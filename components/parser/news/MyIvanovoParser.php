@@ -35,9 +35,8 @@ class MyIvanovoParser implements ParserInterface
                 }
                 $a = $item->find('.item h2 a');
                 $title = trim($a->text());
-                //$original = $a->attr('href');
                 //  оригинальные страницы выдают 500 ошибку
-                $original = sprintf('%s%s', self::DOMAIN, '/');
+                $original = sprintf('%s%s', self::DOMAIN, $a->attr('href'));
                 $createDate = $item->find('.article-info .create')->text();
                 $createDate = trim(str_replace('Создано:', '', $createDate));
                 $image = $item->find('.item > p img')->attr('src');
