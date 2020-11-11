@@ -21,6 +21,7 @@ class SpbDnevnikParser implements ParserInterface
     private const LINK = 'https://spbdnevnik.ru/';
     private const DOMAIN = 'https://spbdnevnik.ru';
     private const COUNT = 10;
+    private const TIMEZONE = '+0300';
 
     public static function run(): array
     {
@@ -47,6 +48,7 @@ class SpbDnevnikParser implements ParserInterface
                 $createDate = $item->find('.live__article-time')->text();
                 $createDate = str_replace('Сегодня в', date('d.m.Y'), $createDate);
                 $createDate = str_replace('Вчера в', date('d.m.Y', strtotime('-1day')), $createDate);
+                $createDate = date('d.m.Y H:i:s', strtotime(sprintf('%s %s', $createDate, self::TIMEZONE)));
                 $image = $originalParser->find('.news-full--element-image img')->attr('src');
                 $description = $originalParser->find('.news-full--element-subtitle')->text();
                 try {
