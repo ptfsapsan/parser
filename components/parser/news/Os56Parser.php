@@ -82,11 +82,14 @@ class Os56Parser implements ParserInterface
     {
         $paragraphs = $parser->find('.entry-content > p');
         if (count($paragraphs)) {
-            foreach ($paragraphs as $paragraph) {
-                self::setImage($paragraph, $post);
-                self::setLink($paragraph, $post);
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                if ($paragraph instanceof DOMElement) {
+                    self::setImage($paragraph, $post);
+                    self::setLink($paragraph, $post);
+                }
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
