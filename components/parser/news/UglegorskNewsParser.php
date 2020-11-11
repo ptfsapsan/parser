@@ -46,8 +46,9 @@ class UglegorskNewsParser implements ParserInterface
                 $title = trim($item->find('title')->text());
                 $original = $item->find('link')->text();
                 $createDate = date('d.m.Y H:i:s', strtotime($item->find('pubDate')->text()));
-                $description = trim(strip_tags($item->find('description')->text()));
                 $originalParser = self::getParser($original, $curl);
+                $description = trim($originalParser->find('.td-post-content p:first')->text());
+                $description = empty($description) ? $title : $description;
                 $image = $originalParser->find('.gallery-icon.landscape:first a img')->attr('src');
                 $image = filter_var($image, FILTER_VALIDATE_URL) ? $image : null;
                 try {
@@ -80,7 +81,7 @@ class UglegorskNewsParser implements ParserInterface
     {
         $paragraphs = $parser->find('.td-post-content');
         $paragraphs->find('.mistape_caption')->remove();
-        $paragraphs = $paragraphs->find('p');
+        $paragraphs = $paragraphs->find('p:gt(0)');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 self::setImage($paragraph, $post);
