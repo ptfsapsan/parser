@@ -21,6 +21,7 @@ class YolaPoiskParser implements ParserInterface
 
     private const LINK = 'https://yola-poisk.ru/news';
     private const DOMAIN = 'https://yola-poisk.ru';
+    private const TIMEZONE = '+0300';
 
     public static function run(): array
     {
@@ -40,8 +41,9 @@ class YolaPoiskParser implements ParserInterface
                 $original = $a->attr('href');
                 $originalParser = self::getParser($original, $curl);
                 $createDate = $originalParser->find('span[itemprop=datePublished]')->attr('content');
+                $createDate = sprintf('%s %s', $createDate, self::TIMEZONE);
                 $createDate = date('d.m.Y H:i:s', strtotime($createDate));
-                $image = $item->find('img.list-images')->attr('src');
+                $image = $originalParser->find('.image-container.wide img')->attr('src');
                 $image = sprintf('%s%s', self::DOMAIN, $image);
                 $description = trim($originalParser->find('div[itemprop=articleBody] p:first')->text());
                 $description = str_replace('&nbsp; ', '', $description);
@@ -71,7 +73,7 @@ class YolaPoiskParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('div[itemprop=articleBody] p');
+        $paragraphs = $parser->find('div[itemprop=articleBody] p:gt(0)');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 self::setImage($paragraph, $post);
