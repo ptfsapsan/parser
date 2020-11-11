@@ -46,13 +46,14 @@ class RiaLipetskParser implements ParserInterface
                 $title = trim($item->find('title')->text());
                 $original = $item->find('link')->text();
                 $createDate = date('d.m.Y H:i:s', strtotime($item->find('pubDate')->text()));
-                $description = trim(strip_tags($item->find('description')->text()));
                 $originalParser = self::getParser($original, $curl);
+                $description = trim($originalParser->find('.entry-content p:first')->text());
+                $description = empty($description) ? $title : $description;
                 $image = $originalParser->find('.featured-image.page-header-image-single img')->attr('src');
                 if (empty($image)) {
                     $image = $originalParser->find('.entry-content .wp-block-image img:first')->attr('src');
                 }
-                $image = filter_var($image, FILTER_VALIDATE_URL) ? $image : null;
+                $image = empty($image) ? null : $image;
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
@@ -96,13 +97,14 @@ class RiaLipetskParser implements ParserInterface
         }
         $paragraphs = $parser->find('.entry-content');
         $paragraphs->find('.pvc_stats')->remove();
-        $paragraphs = $paragraphs->find('p');
+        $paragraphs = $paragraphs->find('p:gt(0)');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 self::setImage($paragraph, $post);
                 self::setLink($paragraph, $post);
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
