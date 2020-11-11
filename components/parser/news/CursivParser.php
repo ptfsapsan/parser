@@ -48,8 +48,7 @@ class CursivParser implements ParserInterface
                 $original = $item->find('link')->text();
                 $createDate = date('d.m.Y H:i:s', strtotime($item->find('pubDate')->text()));
                 $originalParser = self::getParser($original, $curl);
-                $description = trim(strip_tags($item->find('description')->text()));
-                $description = empty($description) ? $originalParser->find('.text p:first')->text() : $description;
+                $description = $originalParser->find('.text p:first')->text();
                 $description = empty($description) ? $title : $description;
                 $image = $originalParser->find('.text p:first img')->attr('src');
                 if (empty($image)) {
@@ -83,13 +82,14 @@ class CursivParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.text p');
+        $paragraphs = $parser->find('.text p:gt(0)');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 self::setImage($paragraph, $post);
                 self::setLink($paragraph, $post);
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
