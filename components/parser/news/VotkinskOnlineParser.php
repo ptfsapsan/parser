@@ -55,7 +55,7 @@ class VotkinskOnlineParser implements ParserInterface
                 $description = trim($originalParser->find('p.MsoNormal:first')->text());
                 $description = empty($description) ? $title : $description;
                 $image = $originalParser->find('li.gallery-slide a')->attr('href');
-                $image = filter_var($image, FILTER_VALIDATE_URL) ? $image : null;
+                $image = empty($image) ? null : $image;
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
