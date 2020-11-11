@@ -37,13 +37,12 @@ class BusinessDnevnikParser implements ParserInterface
                 $title = $a->attr('title');
                 $original = $a->attr('href');
                 $image = htmlspecialchars($item->find('a img')->attr('src'));
-                if (empty($image) || !filter_var($image, FILTER_VALIDATE_URL)) {
-                    $image = null;
-                }
-                $createDate = $item->find('.post-meta.group .post-date')->text();
-                $createDate = date('d.m.Y H:i:s', self::getTimestampFromString($createDate));
-                $description = str_replace('...', '', $item->find('.entry.excerpt p')->text());
+                $image = empty($image) ? null : $image;
                 $originalParser = self::getParser($original, $curl);
+                $createDate = $originalParser->find('meta[property=article:published_time]')->attr('content');
+                $createDate = date('d.m.Y H:i:s', strtotime($createDate));
+                $description = str_replace('...', '', $item->find('.entry.excerpt p')->text());
+                $description = empty($description) ? $title : $description;
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
@@ -131,77 +130,4 @@ class BusinessDnevnikParser implements ParserInterface
 
         return $post;
     }
-    private static function getTimestampFromString(string $time): string
-    {
-        if (!preg_match('/^(\d+) (\w+), (\d+)$/ui', trim(mb_strtolower($time)), $matches)) {
-            return time();
-        }
-        switch ($matches[2]) {
-            case 'янв':
-            case 'январь':
-            case 'января':
-                $month = '01';
-                break;
-            case 'фев':
-            case 'февраль':
-            case 'февраля':
-                $month = '02';
-                break;
-            case 'мар':
-            case 'март':
-            case 'марта':
-                $month = '03';
-                break;
-            case 'апр':
-            case 'апрель':
-            case 'апреля':
-                $month = '04';
-                break;
-            case 'май':
-            case 'мая':
-                $month = '05';
-                break;
-            case 'июн':
-            case 'июнь':
-            case 'июня':
-                $month = '06';
-                break;
-            case 'июл':
-            case 'июль':
-            case 'июля':
-                $month = '07';
-                break;
-            case 'авг':
-            case 'август':
-            case 'августа':
-                $month = '08';
-                break;
-            case 'сен':
-            case 'сентябрь':
-            case 'сентября':
-                $month = '09';
-                break;
-            case 'окт':
-            case 'октябрь':
-            case 'октября':
-                $month = '10';
-                break;
-            case 'ноя':
-            case 'ноябрь':
-            case 'ноября':
-                $month = '11';
-                break;
-            case 'дек':
-            case 'декабрь':
-            case 'декабря':
-                $month = '12';
-                break;
-            default:
-                $month = '01';
-        }
-        $time = strtotime(sprintf('%d-%d-%d %s', $matches[3], $month, $matches[1], date('H:i:s')));
-
-        return $time ?? time();
-    }
-
 }
