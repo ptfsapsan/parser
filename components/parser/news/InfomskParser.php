@@ -81,7 +81,7 @@ class InfomskParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.fulltext p');
+        $paragraphs = $parser->find('.fulltext p:gt(0)');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 self::setImage($paragraph, $post);
