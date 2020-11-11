@@ -46,12 +46,9 @@ class MyGazetaParser implements ParserInterface
                 $title = trim($item->find('title')->text());
                 $original = $item->find('link')->text();
                 $createDate = date('d.m.Y H:i:s', strtotime($item->find('pubDate')->text()));
-                $desc = $item->find('description')->html();
-                $desc = str_replace(['<![CDATA[', ']]'], '', $desc);
-                $desc = PhpQuery::newDocument($desc);
-                $desc->find('.yarpp-related-rss')->remove();
-                $description = trim(str_replace(['[…]', '>'], '', $desc->text()));
                 $originalParser = self::getParser($original, $curl);
+                $description = trim($originalParser->find('#entry > p:not(.istok):first')->text());
+                $description = empty($description) ? $title : $description;
                 $image = $originalParser->find('#entry .highslide img')->attr('src');
                 $image = filter_var($image, FILTER_VALIDATE_URL) ? $image : null;
                 try {
@@ -83,7 +80,7 @@ class MyGazetaParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('#entry > p:not(.istok)');
+        $paragraphs = $parser->find('#entry > p:not(.istok):gt(0)');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 self::setImage($paragraph, $post);
