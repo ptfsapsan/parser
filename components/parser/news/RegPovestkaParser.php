@@ -8,6 +8,7 @@ use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
+use DOMElement;
 use Exception;
 use linslin\yii2\curl\Curl;
 use PhpQuery\PhpQuery;
@@ -19,6 +20,7 @@ class RegPovestkaParser implements ParserInterface
     const FEED_ID = 2;
 
     private const LINK = 'https://www.regpovestka.ru/';
+    private const TIMEZONE = '+0300';
 
     public static function run(): array
     {
@@ -32,12 +34,11 @@ class RegPovestkaParser implements ParserInterface
                 $original = $item->getAttribute('href');
                 $originalParser = self::getParser($original, $curl);
                 $createDate = $originalParser->find('time')->attr('datetime');
-                $createDate = date('d.m.Y H:i:s', strtotime($createDate));
-                $description = $originalParser->find('p[itemprop=description]')->text();
-                if (empty($description)) {
-                    $description = trim($originalParser->find('article[itemprop=articleBody] p:first')->text());
-                }
-                $image = null;
+                $createDate = date('d.m.Y H:i:s', strtotime(sprintf('%s %s', $createDate, self::TIMEZONE)));
+                $description = trim($originalParser->find('article[itemprop=articleBody] p:first')->text());
+                $description = empty($description) ? $title : $description;
+                $image = $originalParser->find('article[itemprop=articleBody] figure img')->attr('src');
+                $image = empty($image) ? null : $image;
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
@@ -66,7 +67,11 @@ class RegPovestkaParser implements ParserInterface
         $paragraphs = $parser->find('article[itemprop=articleBody] p:gt(0)');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
-                $text = trim($paragraph->textContent);
+                self::setImage($paragraph, $post);
+                self::setLink($paragraph, $post);
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
@@ -77,41 +82,48 @@ class RegPovestkaParser implements ParserInterface
                 }
             }
         }
-        $images = $parser->find('article[itemprop=articleBody] p img');
-        if (count($images)) {
-            foreach ($images as $img) {
-                $src = $img->getAttribute('src');
-                if (!empty($src)) {
-                    if (filter_var($src, FILTER_VALIDATE_URL)) {
-                        $post->addItem(
-                            new NewsPostItem(
-                                NewsPostItem::TYPE_IMAGE,
-                                null,
-                                $src,
-                            )
-                        );
-                    }
-                }
-            }
-        }
-        $links = $parser->find('article[itemprop=articleBody] p a');
-        if (count($links)) {
-            foreach ($links as $link) {
-                $href = $link->getAttribute('href');
-                if (!empty($href) && filter_var($href, FILTER_VALIDATE_URL)) {
-                    $post->addItem(
-                        new NewsPostItem(
-                            NewsPostItem::TYPE_LINK,
-                            null,
-                            null,
-                            $href,
-                        )
-                    );
-                }
-            }
-        }
 
         return $post;
     }
 
+    private static function setImage(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $src = $item->find('img')->attr('src');
+        if (empty($src)) {
+            return;
+        }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_IMAGE,
+                null,
+                $src,
+            )
+        );
+    }
+
+    private static function setLink(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $href = $item->find('a')->attr('href');
+        if (empty($href)) {
+            return;
+        }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_LINK,
+                null,
+                null,
+                $href,
+            )
+        );
+    }
 }
