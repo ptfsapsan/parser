@@ -8,6 +8,7 @@ use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
+use DOMElement;
 use Exception;
 use linslin\yii2\curl\Curl;
 use PhpQuery\PhpQuery;
@@ -20,6 +21,7 @@ class OtradnoeVszParser implements ParserInterface
 
     private const LINK = 'https://otradnoevsz.ru/';
     private const DOMAIN = 'https://otradnoevsz.ru';
+    private const TIMEZONE = '+0300';
 
     public static function run(): array
     {
@@ -44,7 +46,7 @@ class OtradnoeVszParser implements ParserInterface
                     $description = $title;
                 }
                 $createDate = $originalParser->find('.itemBody time')->text();
-                $createDate = sprintf('%s %s', date('d.m.Y', self::getTimestampFromString($createDate)), date('H:i:s'));
+                $createDate = date('d.m.Y H:i:s', self::getTimestampFromString($createDate));
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
@@ -70,12 +72,17 @@ class OtradnoeVszParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $text = $parser->find('.itemFullText');
-        $text->find('p[style="text-align: right;"]')->remove();
-        $paragraphs = $text->find('p');
+        $paragraphs = $parser->find('.itemFullText');
+        $paragraphs->find('p[style="text-align: right;"]')->remove();
         if (count($paragraphs)) {
-            foreach ($paragraphs as $paragraph) {
-                $text = trim($paragraph->textContent);
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                if ($paragraph instanceof DOMElement) {
+                    self::setImage($paragraph, $post);
+                    self::setLink($paragraph, $post);
+                }
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;', '', $text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
@@ -87,47 +94,51 @@ class OtradnoeVszParser implements ParserInterface
             }
         }
 
-        if (!empty($text)) {
-            $post->addItem(
-                new NewsPostItem(
-                    NewsPostItem::TYPE_TEXT,
-                    trim($text),
-                )
-            );
-        }
-        $images = $parser->find('.itemFullText p img');
-        if (count($images)) {
-            foreach ($images as $img) {
-                $src = $img->getAttribute('src');
-                if (!empty($src)) {
-                    $post->addItem(
-                        new NewsPostItem(
-                            NewsPostItem::TYPE_IMAGE,
-                            null,
-                            sprintf('%s%s', self::DOMAIN, $src),
-                        )
-                    );
-                }
-            }
-        }
-        $links = $parser->find('.itemFullText p a');
-        if (count($links)) {
-            foreach ($links as $link) {
-                $href = $link->getAttribute('href');
-                if (!empty($href) && filter_var($href, FILTER_VALIDATE_URL)) {
-                    $post->addItem(
-                        new NewsPostItem(
-                            NewsPostItem::TYPE_LINK,
-                            null,
-                            null,
-                            $href,
-                        )
-                    );
-                }
-            }
-        }
-
         return $post;
+    }
+
+    private static function setImage(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $src = $item->find('img')->attr('src');
+        if (empty($src)) {
+            return;
+        }
+        if (strpos($src, 'http') === false) {
+            $src = sprintf('%s%s', self::DOMAIN, $src);
+        }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_IMAGE,
+                null,
+                $src,
+            )
+        );
+    }
+
+    private static function setLink(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $href = $item->find('a')->attr('href');
+        if (empty($href)) {
+            return;
+        }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_LINK,
+                null,
+                null,
+                $href,
+            )
+        );
     }
 
     private static function getTimestampFromString(string $time): string
@@ -198,7 +209,7 @@ class OtradnoeVszParser implements ParserInterface
             default:
                 $month = '01';
         }
-        $time = strtotime(sprintf('%d-%d-%d', $matches[3], $month, $matches[1]));
+        $time = strtotime(sprintf('%d-%d-%d %s %s', $matches[3], $month, $matches[1], date('H:i:s'), self::TIMEZONE));
 
         return $time ?? time();
     }
