@@ -8,6 +8,7 @@ use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
+use DOMElement;
 use Exception;
 use linslin\yii2\curl\Curl;
 use PhpQuery\PhpQuery;
@@ -20,6 +21,8 @@ class MordoviaNewsParser implements ParserInterface
 
     private const LINK = 'http://mordovia-news.ru/';
     private const DOMAIN = 'http://mordovia-news.ru';
+    private static $description = null;
+    private static $mainImageSrc = null;
 
     public static function run(): array
     {
@@ -37,14 +40,15 @@ class MordoviaNewsParser implements ParserInterface
                 $original = $item->find('a')->attr('href');
                 $original = sprintf('%s/%s', self::DOMAIN, trim($original));
                 $title = $item->find('a')->text();
-                $image = null;
                 $createDate = $item->find('p span')->text();
                 $createDate = sprintf('%s %s', $createDate, date('H:i:s'));
                 $originalParser = self::getParser($original, $curl);
-                $description = $originalParser->find('dd.text p strong')->text();
-                if (empty($description)) {
-                    $description = $title;
-                }
+                $description = self::getDescription($originalParser);
+                self::$description = $description;
+                $description = $description ?? $title;
+                $image = $originalParser->find('dd.text img:first')->attr('src');
+                self::$mainImageSrc = $image;
+                $image = empty($image) ? null : sprintf('%s%s', self::DOMAIN, $image);
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
@@ -68,13 +72,36 @@ class MordoviaNewsParser implements ParserInterface
         return PhpQuery::newDocument($content);
     }
 
+    private static function getDescription(PhpQueryObject $parser): ?string
+    {
+        $paragraphs = $parser->find('dd.text');
+        if (count($paragraphs)) {
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;', '', $text));
+                $text = html_entity_decode($text);
+                if (!empty($text)) {
+                    return $text;
+                }
+            }
+        }
+
+        return null;
+    }
+
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('dd.text p');
+        $paragraphs = $parser->find('dd.text');
         if (count($paragraphs)) {
-            foreach ($paragraphs as $paragraph) {
-                $text = trim($paragraph->textContent);
-                if (!empty($text)) {
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                if ($paragraph instanceof DOMElement) {
+                    self::setImage($paragraph, $post);
+                    self::setLink($paragraph, $post);
+                }
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;', '', $text));
+                $text = html_entity_decode($text);
+                if (!empty($text) && $text != self::$description) {
                     $post->addItem(
                         new NewsPostItem(
                             NewsPostItem::TYPE_TEXT,
@@ -85,39 +112,50 @@ class MordoviaNewsParser implements ParserInterface
             }
         }
 
-        $images = $parser->find('dd.text p img');
-        if (count($images)) {
-            foreach ($images as $img) {
-                $src = $img->getAttribute('src');
-                if (!empty($src)) {
-                    $post->addItem(
-                        new NewsPostItem(
-                            NewsPostItem::TYPE_IMAGE,
-                            null,
-                            sprintf('%s%s', self::DOMAIN, $src),
-                        )
-                    );
-                }
-            }
-        }
-        $links = $parser->find('dd.text p a');
-        if (count($links)) {
-            foreach ($links as $link) {
-                $href = $link->getAttribute('href');
-                if (!empty($href) && filter_var($href, FILTER_VALIDATE_URL)) {
-                    $post->addItem(
-                        new NewsPostItem(
-                            NewsPostItem::TYPE_LINK,
-                            null,
-                            null,
-                            $href,
-                        )
-                    );
-                }
-            }
-        }
-
         return $post;
     }
 
+    private static function setImage(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $src = $item->find('img')->attr('src');
+        if (empty($src) || self::$mainImageSrc == $src) {
+            return;
+        }
+        if (strpos($src, 'http') === false) {
+            $src = sprintf('%s%s', self::DOMAIN, $src);
+        }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_IMAGE,
+                null,
+                $src,
+            )
+        );
+    }
+
+    private static function setLink(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $href = $item->find('a')->attr('href');
+        if (empty($href)) {
+            return;
+        }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_LINK,
+                null,
+                null,
+                $href,
+            )
+        );
+    }
 }
