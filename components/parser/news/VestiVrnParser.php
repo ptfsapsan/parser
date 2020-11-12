@@ -20,6 +20,7 @@ class VestiVrnParser implements ParserInterface
     const FEED_ID = 2;
 
     private const LINK = 'https://vestivrn.ru/rss/';
+    private const DOMAIN = 'https://vestivrn.ru';
 
     public static function run(): array
     {
@@ -40,7 +41,16 @@ class VestiVrnParser implements ParserInterface
                 $createDate = date('d.m.Y H:i:s', strtotime($createDate));
                 $description = trim($item->find('description')->text());
                 $originalParser = self::getParser($original, $curl);
-                $image = $originalParser->find('img.img-responsive')->attr('src');
+                $image = $originalParser->find('.news-figure video')->attr('poster');
+                if (empty($image)) {
+                    $image = $originalParser->find('.news-figure img')->attr('src');
+                }
+                if (empty($image)) {
+                    $image = null;
+                } elseif (strpos($image, 'http') === false) {
+                    $image = sprintf('%s%s', self::DOMAIN, $image);
+                }
+                
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
