@@ -23,6 +23,7 @@ class TrueInformParser implements ParserInterface
     private const DOMAIN = 'http://trueinform.ru';
     private const COUNT = 10;
     private static $mainImageSrc = null;
+    private static $tempLink = null;
 
     /**
      * @return array
@@ -130,6 +131,7 @@ class TrueInformParser implements ParserInterface
                 $src,
             )
         );
+        self::$tempLink = $src;
     }
 
     private static function setLink(DOMElement $paragraph, NewsPost $post)
@@ -140,7 +142,7 @@ class TrueInformParser implements ParserInterface
             return;
         }
         $href = $item->find('a')->attr('href');
-        if (empty($href)) {
+        if (empty($href) || self::$tempLink == $href) {
             return;
         }
         if (strpos($href, 'http') === false) {
