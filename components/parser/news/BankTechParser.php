@@ -44,10 +44,9 @@ class BankTechParser implements ParserInterface
             $a = $it->find('a.title');
             $title = $a->text();
             $original = $a->attr('href');
-            $description = $it->find('p')->text();
-            $description = trim(str_replace('[…]', '', $description));
-            $itemParser = self::getParser($original, $curl);
-            $detail = $itemParser->find('.container:eq(3) > div > div');
+            $originalParser = self::getParser($original, $curl);
+            $description = trim($originalParser->find('.container:eq(3) > div > div p:first')->text());
+            $detail = $originalParser->find('.container:eq(3) > div > div');
             $image = $detail->find('img:first')->attr('src');
             $image = empty($image) ? null : $image;
             try {
@@ -80,7 +79,7 @@ class BankTechParser implements ParserInterface
 
     private static function getItemText(PhpQueryObject $detail, NewsPost $post)
     {
-        $paragraphs = $detail->find('p');
+        $paragraphs = $detail->find('p:gt(0)');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 self::setImage($paragraph, $post);
