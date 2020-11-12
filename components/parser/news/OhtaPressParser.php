@@ -134,7 +134,7 @@ class OhtaPressParser implements ParserInterface
             return;
         }
         $href = $item->find('a')->attr('href');
-        if (empty($href)) {
+        if (empty($href) || !empty($item->find('a img'))) {
             return;
         }
         $post->addItem(
