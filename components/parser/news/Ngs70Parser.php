@@ -8,6 +8,7 @@ use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
+use DOMElement;
 use Exception;
 use linslin\yii2\curl\Curl;
 use PhpQuery\PhpQuery;
@@ -19,6 +20,8 @@ class Ngs70Parser implements ParserInterface
     const FEED_ID = 2;
 
     private const LINK = 'https://newsapi.ngs70.ru/v1/pages/jtnews/main/?regionId=70';
+    private const TIMEZONE = '+0300';
+    private static $mainImageSrc = null;
 
     public static function run(): array
     {
@@ -32,9 +35,11 @@ class Ngs70Parser implements ParserInterface
                 $description = $item['subheader'];
                 $original = $item['urls']['urlCanonical'];
                 $originalParser = self::getParser($original, $curl);
-                $image = $originalParser->find('figure picture img')->attr('src');
+                $image = $originalParser->find('figure picture img:first')->attr('src');
+                $image = empty($image) ? null : $image;
+                self::$mainImageSrc = $image;
                 $createDate = $originalParser->find('time')->attr('datetime');
-                $createDate = date('d.m.Y H:i:s', strtotime($createDate));
+                $createDate = date('d.m.Y H:i:s', strtotime(sprintf('%s %s', $createDate, self::TIMEZONE)));
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
@@ -78,7 +83,11 @@ class Ngs70Parser implements ParserInterface
         $paragraphs = $t->find('p');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
-                $text = trim($paragraph->textContent);
+                self::setImage($paragraph, $post);
+                self::setLink($paragraph, $post);
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;', '', $text));
+                $text = html_entity_decode($text);
                 $text = str_replace('Поделиться', '', $text);
                 if (!empty($text)) {
                     $post->addItem(
@@ -90,39 +99,48 @@ class Ngs70Parser implements ParserInterface
                 }
             }
         }
-        $images = $block->find('img');
-        if (count($images)) {
-            foreach ($images as $img) {
-                $src = $img->getAttribute('src');
-                if (!empty($src) || filter_var($src, FILTER_VALIDATE_URL)) {
-                    $post->addItem(
-                        new NewsPostItem(
-                            NewsPostItem::TYPE_IMAGE,
-                            null,
-                            $src,
-                        )
-                    );
-                }
-            }
-        }
-        $links = $block->find('a');
-        if (count($links)) {
-            foreach ($links as $link) {
-                $href = $link->getAttribute('href');
-                if (!empty($href) && filter_var($href, FILTER_VALIDATE_URL)) {
-                    $post->addItem(
-                        new NewsPostItem(
-                            NewsPostItem::TYPE_LINK,
-                            null,
-                            null,
-                            $href,
-                        )
-                    );
-                }
-            }
-        }
-
 
         return $post;
+    }
+
+    private static function setImage(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $src = $item->find('img')->attr('src');
+        if (empty($src) || self::$mainImageSrc == $src) {
+            return;
+        }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_IMAGE,
+                null,
+                $src,
+            )
+        );
+    }
+
+    private static function setLink(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $href = $item->find('a')->attr('href');
+        if (empty($href)) {
+            return;
+        }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_LINK,
+                null,
+                null,
+                $href,
+            )
+        );
     }
 }
