@@ -8,6 +8,7 @@ use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
+use DOMElement;
 use Exception;
 use linslin\yii2\curl\Curl;
 use PhpQuery\PhpQuery;
@@ -20,6 +21,7 @@ class ProvTelegrafParser implements ParserInterface
 
     private const LINK = 'https://prov-telegraf.ru/';
     private const DOMAIN = 'https://prov-telegraf.ru';
+    private const TIMEZONE = '+0300';
 
     public static function run(): array
     {
@@ -44,7 +46,7 @@ class ProvTelegrafParser implements ParserInterface
                 $originalParser = self::getParser($original, $curl);
                 $createDate = $originalParser->find('.content_params .date')->text();
                 $createDate = date('d.m.Y H:i:s', self::getTimestampFromString($createDate));
-                $description = $originalParser->find('.content_txt h4')->text();
+                $description = trim($originalParser->find('.content_txt h4')->text());
                 if (empty($description)) {
                     $description = $title;
                 }
@@ -75,8 +77,14 @@ class ProvTelegrafParser implements ParserInterface
     {
         $paragraphs = $parser->find('.content_txt p');
         if (count($paragraphs)) {
-            foreach ($paragraphs as $paragraph) {
-                $text = trim($paragraph->textContent);
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                if ($paragraph instanceof DOMElement) {
+                    self::setImage($paragraph, $post);
+                    self::setLink($paragraph, $post);
+                }
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;', '', $text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
@@ -87,39 +95,55 @@ class ProvTelegrafParser implements ParserInterface
                 }
             }
         }
-        $images = $parser->find('.content_txt p img');
-        if (count($images)) {
-            foreach ($images as $img) {
-                $src = $img->getAttribute('src');
-                if (!empty($src) && filter_var($src, FILTER_VALIDATE_URL)) {
-                    $post->addItem(
-                        new NewsPostItem(
-                            NewsPostItem::TYPE_IMAGE,
-                            null,
-                            $src,
-                        )
-                    );
-                }
-            }
-        }
-        $links = $parser->find('.content_txt p a');
-        if (count($links)) {
-            foreach ($links as $link) {
-                $href = $link->getAttribute('href');
-                if (!empty($href) && filter_var($href, FILTER_VALIDATE_URL)) {
-                    $post->addItem(
-                        new NewsPostItem(
-                            NewsPostItem::TYPE_LINK,
-                            null,
-                            null,
-                            $href,
-                        )
-                    );
-                }
-            }
-        }
 
         return $post;
+    }
+
+    private static function setImage(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $src = $item->find('img')->attr('src');
+        if (empty($src)) {
+            return;
+        }
+        if (strpos($src, 'http') === false) {
+            $src = sprintf('%s%s', self::DOMAIN, $src);
+        }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_IMAGE,
+                null,
+                $src,
+            )
+        );
+    }
+
+    private static function setLink(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $href = $item->find('a')->attr('href');
+        if (empty($href)) {
+            return;
+        }
+        if (strpos($href, 'http') === false) {
+            $href = sprintf('%s%s', self::DOMAIN, $href);
+        }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_LINK,
+                null,
+                null,
+                $href,
+            )
+        );
     }
 
     private static function getTimestampFromString(string $time): string
@@ -190,7 +214,7 @@ class ProvTelegrafParser implements ParserInterface
             default:
                 $month = '01';
         }
-        $time = strtotime(sprintf('%d-%d-%d %d:%d:00', $matches[3], $month, $matches[1], $matches[4], $matches[5]));
+        $time = strtotime(sprintf('%d-%d-%d %d:%d:00 %s', $matches[3], $month, $matches[1], $matches[4], $matches[5], self::TIMEZONE));
 
         return $time ?? time();
     }
