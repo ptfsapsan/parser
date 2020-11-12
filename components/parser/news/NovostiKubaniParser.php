@@ -37,13 +37,16 @@ class NovostiKubaniParser implements ParserInterface
             } catch (Exception $e) {
                 continue;
             }
+            $original = $it->find('a')->attr('href') ?? '';
+            if (strpos($original, '/novosti/') === false) {
+                continue;
+            }
             $text = $it->find('a')->text();
             $textDif = explode(' - ', $text);
             $title = $textDif[1];
             $dateDif = explode(' - ', $text);
             $createDate = str_replace(',', '', current($dateDif));
             $createDate = date('d.m.Y H:i:s', strtotime(sprintf('%s %s', $createDate, self::TIMEZONE)));
-            $original = $it->find('a')->attr('href') ?? '';
             $originalParser = self::getParser($original, $curl);
             $description = $originalParser->find('.article_odin1 p:first')->text();
             $description = empty($description) ? $title : $description;
@@ -55,7 +58,6 @@ class NovostiKubaniParser implements ParserInterface
                 continue;
             }
 
-//                $itemParser = PhpQuery::newDocumentHTML($content, 'utf8');
             $itemHtml = $originalParser->find('.article_odin1');
             try {
                 $detail = PhpQuery::pq($itemHtml);
