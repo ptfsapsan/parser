@@ -8,6 +8,7 @@ use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
+use DOMElement;
 use Exception;
 use linslin\yii2\curl\Curl;
 use PhpQuery\PhpQuery;
@@ -20,6 +21,7 @@ class YarmaxParser implements ParserInterface
 
     private const LINK = 'http://www.yarmax.ru/news/';
     private const DOMAIN = 'http://www.yarmax.ru';
+    private static $mainImageSrc = null;
 
     public static function run(): array
     {
@@ -37,10 +39,12 @@ class YarmaxParser implements ParserInterface
                 $a = $item->find('a');
                 $original = sprintf('%s%s', self::DOMAIN, $a->attr('href'));
                 $title = $a->text();
-                $image = $item->find('a img')->attr('src');
-                $image = empty($image) ? null : sprintf('%s%s', self::DOMAIN, $image);
-                $description = $title;
                 $originalParser = self::getParser($original, $curl);
+                $image = $originalParser->find('.news-detail img:first')->attr('src');
+                $image = empty($image) ? null : sprintf('%s%s', self::DOMAIN, $image);
+                self::$mainImageSrc = $image;
+                $description = trim($originalParser->find('.news-detail p:first')->text());
+                $description = empty($description) ? $title : $description;
                 $createDate = $originalParser->find('span.news-date-time')->text();
                 $createDate = sprintf('%s %s', $createDate, date('H:i:s'));
                 try {
@@ -74,48 +78,71 @@ class YarmaxParser implements ParserInterface
         $t->find('p[align="right"]')->remove();
         $t->find('div')->remove();
         $t->find('script')->remove();
-        $text = trim($t->text());
-        if (!empty($text)) {
-            $post->addItem(
-                new NewsPostItem(
-                    NewsPostItem::TYPE_TEXT,
-                    trim($text),
-                )
-            );
-        }
-        $images = $parser->find('.news-detail img');
-        if (count($images)) {
-            foreach ($images as $img) {
-                $src = $img->getAttribute('src');
-                if (!empty($src)) {
+        $paragraphs = $t->find('p:gt(0)');
+        if (count($paragraphs)) {
+            foreach ($paragraphs as $paragraph) {
+                if ($paragraph instanceof DOMElement) {
+                    self::setImage($paragraph, $post);
+                    self::setLink($paragraph, $post);
+                }
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;', '', $text));
+                $text = html_entity_decode($text);
+                if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
-                            NewsPostItem::TYPE_IMAGE,
-                            null,
-                            sprintf('%s%s', self::DOMAIN, trim($src)),
+                            NewsPostItem::TYPE_TEXT,
+                            $text,
                         )
                     );
                 }
             }
         }
-        $links = $parser->find('.news-detail a');
-        if (count($links)) {
-            foreach ($links as $link) {
-                $href = $link->getAttribute('href');
-                if (!empty($href) && filter_var($href, FILTER_VALIDATE_URL)) {
-                    $post->addItem(
-                        new NewsPostItem(
-                            NewsPostItem::TYPE_LINK,
-                            null,
-                            null,
-                            $href,
-                        )
-                    );
-                }
-            }
-        }
-
 
         return $post;
+    }
+
+    private static function setImage(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $src = $item->find('img')->attr('src');
+        if (empty($src) || self::$mainImageSrc == $src) {
+            return;
+        }
+        if (strpos($src, 'http') === false) {
+            $src = sprintf('%s%s', self::DOMAIN, $src);
+        }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_IMAGE,
+                null,
+                $src,
+            )
+        );
+    }
+
+    private static function setLink(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $href = $item->find('a')->attr('href');
+        if (empty($href)) {
+            return;
+        }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_LINK,
+                null,
+                null,
+                $href,
+            )
+        );
     }
 }
