@@ -8,6 +8,7 @@ use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
+use DOMElement;
 use Exception;
 use linslin\yii2\curl\Curl;
 use PhpQuery\PhpQuery;
@@ -39,10 +40,11 @@ class RybakKamchatkyParser implements ParserInterface
                     $a = $item->find('.image_feat a');
                 }
                 $original = sprintf('%s%s', self::DOMAIN, $a->attr('href'));
-                $image = sprintf('%s%s', self::DOMAIN, $a->find('img')->attr('src'));
                 $title = $a->find('img')->attr('title');
                 $description = $item->find('.info .teaser')->text();
                 $originalParser = self::getParser($original, $curl);
+                $image = $originalParser->find('.ft_image.f_photo img')->attr('src');
+                $image = empty($image) ? null : sprintf('%s%s', self::DOMAIN, $image);
                 $createDate = $originalParser->find('.bar_item.bi_date_pub time')->attr('datetime');
                 $createDate = date('d.m.Y H:i:s', strtotime($createDate));
                 try {
@@ -73,7 +75,11 @@ class RybakKamchatkyParser implements ParserInterface
         $paragraphs = $parser->find('.content_item.news_item .value p:gt(0)');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
-                $text = trim($paragraph->textContent);
+                self::setImage($paragraph, $post);
+                self::setLink($paragraph, $post);
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;', '', $text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
@@ -84,38 +90,51 @@ class RybakKamchatkyParser implements ParserInterface
                 }
             }
         }
-        $images = $parser->find('.content_item.news_item .value p img');
-        if (count($images)) {
-            foreach ($images as $img) {
-                $src = $img->getAttribute('src');
-                if (!empty($src) && filter_var($src, FILTER_VALIDATE_URL)) {
-                    $post->addItem(
-                        new NewsPostItem(
-                            NewsPostItem::TYPE_IMAGE,
-                            null,
-                            $src,
-                        )
-                    );
-                }
-            }
-        }
-        $links = $parser->find('.content_item.news_item .value p a');
-        if (count($links)) {
-            foreach ($links as $link) {
-                $href = $link->getAttribute('href');
-                if (!empty($href) && filter_var($href, FILTER_VALIDATE_URL)) {
-                    $post->addItem(
-                        new NewsPostItem(
-                            NewsPostItem::TYPE_LINK,
-                            null,
-                            null,
-                            $href,
-                        )
-                    );
-                }
-            }
-        }
 
         return $post;
+    }
+
+    private static function setImage(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $src = $item->find('img')->attr('src');
+        if (empty($src)) {
+            return;
+        }
+        if (strpos($src, 'http') === false) {
+            $src = sprintf('%s%s', self::DOMAIN, $src);
+        }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_IMAGE,
+                null,
+                $src,
+            )
+        );
+    }
+
+    private static function setLink(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $href = $item->find('a')->attr('href');
+        if (empty($href)) {
+            return;
+        }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_LINK,
+                null,
+                null,
+                $href,
+            )
+        );
     }
 }
