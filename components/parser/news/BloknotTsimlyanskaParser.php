@@ -20,6 +20,7 @@ class BloknotTsimlyanskaParser implements ParserInterface
 
     private const LINK = 'http://bloknot-tsimlyanska.ru/';
     private const DOMAIN = 'http://bloknot-tsimlyanska.ru';
+    private const TIMEZONE = '+0300';
 
     public static function run(): array
     {
@@ -37,13 +38,14 @@ class BloknotTsimlyanskaParser implements ParserInterface
                 $original = $item->find('a.sys')->attr('href');
                 $original = sprintf('%s%s', self::DOMAIN, $original);
                 $title = $item->find('a.sys')->text();
-                $image = $item->find('.thumbimage img.preview_picture')->attr('src');
+                $originalParser = self::getParser($original, $curl);
+                $image = $originalParser->find('.news-picture img')->attr('src');
                 if (!empty($image)) {
                     $image = str_replace('//', 'http://', $image);
                 }
-                $originalParser = self::getParser($original, $curl);
                 $description = $originalParser->find('#news-text p:first')->text();
                 $createDate = $originalParser->find('.news-item-info span.news-date-time')->text();
+                $createDate = date('d.m.Y H:i:s', strtotime(sprintf('%s %s', $createDate, self::TIMEZONE)));
                 if (empty($description)) {
                     $description = $title;
                 }
@@ -72,12 +74,15 @@ class BloknotTsimlyanskaParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('#news-text p:not([style="text-align: right;"])');
+        $paragraphs = $parser->find('#news-text p:not([style="text-align: right;"]):gt(0)');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 $text = trim($paragraph->textContent);
                 $text = str_replace('Если вам есть, чем поделиться, хотите высказать свое мнение, рассказать о проблемных ситуациях или просто поделиться наболевшем, пишите нам на номер WhatsApp: 8-928-117-7705', '', $text);
-                if (!empty($text)) {
+                $text = htmlentities($text);
+                $text = trim(str_replace('&nbsp;', '', $text));
+                $text = html_entity_decode($text);
+                if (!empty($text) && $text != '.') {
                     $post->addItem(
                         new NewsPostItem(
                             NewsPostItem::TYPE_TEXT,
