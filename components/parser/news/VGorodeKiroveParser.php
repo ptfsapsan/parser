@@ -23,6 +23,8 @@ class VGorodeKiroveParser implements ParserInterface
     private const DOMAIN = 'https://vgorodekirove.ru';
     private const COUNT = 10;
     private const TIMEZONE = '+0300';
+    private static $mainImageSrc = null;
+    private static $description = null;
 
     /**
      * @return array
@@ -51,10 +53,11 @@ class VGorodeKiroveParser implements ParserInterface
                 $originalParser = self::getParser($original, $curl);
                 $createDate = $item->find('.bu_info time')->text();
                 $createDate = date('d.m.Y H:i:s', self::getTimestampFromString($createDate));
-                $image = $item->find('.bu_pic img')->attr('src');
+                $image = $originalParser->find('.user_content img:first')->attr('src');
+                self::$mainImageSrc = $image;
                 $image = empty($image) ? null : sprintf('%s%s', self::DOMAIN, $image);
-                $description = $originalParser->find('.user_content p span:first')->text();
-                $description = empty($description) ? $title : $description;
+                $description = self::getDescription($originalParser);
+                $description = $description ?? $title;
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
@@ -66,6 +69,25 @@ class VGorodeKiroveParser implements ParserInterface
         }
 
         return $posts;
+    }
+
+    private static function getDescription(PhpQueryObject $parser): ?string
+    {
+        $paragraphs = $parser->find('.user_content > div');
+        $paragraphs->find('[style=color:#999999;]')->remove();
+        if (count($paragraphs)) {
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;', ' ', $text));
+                $text = html_entity_decode($text);
+                if (!empty($text)) {
+                    self::$description = $text;
+                    return $text;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -83,22 +105,34 @@ class VGorodeKiroveParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.user_content p');
+        $paragraphs = $parser->find('.user_content > div');
         $paragraphs->find('span:first')->remove();
+        $paragraphs->find('[style=color:#999999;]')->remove();
         if (count($paragraphs)) {
-            foreach ($paragraphs as $paragraph) {
-                self::setImage($paragraph, $post);
-                self::setLink($paragraph, $post);
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                if ($paragraph instanceof DOMElement) {
+                    self::setImage($paragraph, $post);
+                    self::setLink($paragraph, $post);
+                }
                 $text = htmlentities($paragraph->textContent);
-                $text = trim(str_replace('&nbsp;','',$text));
+                $text = trim(str_replace('&nbsp;', ' ', $text));
                 $text = html_entity_decode($text);
-                if (!empty($text)) {
-                    $post->addItem(
-                        new NewsPostItem(
-                            NewsPostItem::TYPE_TEXT,
-                            $text,
-                        )
-                    );
+                if (!empty($text) && $text != self::$description) {
+                    if ($paragraph->nodeName == 'blockquote') {
+                        $post->addItem(
+                            new NewsPostItem(
+                                NewsPostItem::TYPE_QUOTE,
+                                $text,
+                            )
+                        );
+                    } else {
+                        $post->addItem(
+                            new NewsPostItem(
+                                NewsPostItem::TYPE_TEXT,
+                                $text,
+                            )
+                        );
+                    }
                 }
             }
         }
@@ -114,7 +148,7 @@ class VGorodeKiroveParser implements ParserInterface
             return;
         }
         $src = $item->find('img')->attr('src');
-        if (empty($src)) {
+        if (empty($src) || self::$mainImageSrc == $src) {
             return;
         }
         if (strpos($src, 'http') === false) {
