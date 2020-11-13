@@ -44,8 +44,9 @@ class NewsVladimirParser implements ParserInterface
                 $title = trim($item->find('title')->text());
                 $original = $item->find('link')->text();
                 $createDate = date('d.m.Y H:i:s', strtotime($item->find('pubDate')->text()));
-                $description = trim(strip_tags($item->find('description')->text()));
                 $originalParser = self::getParser($original);
+                $description = trim($originalParser->find('.post-content p:')->text());
+                $description = empty($description) ? $title : $description;
                 $image = $originalParser->find('.img-responsive.post-image')->attr('src');
                 if (empty($image)) {
                     $image = null;
@@ -88,13 +89,14 @@ class NewsVladimirParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.post-content p');
+        $paragraphs = $parser->find('.post-content p:gt(0)');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 self::setImage($paragraph, $post);
                 self::setLink($paragraph, $post);
                 $text = htmlentities($paragraph->textContent);
-                $text = trim(str_replace('&nbsp;','',$text));
+                $text = trim(str_replace('&nbsp;', '', $text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
