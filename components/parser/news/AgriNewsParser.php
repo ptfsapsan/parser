@@ -22,6 +22,7 @@ class AgriNewsParser implements ParserInterface
     private const LINK = 'https://agri-news.ru/lenta.rss';
     private const DOMAIN = 'https://agri-news.ru';
     private const COUNT = 10;
+    private static $description = null;
 
     /**
      * @return array
@@ -44,12 +45,9 @@ class AgriNewsParser implements ParserInterface
                 $createDate = trim($item->getElementsByTagName('pubdate')->item(0)->textContent);
                 $createDate = date('d.m.Y H:i:s', strtotime($createDate));
                 $originalParser = self::getParser($original, $curl);
-                $description = trim($item->getElementsByTagName('description')->item(0)->nextSibling->textContent);
-                $description = empty($description) ? $originalParser->find('[itemprop=articleBody] p:first')->text() : $description;
-                $description = empty($description) ? $title : $description;
+                $description = self::getDescription($originalParser) ?? $title;
                 $image = $originalParser->find('.post_content img:first')->attr('src');
                 $image = empty($image) ? null : sprintf('%s%s', self::DOMAIN, $image);
-                $image = filter_var($image, FILTER_VALIDATE_URL) ? $image : null;
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
@@ -61,6 +59,24 @@ class AgriNewsParser implements ParserInterface
         }
 
         return $posts;
+    }
+
+    private static function getDescription(PhpQueryObject $parser): ?string
+    {
+        $paragraphs = $parser->find('[itemprop=articleBody]');
+        $paragraphs->find('em')->remove();
+        if (count($paragraphs)) {
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;', '', $text));
+                $text = html_entity_decode($text);
+                if (!empty($text)) {
+                    self::$description = $text;
+                    return $text;
+                }
+            }
+        }
+        return null;
     }
 
     /**
@@ -89,7 +105,7 @@ class AgriNewsParser implements ParserInterface
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;','',$text));
                 $text = html_entity_decode($text);
-                if (!empty($text)) {
+                if (!empty($text) && $text != self::$description) {
                     $post->addItem(
                         new NewsPostItem(
                             NewsPostItem::TYPE_TEXT,
@@ -134,7 +150,7 @@ class AgriNewsParser implements ParserInterface
             return;
         }
         $href = $item->find('a')->attr('href');
-        if (empty($href)) {
+        if (empty($href) || strpos($href, 'mailto') !== false) {
             return;
         }
         if (strpos($href, 'http') === false) {
