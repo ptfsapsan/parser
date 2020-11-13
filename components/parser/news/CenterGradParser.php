@@ -20,6 +20,7 @@ class CenterGradParser implements ParserInterface
     const FEED_ID = 2;
 
     private const LINK = 'https://center-grad.ru/feed';
+    private static $description = null;
 
     public static function run(): array
     {
@@ -38,9 +39,11 @@ class CenterGradParser implements ParserInterface
                 $original = trim($item->find('link')->text());
                 $createDate = $item->find('pubDate')->text();
                 $createDate = date('d.m.Y H:i:s', strtotime($createDate));
-                $description = trim($item->find('description')->text());
                 $originalParser = self::getParser($original, $curl);
+                $description = self::getDescription($originalParser);
+                $description = $description ?? $title;
                 $image = $originalParser->find('.post-thumb img')->attr('src');
+                $image = empty($image) ? null : $image;
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
@@ -51,6 +54,25 @@ class CenterGradParser implements ParserInterface
         }
 
         return $posts;
+    }
+
+    private static function getDescription(PhpQueryObject $parser): string
+    {
+        $paragraphs = $parser->find('.entry-content');
+        $paragraphs->find('script')->remove();
+        if (count($paragraphs)) {
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;','',$text));
+                $text = html_entity_decode($text);
+                if (!empty($text)) {
+                    self::$description = $text;
+                    return $text;
+                }
+            }
+        }
+
+        return null;
     }
 
     private static function getParser(string $link, Curl $curl): PhpQueryObject
@@ -66,22 +88,34 @@ class CenterGradParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.entry-content p');
+        $paragraphs = $parser->find('.entry-content');
         $paragraphs->find('script')->remove();
         if (count($paragraphs)) {
-            foreach ($paragraphs as $paragraph) {
-                self::setImage($paragraph, $post);
-                self::setLink($paragraph, $post);
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                if ($paragraph instanceof DOMElement) {
+                    self::setImage($paragraph, $post);
+                    self::setLink($paragraph, $post);
+                    self::setYoutube($paragraph, $post);
+                }
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;','',$text));
                 $text = html_entity_decode($text);
-                if (!empty($text)) {
-                    $post->addItem(
-                        new NewsPostItem(
-                            NewsPostItem::TYPE_TEXT,
-                            $text,
-                        )
-                    );
+                if (!empty($text) && $text != self::$description) {
+                    if ($paragraph->nodeName == 'blockquote') {
+                        $post->addItem(
+                            new NewsPostItem(
+                                NewsPostItem::TYPE_QUOTE,
+                                $text,
+                            )
+                        );
+                    } else {
+                        $post->addItem(
+                            new NewsPostItem(
+                                NewsPostItem::TYPE_TEXT,
+                                $text,
+                            )
+                        );
+                    }
                 }
             }
         }
@@ -126,6 +160,31 @@ class CenterGradParser implements ParserInterface
                 null,
                 null,
                 $href,
+            )
+        );
+    }
+
+    private static function setYoutube(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $src = $item->find('iframe')->attr('src');
+        $pos = strpos($src, 'youtube.com/embed/');
+        if (empty($src) || $pos === false) {
+            return;
+        }
+        $code = substr($src, ($pos + 18), 11);
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_VIDEO,
+                null,
+                null,
+                null,
+                null,
+                $code,
             )
         );
     }
