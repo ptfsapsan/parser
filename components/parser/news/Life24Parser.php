@@ -22,6 +22,8 @@ class Life24Parser implements ParserInterface
     private const LINK = 'https://life24.pro/rss/';
     private const DOMAIN = 'https://life24.pro';
     private const COUNT = 10;
+    private static $description = null;
+    private static $mainImageSrc = null;
 
     /**
      * @return array
@@ -48,10 +50,12 @@ class Life24Parser implements ParserInterface
                 $original = $item->find('link')->text();
                 $createDate = date('d.m.Y H:i:s', strtotime($item->find('pubDate')->text()));
                 $originalParser = self::getParser($original, $curl);
-                $description = trim($originalParser->find('.n24_text p:first')->text());
-                $description = empty($description) ? $title : $description;
-                $image = $item->find('enclosure')->attr('url');
-                $image = empty($image) ? null : $image;
+                $description = self::getDescription($originalParser) ?? $title;
+                $image = $originalParser->find('img.n24_image')->attr('data-src');
+                self::$mainImageSrc = $image;
+                $image = empty($image)
+                    ? null
+                    : (strpos($image, 'http') === false ? sprintf('%s%s', self::DOMAIN, $image) : $image);
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
@@ -63,6 +67,24 @@ class Life24Parser implements ParserInterface
         }
 
         return $posts;
+    }
+
+    private static function getDescription(PhpQueryObject $parser): ?string
+    {
+        $paragraphs = $parser->find('.n24_text');
+        if (count($paragraphs)) {
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;', ' ', $text));
+                $text = html_entity_decode($text);
+                if (!empty($text)) {
+                    self::$description = $text;
+                    return $text;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -80,21 +102,32 @@ class Life24Parser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.n24_text p:gt(0)');
+        $paragraphs = $parser->find('.n24_text');
         if (count($paragraphs)) {
-            foreach ($paragraphs as $paragraph) {
-                self::setImage($paragraph, $post);
-                self::setLink($paragraph, $post);
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                if ($paragraph instanceof DOMElement) {
+                    self::setImage($paragraph, $post);
+                    self::setLink($paragraph, $post);
+                }
                 $text = htmlentities($paragraph->textContent);
-                $text = trim(str_replace('&nbsp;','',$text));
+                $text = trim(str_replace('&nbsp;', ' ', $text));
                 $text = html_entity_decode($text);
                 if (!empty($text)) {
-                    $post->addItem(
-                        new NewsPostItem(
-                            NewsPostItem::TYPE_TEXT,
-                            $text,
-                        )
-                    );
+                    if ($paragraph->nodeName == 'blockquote') {
+                        $post->addItem(
+                            new NewsPostItem(
+                                NewsPostItem::TYPE_QUOTE,
+                                $text,
+                            )
+                        );
+                    } else {
+                        $post->addItem(
+                            new NewsPostItem(
+                                NewsPostItem::TYPE_TEXT,
+                                $text,
+                            )
+                        );
+                    }
                 }
             }
         }
@@ -110,7 +143,7 @@ class Life24Parser implements ParserInterface
             return;
         }
         $src = $item->find('img')->attr('src');
-        if (empty($src)) {
+        if (empty($src) || self::$mainImageSrc == $src) {
             return;
         }
         if (strpos($src, 'http') === false) {
