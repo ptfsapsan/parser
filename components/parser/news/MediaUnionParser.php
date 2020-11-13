@@ -46,6 +46,7 @@ class MediaUnionParser implements ParserInterface
                 $image = empty($image) ? null : $image;
                 self::$mainImageSrc = $image;
                 $description = $originalParser->find('.content p:first')->text();
+                $description = empty($description) ? $title : $description;
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
