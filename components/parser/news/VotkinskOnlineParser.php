@@ -92,7 +92,7 @@ class VotkinskOnlineParser implements ParserInterface
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;','',$text));
                 $text = html_entity_decode($text);
-                if (!empty($text)) {
+                if (!empty($text) && strpos($text, 'Фото:') !== 0) {
                     $post->addItem(
                         new NewsPostItem(
                             NewsPostItem::TYPE_TEXT,
