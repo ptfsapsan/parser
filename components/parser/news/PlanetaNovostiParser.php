@@ -45,8 +45,6 @@ class PlanetaNovostiParser implements ParserInterface
                 $title = trim($item->find('a b')->text());
                 $original = $item->find('a')->attr('href');
                 $original = sprintf('%s%s', self::DOMAIN, $original);
-                $description = trim($item->next('.eMessage')->text());
-                $description = str_replace('...', '', $description);
                 $d = $item->prev('.eDetails')->find('.e-date .ed-value');
                 $time = $d->attr('title');
                 $date = trim($d->text());
@@ -58,6 +56,9 @@ class PlanetaNovostiParser implements ParserInterface
                 $image = empty($image) ? null : sprintf('%s%s', self::DOMAIN, $image);
                 $content = file_get_contents($original);
                 $originalParser = PhpQuery::newDocument($content);
+                $description = trim($originalParser->find('.eText p:first')->text());
+                $description = str_replace('...', '', $description);
+                $description = empty($description) ? $title : $description;
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
@@ -73,13 +74,14 @@ class PlanetaNovostiParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.eText p');
+        $paragraphs = $parser->find('.eText p:gt(0)');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 self::setImage($paragraph, $post);
                 self::setLink($paragraph, $post);
                 $text = htmlentities($paragraph->textContent);
-                $text = trim(str_replace('&nbsp;','',$text));
+                $text = trim(str_replace('&nbsp;', ' ', $text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
