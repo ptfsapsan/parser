@@ -21,6 +21,7 @@ class TroizkInformMoskvaParser implements ParserInterface
 
     private const LINK = 'https://xn--h1aafjecekgm2au.xn--80adxhks/posts-format-1/';
     private const DOMAIN = 'https://xn--h1aafjecekgm2au.xn--80adxhks';
+    private static $mainImageSrc = null;
 
     public static function run(): array
     {
@@ -40,8 +41,10 @@ class TroizkInformMoskvaParser implements ParserInterface
                 $original = $a->attr('href');
                 $createDate = $item->find('time.date.updated')->attr('datetime');
                 $createDate = date('d.m.Y H:i:s', strtotime($createDate));
-                $image = $item->find('.entry-thumb img')->attr('src');
                 $originalParser = self::getParser($original, $curl);
+                $image = $originalParser->find('.entry-content img:first')->attr('src');
+                $image = empty($image) ? null : $image;
+                self::$mainImageSrc = $image;
                 $description = trim($originalParser->find('.entry-content p:first')->text());
                 $description = empty($description) ? $title : $description;
                 try {
@@ -99,7 +102,7 @@ class TroizkInformMoskvaParser implements ParserInterface
             return;
         }
         $src = $item->find('img')->attr('src');
-        if (empty($src)) {
+        if (empty($src) || self::$mainImageSrc == $src) {
             return;
         }
         if (strpos($src, 'http') === false) {
