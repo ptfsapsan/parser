@@ -22,6 +22,7 @@ class ArsVestParser implements ParserInterface
     private const LINK = 'https://www.arsvest.ru/';
     private const DOMAIN = 'https://www.arsvest.ru';
     private const COUNT = 10;
+    private static $firstParagraph = 0;
 
     /**
      * @return array
@@ -53,8 +54,7 @@ class ArsVestParser implements ParserInterface
                 $originalParser = self::getParser($original, $curl);
                 $image = $originalParser->find('.article .text img:first')->attr('src');
                 $image = empty($image) ? null : $image;
-                $description = $originalParser->find('.article .text p:first')->text();
-                $description = empty($description) ? $title : $description;
+                $description = self::getDescription($originalParser) ?? $title;
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
@@ -66,6 +66,26 @@ class ArsVestParser implements ParserInterface
         }
 
         return $posts;
+    }
+
+    private static function getDescription(PhpQueryObject $parser): ?string
+    {
+        $paragraphs = $parser->find('.article .text p');
+        $paragraphs->find('em')->remove();
+        self::$firstParagraph = 0;
+        if (count($paragraphs)) {
+            foreach ($paragraphs as $paragraph) {
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;', '', $text));
+                $text = html_entity_decode($text);
+                if (!empty($text)) {
+                    return $text;
+                }
+                self::$firstParagraph++;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -83,7 +103,8 @@ class ArsVestParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.article .text p:gt(0)');
+        $paragraphs = $parser->find(sprintf('.article .text p:gt(%s)', self::$firstParagraph));
+        $paragraphs->find('em')->remove();
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 self::setImage($paragraph, $post);
