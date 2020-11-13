@@ -55,8 +55,10 @@ class TrueInformParser implements ParserInterface
                     continue;
                 }
                 $originalParser = self::getParser($original, $curl);
-                $image = $originalParser->find('h2')->parent()->find('p:not(.author) img:first')->attr('src');
-                $image = empty($image) ? null : $image;
+                $image = $originalParser->find('p.author')->parent()->find('img:first')->attr('src');
+                $image = empty($image)
+                    ? null
+                    : (strpos($image, 'http') === false ? sprintf('%s/%s', self::DOMAIN, $image) : $image);
                 self::$mainImageSrc = $image;
                 $description = trim($a->next('p.simple')->text());
                 try {
