@@ -20,6 +20,7 @@ class RtRbcParser implements ParserInterface
     const FEED_ID = 2;
 
     private const LINK = 'https://rt.rbc.ru/';
+    private static $description = null;
 
     public static function run(): array
     {
@@ -38,8 +39,15 @@ class RtRbcParser implements ParserInterface
                 $createDate = $originalParser->find('.article__header__date')->attr('content');
                 $createDate = date('d.m.Y H:i:s', strtotime($createDate));
                 $image = $originalParser->find('.article__main-image__wrap img')->attr('src');
-                $description = $originalParser->find('.article__text.article__text_free p:first')->text();
+                $description = trim($originalParser->find('.article__text__overview')->text());
+                if (empty($description)) {
+                    $description = trim($originalParser->find('.article__text p:first')->text());
+                    $description = htmlentities($description);
+                    $description = trim(str_replace('&nbsp;', '', $description));
+                    $description = html_entity_decode($description);
+                }
                 $description = empty($description) ? $title : $description;
+                self::$description = $description;
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
@@ -65,13 +73,15 @@ class RtRbcParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.article__text.article__text_free p:gt(0)');
+        $paragraphs = $parser->find('.article__text p');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 self::setImage($paragraph, $post);
                 self::setLink($paragraph, $post);
-                $text = trim($paragraph->textContent);
-                if (!empty($text)) {
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;', '', $text));
+                $text = html_entity_decode($text);
+                if (!empty($text) && $text != self::$description) {
                     $post->addItem(
                         new NewsPostItem(
                             NewsPostItem::TYPE_TEXT,
