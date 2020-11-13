@@ -22,6 +22,7 @@ class AnatomusParser implements ParserInterface
     private const LINK = 'https://anatomus.ru/rss.xml';
     private const DOMAIN = 'https://anatomus.ru';
     private const COUNT = 10;
+    private static $description = null;
 
     /**
      * @return array
@@ -47,8 +48,8 @@ class AnatomusParser implements ParserInterface
                 $title = trim($item->find('title')->text());
                 $original = $item->find('link')->text();
                 $createDate = date('d.m.Y H:i:s', strtotime($item->find('pubDate')->text()));
-                $description = trim(strip_tags($item->find('description')->text()));
                 $originalParser = self::getParser($original, $curl);
+                $description = self::getDescription($originalParser) ?? $title;
                 $image = $originalParser->find('.text-img img')->attr('src');
                 $image = empty($image) ? null : sprintf('%s%s', self::DOMAIN, $image);
                 $image = filter_var($image, FILTER_VALIDATE_URL) ? $image : null;
@@ -63,6 +64,25 @@ class AnatomusParser implements ParserInterface
         }
 
         return $posts;
+    }
+
+    private static function getDescription(PhpQueryObject $parser): ?string
+    {
+        $paragraphs = $parser->find('.full-news-text > div:eq(1)');
+        $paragraphs->find('.text-img')->remove();
+        if (count($paragraphs)) {
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;', '', $text));
+                $text = html_entity_decode($text);
+                if (!empty($text)) {
+                    self::$description = $text;
+                    return $text;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -80,7 +100,7 @@ class AnatomusParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.full-news-text');
+        $paragraphs = $parser->find('.full-news-text > div:eq(1)');
         $paragraphs->find('.text-img')->remove();
         if (count($paragraphs)) {
             foreach (current($paragraphs->get())->childNodes as $paragraph) {
@@ -89,8 +109,9 @@ class AnatomusParser implements ParserInterface
                     self::setLink($paragraph, $post);
                 }
                 $text = htmlentities($paragraph->textContent);
-                $text = trim(str_replace('&nbsp;','',$text));
-                if (!empty($text)) {
+                $text = trim(str_replace('&nbsp;', '', $text));
+                $text = html_entity_decode($text);
+                if (!empty($text) && self::$description != $text) {
                     $post->addItem(
                         new NewsPostItem(
                             NewsPostItem::TYPE_TEXT,
