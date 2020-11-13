@@ -21,6 +21,7 @@ class RadioZelenogradParser implements ParserInterface
 
     private const LINK = 'https://zelenograd-news.ru/';
     private const DOMAIN = 'https://zelenograd-news.ru';
+    private static $description;
 
     public static function run(): array
     {
@@ -44,8 +45,8 @@ class RadioZelenogradParser implements ParserInterface
                 $image = str_replace(['background-image: url(', ');'], '', $image);
                 $image = sprintf('%s%s', self::DOMAIN, $image);
                 $originalParser = self::getParser($original, $curl);
-                $description = $originalParser->find('.text p:first')->text();
-                $description = empty($description) ? $title : $description;
+                $description = self::getDescription($originalParser);
+                $description = $description ?? $title;
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
@@ -56,6 +57,24 @@ class RadioZelenogradParser implements ParserInterface
         }
 
         return $posts;
+    }
+
+    private static function getDescription(PhpQueryObject $parser): ?string
+    {
+        $paragraphs = $parser->find('.colLeft article .text');
+        if (count($paragraphs)) {
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;', '', $text));
+                $text = html_entity_decode($text);
+                if (!empty($text)) {
+                    self::$description = $text;
+                    return $text;
+                }
+            }
+        }
+
+        return null;
     }
 
     private static function getParser(string $link, Curl $curl): PhpQueryObject
@@ -71,15 +90,18 @@ class RadioZelenogradParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.text');
+        $paragraphs = $parser->find('.colLeft article .text');
         if (count($paragraphs)) {
             foreach (current($paragraphs->get())->childNodes as $paragraph) {
-                self::setImage($paragraph, $post);
-                self::setLink($paragraph, $post);
+                if ($paragraph instanceof DOMElement) {
+                    self::setImage($paragraph, $post);
+                    self::setLink($paragraph, $post);
+                }
                 $text = htmlentities($paragraph->textContent);
-                $text = trim(str_replace('&nbsp;','',$text));
+                $text = trim(str_replace('&nbsp;', '', $text));
                 $text = html_entity_decode($text);
-                if (!empty($text)) {
+                $text = preg_replace('/<!--.+-->/ui', '', $text);
+                if (!empty($text) && $text != self::$description) {
                     $post->addItem(
                         new NewsPostItem(
                             NewsPostItem::TYPE_TEXT,
@@ -105,7 +127,9 @@ class RadioZelenogradParser implements ParserInterface
             return;
         }
         if (strpos($src, 'http') === false) {
-            $src = sprintf('%s%s', self::DOMAIN, $src);
+            $src = strpos($src, '//') === 0
+                ? sprintf('https:%s', $src)
+                : sprintf('%s%s', self::DOMAIN, $src);
         }
         $post->addItem(
             new NewsPostItem(
