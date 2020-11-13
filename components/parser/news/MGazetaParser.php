@@ -48,13 +48,12 @@ class MGazetaParser implements ParserInterface
                 $title = trim($a->text());
                 $original = $a->attr('href');
                 $original = sprintf('%s%s', self::DOMAIN, $original);
-                $image = trim($a->attr('style'));
-                $image = str_replace(['background-image: url(', ')'], '', $image);
-                $image = sprintf('%s%s', self::DOMAIN, $image);
+                $originalParser = self::getParser($original, $curl);
+                $image = $originalParser->find('.news-picture img')->attr('src');
+                $image = empty($image) ? null : sprintf('%s%s', self::DOMAIN, $image);
                 $createDate = $item->find('.news-date-time')->text();
                 $createDate = sprintf('%s %s', trim($createDate), date('H:i:s'));
                 $description = $item->find('.news-preview-text')->text();
-                $originalParser = self::getParser($original, $curl);
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
@@ -83,15 +82,18 @@ class MGazetaParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.news-text > p');
+        $paragraphs = $parser->find('.news-text');
+        $paragraphs->find('.news-property')->remove();
         if (count($paragraphs)) {
-            foreach ($paragraphs as $paragraph) {
-                self::setImage($paragraph, $post);
-                self::setLink($paragraph, $post);
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                if ($paragraph instanceof DOMElement) {
+                    self::setImage($paragraph, $post);
+                    self::setLink($paragraph, $post);
+                }
                 $text = htmlentities($paragraph->textContent);
-                $text = trim(str_replace('&nbsp;','',$text));
+                $text = trim(str_replace('&nbsp;', ' ', $text));
                 $text = html_entity_decode($text);
-                if (!empty($text)) {
+                if (!empty($text) && strpos($text, ':&nbsp;') === false) {
                     $post->addItem(
                         new NewsPostItem(
                             NewsPostItem::TYPE_TEXT,
