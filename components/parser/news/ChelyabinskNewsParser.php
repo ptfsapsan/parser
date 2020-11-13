@@ -44,11 +44,9 @@ class ChelyabinskNewsParser implements ParserInterface
                 $createDate = date('d.m.Y H:i:s', strtotime($createDate));
                 $originalParser = self::getParser2($original, $curl);
                 $description = trim($originalParser->find('[itemprop=articleBody] p:first')->text());
-                $description = str_replace('...', '', $description);
-                $description = empty($description) ? $originalParser->find('[itemprop=articleBody] p:first')->text() : $description;
                 $description = empty($description) ? $title : $description;
                 $image = $originalParser->find('img#current_img')->attr('src');
-                $image = filter_var($image, FILTER_VALIDATE_URL) ? $image : null;
+                $image = empty($image) ? null : $image;
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
