@@ -8,6 +8,7 @@ use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
+use DOMElement;
 use Exception;
 use linslin\yii2\curl\Curl;
 use PhpQuery\PhpQuery;
@@ -19,6 +20,7 @@ class BusinessDnevnikParser implements ParserInterface
     const FEED_ID = 2;
 
     private const LINK = 'http://businessdnevnik.ru/';
+    private static $mainImageSrc = null;
 
     public static function run(): array
     {
@@ -36,12 +38,13 @@ class BusinessDnevnikParser implements ParserInterface
                 $a = $item->find('a');
                 $title = $a->attr('title');
                 $original = $a->attr('href');
-                $image = htmlspecialchars($item->find('a img')->attr('src'));
-                $image = empty($image) ? null : $image;
                 $originalParser = self::getParser($original, $curl);
+                $image = $originalParser->find('.entry-inner img:first')->attr('src');
+                $image = empty($image) ? null : $image;
+                self::$mainImageSrc = $image;
                 $createDate = $originalParser->find('meta[property=article:published_time]')->attr('content');
                 $createDate = date('d.m.Y H:i:s', strtotime($createDate));
-                $description = str_replace('...', '', $item->find('.entry.excerpt p')->text());
+                $description = trim($originalParser->find('.entry-inner p:first')->text());
                 $description = empty($description) ? $title : $description;
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
@@ -68,22 +71,14 @@ class BusinessDnevnikParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $header = $parser->find('.entry-inner p:first strong')->text();
-        if (!empty($header)) {
-            $post->addItem(
-                new NewsPostItem(
-                    NewsPostItem::TYPE_HEADER,
-                    trim($header),
-                    null,
-                    null,
-                    1,
-                )
-            );
-        }
-        $paragraphs = $parser->find('.entry-inner p');
+        $paragraphs = $parser->find('.entry-inner p:gt(0)');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
-                $text = trim($paragraph->textContent);
+                self::setImage($paragraph, $post);
+                self::setLink($paragraph, $post);
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;', '', $text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
@@ -94,40 +89,48 @@ class BusinessDnevnikParser implements ParserInterface
                 }
             }
         }
-        $images = $parser->find('.entry-inner p img');
-        if (count($images)) {
-            foreach ($images as $img) {
-                $src = htmlspecialchars($img->getAttribute('src'));
-                if (!empty($src)) {
-                    if (filter_var($src, FILTER_VALIDATE_URL)) {
-                        $post->addItem(
-                            new NewsPostItem(
-                                NewsPostItem::TYPE_IMAGE,
-                                null,
-                                $src,
-                            )
-                        );
-                    }
-                }
-            }
-        }
-        $links = $parser->find('.entry-inner p a');
-        if (count($links)) {
-            foreach ($links as $link) {
-                $href = $link->getAttribute('href');
-                if (!empty($href) && filter_var($href, FILTER_VALIDATE_URL)) {
-                    $post->addItem(
-                        new NewsPostItem(
-                            NewsPostItem::TYPE_LINK,
-                            null,
-                            null,
-                            $href,
-                        )
-                    );
-                }
-            }
-        }
 
         return $post;
+    }
+
+    private static function setImage(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $src = $item->find('img')->attr('src');
+        if (empty($src) || self::$mainImageSrc == $src) {
+            return;
+        }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_IMAGE,
+                null,
+                $src,
+            )
+        );
+    }
+
+    private static function setLink(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $href = $item->find('a')->attr('href');
+        if (empty($href)) {
+            return;
+        }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_LINK,
+                null,
+                null,
+                $href,
+            )
+        );
     }
 }
