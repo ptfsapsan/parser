@@ -78,7 +78,9 @@ class YolaPoiskParser implements ParserInterface
             foreach ($paragraphs as $paragraph) {
                 self::setImage($paragraph, $post);
                 self::setLink($paragraph, $post);
-                $text = trim($paragraph->textContent);
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;', '', $text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
@@ -126,6 +128,9 @@ class YolaPoiskParser implements ParserInterface
         $href = $item->find('a')->attr('href');
         if (empty($href)) {
             return;
+        }
+        if (strpos($href, 'http') === false) {
+            $href = sprintf('%s%s', self::DOMAIN, $href);
         }
         $post->addItem(
             new NewsPostItem(
