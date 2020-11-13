@@ -8,6 +8,7 @@ use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
+use DOMElement;
 use Exception;
 use linslin\yii2\curl\Curl;
 use PhpQuery\PhpQuery;
@@ -19,6 +20,9 @@ class SmiTodayParser implements ParserInterface
     const FEED_ID = 2;
 
     private const LINK = 'https://www.smi.today/ru_smi/';
+    private const IMAGE_LOG = 'https://www.smi.today/imagelog/rgru.jpg';
+    private static $description = null;
+    private static $mainImageSrc = null;
 
     public static function run(): array
     {
@@ -42,13 +46,16 @@ class SmiTodayParser implements ParserInterface
                 $date = substr_replace($date, '20', 6, 0);
                 $time = trim($item->find('.short-data')->text());
                 $createDate = sprintf('%s %s:00', $date, $time);
-                $image = null;
-                $description = $originalParser->find('.newful')->text();
-                $description = empty($description) ? $title : $description;
+                $description = self::getDescription($originalParser);
+                $description = $description ?? $title;
+                $image = $originalParser->find('.newful img')->attr('data-src');
+                self::$mainImageSrc = $image;
+                if (empty($image) || $image == self::IMAGE_LOG) {
+                    $image = null;
+                }
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
-                    var_dump($e->getMessage());
                     continue;
                 }
                 $posts[] = self::setOriginalData($originalParser, $post);
@@ -56,6 +63,26 @@ class SmiTodayParser implements ParserInterface
         }
 
         return $posts;
+    }
+
+    private static function getDescription(PhpQueryObject $parser): ?string
+    {
+        $paragraphs = $parser->find('.newful');
+        $paragraphs->find('noscript')->remove();
+        if (count($paragraphs)) {
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;', ' ', $text));
+                $text = html_entity_decode($text);
+                $text = trim(str_replace('[…]', '', $text));
+                if (!empty($text)) {
+                    self::$description = $text;
+                    return $text;
+                }
+            }
+        }
+
+        return null;
     }
 
     private static function getParser(string $link, Curl $curl): PhpQueryObject
@@ -71,34 +98,22 @@ class SmiTodayParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $images = $parser->find('.newful img');
-        if (count($images)) {
-            foreach ($images as $img) {
-                $src = $img->getAttribute('src');
-                if (!empty($src) && strpos($src, 'imagelog/realnoevremya.ru') !== false) {
-                    if (filter_var($src, FILTER_VALIDATE_URL)) {
-                        $post->addItem(
-                            new NewsPostItem(
-                                NewsPostItem::TYPE_IMAGE,
-                                null,
-                                $src,
-                            )
-                        );
-                    }
+        $paragraphs = $parser->find('.newful');
+        if (count($paragraphs)) {
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                if ($paragraph instanceof DOMElement) {
+                    self::setImage($paragraph, $post);
+                    self::setLink($paragraph, $post);
                 }
-            }
-        }
-        $links = $parser->find('.newful a');
-        if (count($links)) {
-            foreach ($links as $link) {
-                $href = $link->getAttribute('href');
-                if (!empty($href) && filter_var($href, FILTER_VALIDATE_URL)) {
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;', '', $text));
+                $text = html_entity_decode($text);
+                $text = trim(str_replace('[…]', '', $text));
+                if (!empty($text) && self::$description != $text) {
                     $post->addItem(
                         new NewsPostItem(
-                            NewsPostItem::TYPE_LINK,
-                            null,
-                            null,
-                            $href,
+                            NewsPostItem::TYPE_TEXT,
+                            $text,
                         )
                     );
                 }
@@ -108,4 +123,44 @@ class SmiTodayParser implements ParserInterface
         return $post;
     }
 
+    private static function setImage(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $src = $item->find('img')->attr('src');
+        if (empty($src) || $src == self::IMAGE_LOG || $src == self::$mainImageSrc) {
+            return;
+        }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_IMAGE,
+                null,
+                $src,
+            )
+        );
+    }
+
+    private static function setLink(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $href = $item->find('a')->attr('href');
+        if (empty($href)) {
+            return;
+        }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_LINK,
+                null,
+                null,
+                $href,
+            )
+        );
+    }
 }
