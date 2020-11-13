@@ -8,7 +8,8 @@ use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
-use DOMText;
+use DOMComment;
+use DOMElement;
 use Exception;
 use linslin\yii2\curl\Curl;
 use PhpQuery\PhpQuery;
@@ -21,6 +22,7 @@ class StfwParser implements ParserInterface
 
     private const LINK = 'https://stfw.ru/';
     private const COUNT = 10;
+    private static $description = null;
 
     /**
      * @return array
@@ -50,8 +52,8 @@ class StfwParser implements ParserInterface
                 $createDate = date('d.m.Y H:i:s', self::getTimestampFromString($createDate));
                 $originalParser = self::getParser($original, $curl);
                 $image = $originalParser->find('article img:first')->attr('src');
-                $description = $item->find('article img:first')->attr('title');
-                $description = empty($description) ? $title : $description;
+                $description = self::getDescription($originalParser);
+                $description = $description ?? $title;
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
@@ -63,6 +65,29 @@ class StfwParser implements ParserInterface
         }
 
         return $posts;
+    }
+
+    private static function getDescription(PhpQueryObject $parser): ?string
+    {
+        $paragraphs = $parser->find('article');
+        $paragraphs->find('h1')->remove();
+        $paragraphs->find('address')->remove();
+        if (count($paragraphs)) {
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                if ($paragraph instanceof DOMComment) {
+                    continue;
+                }
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;', '', $text));
+                $text = html_entity_decode($text);
+                if (!empty($text)) {
+                    self::$description = $text;
+                    return $text;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -86,22 +111,69 @@ class StfwParser implements ParserInterface
         $paragraphs->find('address')->remove();
         if (count($paragraphs)) {
             foreach (current($paragraphs->get())->childNodes as $paragraph) {
-                if ($paragraph instanceof DOMText) {
-                    $text = htmlentities($paragraph->textContent);
-                    $text = trim(str_replace('&nbsp;', '', $text));
-                    if (!empty($text)) {
-                        $post->addItem(
-                            new NewsPostItem(
-                                NewsPostItem::TYPE_TEXT,
-                                $text,
-                            )
-                        );
-                    }
+                if ($paragraph instanceof DOMComment) {
+                    continue;
+                }
+                if ($paragraph instanceof DOMElement) {
+                    self::setImage($paragraph, $post);
+                    self::setLink($paragraph, $post);
+                }
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;', '', $text));
+                $text = html_entity_decode($text);
+                if (!empty($text) && $text != self::$description) {
+                    $post->addItem(
+                        new NewsPostItem(
+                            NewsPostItem::TYPE_TEXT,
+                            $text,
+                        )
+                    );
                 }
             }
         }
 
         return $post;
+    }
+
+    private static function setImage(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $src = $item->find('img')->attr('src');
+        if (empty($src)) {
+            return;
+        }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_IMAGE,
+                null,
+                $src,
+            )
+        );
+    }
+
+    private static function setLink(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $href = $item->find('a')->attr('href');
+        if (empty($href)) {
+            return;
+        }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_LINK,
+                null,
+                null,
+                $href,
+            )
+        );
     }
 
     private static function getTimestampFromString(string $time): string
