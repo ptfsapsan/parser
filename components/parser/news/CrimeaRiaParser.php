@@ -21,6 +21,7 @@ class CrimeaRiaParser implements ParserInterface
 
     private const LINK = 'https://crimea.ria.ru/lenta/';
     private const DOMAIN = 'https://crimea.ria.ru';
+    private const TIMEZONE = '+0300';
 
     public static function run(): array
     {
@@ -38,13 +39,14 @@ class CrimeaRiaParser implements ParserInterface
                 $original = $item->find('a')->attr('href');
                 $original = sprintf('%s%s', self::DOMAIN, $original);
                 $title = trim($item->find('a .b-list__item-title')->text());
-                $image = $item->find('.b-list__item-img img')->attr('src');
                 $originalParser = self::getParser($original, $curl);
+                $image = $originalParser->find('.b-article__announce-img-wr img')->attr('src');
+                $image = empty($image) ? null : $image;
                 $description = $originalParser->find('.b-article__body p:first')->text();
                 $description = empty($description) ? $title : $description;
                 $time = $item->find('.b-list__item-time')->text();
                 $date = $item->find('.b-list__item-date')->text();
-                $createDate = sprintf('%s %s:00', $date, $time);
+                $createDate = date('d.m.Y H:i:s', strtotime(sprintf('%s %s:00 %s', $date, $time, self::TIMEZONE)));
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
