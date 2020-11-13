@@ -100,7 +100,7 @@ class Om1Parser implements ParserInterface
             return;
         }
         $src = $item->find('img')->attr('src');
-        if (empty($src)) {
+        if (empty($src) || strpos($src, '120to120') !== false) {
             return;
         }
         $post->addItem(
