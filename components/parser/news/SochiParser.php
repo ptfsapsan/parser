@@ -52,7 +52,7 @@ class SochiParser implements ParserInterface
                 $image = $item->find('.block-news-foto a img')->attr('src');
                 $image = empty($image) ? null : sprintf('%s%s', self::DOMAIN, $image);
                 $originalParser = self::getParser($original, $curl);
-                $description = $item->find('.detail_text p:first')->text();
+                $description = $originalParser->find('.detail_text p:first')->text();
                 $description = empty($description) ? $title : $description;
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
@@ -82,13 +82,14 @@ class SochiParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.detail_text p');
+        $paragraphs = $parser->find('.detail_text p:gt(0)');
         if (count($paragraphs)) {
             foreach ($paragraphs as $paragraph) {
                 self::setImage($paragraph, $post);
                 self::setLink($paragraph, $post);
                 $text = htmlentities($paragraph->textContent);
-                $text = trim(str_replace('&nbsp;','',$text));
+                $text = trim(str_replace('&nbsp;', '', $text));
+                $text = html_entity_decode($text);
                 if (!empty($text)) {
                     $post->addItem(
                         new NewsPostItem(
