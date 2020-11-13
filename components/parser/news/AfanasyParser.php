@@ -21,6 +21,8 @@ class AfanasyParser implements ParserInterface
 
     private const LINK = 'https://www.afanasy.biz/';
     private const DOMAIN = 'https://www.afanasy.biz';
+    private static $mainImageSrc = null;
+    private static $description = null;
 
     public static function run(): array
     {
@@ -41,6 +43,7 @@ class AfanasyParser implements ParserInterface
                 $originalParser = self::getParser($original, $curl);
                 $createDate = trim($originalParser->find('.single-news__meta.news-meta .news-meta__item')->text());
                 $image = $originalParser->find('.text-block img:first')->attr('src');
+                self::$mainImageSrc = $image;
                 if (strpos($image, 'http') === false) {
                     if (strpos($image, '//') !== false) {
                         $image = sprintf('http:%s', $image);
@@ -48,8 +51,9 @@ class AfanasyParser implements ParserInterface
                         $image = sprintf('%s%s', self::DOMAIN, $image);
                     }
                 }
-                $description = $originalParser->find('.text-block p:first')->text();
-                $description = empty($description) ? $title : $description;
+                $image = empty($image) ? null : $image;
+                $description = self::getDescription($originalParser);
+                $description = $description ?? $title;
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
@@ -60,6 +64,29 @@ class AfanasyParser implements ParserInterface
         }
 
         return $posts;
+    }
+
+    private static function getDescription(PhpQueryObject $parser): ?string
+    {
+        $paragraphs = $parser->find('.text-block');
+        $paragraphs->find('span')->remove();
+        if (count($paragraphs)) {
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                $text = preg_replace('/<!--.+-->/ui', '', $paragraph->textContent);
+                $text = htmlentities($text);
+                $text = trim(str_replace('&nbsp;', '', $text));
+                $text = html_entity_decode($text);
+                if (strpos($text, 'noindex') !== false) {
+                    continue;
+                }
+                if (!empty($text)) {
+                    self::$description = $text;
+                    return $text;
+                }
+            }
+        }
+
+        return null;
     }
 
     private static function getParser(string $link, Curl $curl): PhpQueryObject
@@ -84,9 +111,12 @@ class AfanasyParser implements ParserInterface
                     self::setLink($paragraph, $post);
                 }
                 $text = htmlentities($paragraph->textContent);
-                $text = trim(str_replace('&nbsp;','',$text));
+                $text = trim(str_replace('&nbsp;', '', $text));
                 $text = html_entity_decode($text);
-                if (!empty($text)) {
+                if (strpos($text, 'noindex') !== false) {
+                    continue;
+                }
+                if (!empty($text) && $text != self::$description) {
                     $post->addItem(
                         new NewsPostItem(
                             NewsPostItem::TYPE_TEXT,
@@ -108,7 +138,7 @@ class AfanasyParser implements ParserInterface
             return;
         }
         $src = $item->find('img')->attr('src');
-        if (empty($src)) {
+        if (empty($src) || self::$mainImageSrc == $src) {
             return;
         }
         if (strpos($src, 'http') === false) {
