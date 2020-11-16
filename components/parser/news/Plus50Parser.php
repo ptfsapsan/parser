@@ -8,6 +8,7 @@ use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
+use DOMElement;
 use Exception;
 use linslin\yii2\curl\Curl;
 use PhpQuery\PhpQuery;
@@ -20,6 +21,8 @@ class Plus50Parser implements ParserInterface
 
     private const DOMAIN = 'https://www.50plus.ru';
     private const LINK = 'https://www.50plus.ru/news/';
+    private static $mainImageSrc = null;
+    private static $description = null;
 
     /**
      * @return array
@@ -47,7 +50,7 @@ class Plus50Parser implements ParserInterface
                 $createDate = sprintf('%s %s', trim($createDate), date('H:i:s'));
                 $title = $item->find('a.news-title')->text();
                 $originalParser = self::getParser($original, $curl);
-                $description = $originalParser->find('.news-section .frame p:first')->text();
+                $description = self::getDescription($originalParser) ?? $title;
                 $description = empty($description) ? $title : $description;
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
@@ -72,11 +75,30 @@ class Plus50Parser implements ParserInterface
                 $src = str_replace('background-image: url(\'', '', $element);
                 $src = str_replace('\')', '', $src);
                 $src = trim($src);
+                self::$mainImageSrc = $src;
                 $src = sprintf('%s%s', self::DOMAIN, $src);
             }
         }
 
         return $src;
+    }
+
+    private static function getDescription(PhpQueryObject $parser): ?string
+    {
+        $paragraphs = $parser->find('.news-section .frame');
+        if (count($paragraphs)) {
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;', '', $text));
+                $text = html_entity_decode($text);
+                if (!empty($text)) {
+                    self::$description = $text;
+                    return $text;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -86,54 +108,21 @@ class Plus50Parser implements ParserInterface
      */
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        // text
-        $p = $parser->find('.news-section .frame p:gt(0)');
-        if (count($p)) {
-            foreach ($p as $item) {
-                $text = htmlentities($item->textContent);
-                $text = trim(str_replace('&nbsp;','',$text));
+        $paragraphs = $parser->find('.news-section .frame');
+        if (count($paragraphs)) {
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                if ($paragraph instanceof DOMElement) {
+                    self::setImage($paragraph, $post);
+                    self::setLink($paragraph, $post);
+                }
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;', '', $text));
                 $text = html_entity_decode($text);
-                if (!empty($text)) {
+                if (!empty($text) && self::$description != $text) {
                     $post->addItem(
                         new NewsPostItem(
                             NewsPostItem::TYPE_TEXT,
-                            trim($text),
-                        )
-                    );
-                }
-            }
-        }
-
-        // images
-        $img = $parser->find('.news-section .frame p img');
-        if (count($img)) {
-            foreach ($img as $item) {
-                $src = $item->getAttribute('src');
-                $src = sprintf('%s%s', self::DOMAIN, trim($src));
-                if (filter_var($src, FILTER_VALIDATE_URL)) {
-                    $post->addItem(
-                        new NewsPostItem(
-                            NewsPostItem::TYPE_IMAGE,
-                            null,
-                            $src,
-                        )
-                    );
-                }
-            }
-        }
-
-        // links
-        $a = $parser->find('.news-section .frame p a');
-        if (count($a)) {
-            foreach ($a as $item) {
-                $href = trim($item->getAttribute('href'));
-                if (!empty($href) && filter_var($href, FILTER_VALIDATE_URL)) {
-                    $post->addItem(
-                        new NewsPostItem(
-                            NewsPostItem::TYPE_LINK,
-                            null,
-                            null,
-                            $href,
+                            $text,
                         )
                     );
                 }
@@ -141,6 +130,53 @@ class Plus50Parser implements ParserInterface
         }
 
         return $post;
+    }
+
+    private static function setImage(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $src = $item->find('img')->attr('src');
+        if (empty($src) || $src == self::$mainImageSrc) {
+            return;
+        }
+        if (strpos($src, 'http') === false) {
+            $src = sprintf('%s%s', self::DOMAIN, $src);
+        }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_IMAGE,
+                null,
+                $src,
+            )
+        );
+    }
+
+    private static function setLink(DOMElement $paragraph, NewsPost $post)
+    {
+        try {
+            $item = PhpQuery::pq($paragraph);
+        } catch (Exception $e) {
+            return;
+        }
+        $href = $item->find('a')->attr('href');
+        if (empty($href)) {
+            return;
+        }
+        if (strpos($href, 'http') === false) {
+            $href = sprintf('%s%s', self::DOMAIN, $href);
+        }
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_LINK,
+                null,
+                null,
+                $href,
+            )
+        );
     }
 
     /**
