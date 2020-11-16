@@ -73,7 +73,10 @@ class ZarpressaParser implements ParserInterface
     {
         $paragraphs = $parser->find('.news-text');
         $paragraphs->find('noindex')->remove();
+        $paragraphs->find('.news-social')->remove();
+        $paragraphs->find('.news-gallery')->remove();
         $paragraphs->find('script')->remove();
+        $paragraphs->find('i')->remove();
         if (count($paragraphs)) {
             foreach (current($paragraphs->get())->childNodes as $paragraph) {
                 $text = htmlentities($paragraph->textContent);
@@ -106,7 +109,10 @@ class ZarpressaParser implements ParserInterface
     {
         $paragraphs = $parser->find('.news-text');
         $paragraphs->find('noindex')->remove();
+        $paragraphs->find('.news-social')->remove();
+        $paragraphs->find('.news-gallery')->remove();
         $paragraphs->find('script')->remove();
+        $paragraphs->find('i')->remove();
         if (count($paragraphs)) {
             foreach (current($paragraphs->get())->childNodes as $paragraph) {
                 if ($paragraph instanceof DOMElement) {
@@ -116,7 +122,7 @@ class ZarpressaParser implements ParserInterface
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;', '', $text));
                 $text = html_entity_decode($text);
-                if (!empty($text) && $text != self::$description) {
+                if (!empty($text) && $text != self::$description && $text != '.') {
                     $post->addItem(
                         new NewsPostItem(
                             NewsPostItem::TYPE_TEXT,
@@ -161,8 +167,11 @@ class ZarpressaParser implements ParserInterface
             return;
         }
         $href = $item->find('a')->attr('href');
-        if (empty($href)) {
+        if (empty($href) || $href == '#') {
             return;
+        }
+        if (strpos($href, 'http') === false) {
+            $href = sprintf('%s%s', self::DOMAIN, $href);
         }
         $post->addItem(
             new NewsPostItem(
