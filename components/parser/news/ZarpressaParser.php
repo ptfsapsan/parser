@@ -70,6 +70,8 @@ class ZarpressaParser implements ParserInterface
     private static function getDescription(PhpQueryObject $parser): ?string
     {
         $paragraphs = $parser->find('.news-text');
+        $paragraphs->find('noindex')->remove();
+        $paragraphs->find('script')->remove();
         if (count($paragraphs)) {
             foreach (current($paragraphs->get())->childNodes as $paragraph) {
                 $text = htmlentities($paragraph->textContent);
@@ -100,6 +102,8 @@ class ZarpressaParser implements ParserInterface
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
         $paragraphs = $parser->find('.news-text');
+        $paragraphs->find('noindex')->remove();
+        $paragraphs->find('script')->remove();
         if (count($paragraphs)) {
             foreach (current($paragraphs->get())->childNodes as $paragraph) {
                 if ($paragraph instanceof DOMElement) {
