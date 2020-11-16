@@ -22,6 +22,8 @@ class Os56Parser implements ParserInterface
     private const LINK = 'http://os56.ru/feed';
     private const DOMAIN = 'http://os56.ru';
     private const COUNT = 10;
+    private static $description = null;
+    private static $firstParagraph = null;
 
     /**
      * @return array
@@ -47,11 +49,10 @@ class Os56Parser implements ParserInterface
                 $title = trim($item->find('title')->text());
                 $original = $item->find('link')->text();
                 $createDate = date('d.m.Y H:i:s', strtotime($item->find('pubDate')->text()));
-                $description = trim(strip_tags($item->find('description')->text()));
-                $description = str_replace('...', '', $description);
                 $originalParser = self::getParser($original, $curl);
+                $description = self::getDescription($originalParser) ?? $title;
                 $image = $originalParser->find('main#main img.attachment-large')->attr('src');
-                $image = filter_var($image, FILTER_VALIDATE_URL) ? $image : null;
+                $image = empty($image) ? null : $image;
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
@@ -63,6 +64,36 @@ class Os56Parser implements ParserInterface
         }
 
         return $posts;
+    }
+
+    private static function getDescription(PhpQueryObject $parser): ?string
+    {
+        $paragraphs = $parser->find('.entry-content');
+        $paragraphs->find('script')->remove();
+        $paragraphs->find('.yarpp-related')->remove();
+        self::$description = null;
+        self::$firstParagraph = null;
+        if (count($paragraphs)) {
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;', '', $text));
+                $text = html_entity_decode($text);
+                if (!empty($text)) {
+                    $texts = explode('. ', $text);
+                    if (count($texts) > 4) {
+                        self::$description = sprintf('%s. %s.', $texts[0], $texts[1]);
+                        array_shift($texts);
+                        array_shift($texts);
+                        self::$firstParagraph = implode('. ', $texts) . '.';
+                    } else {
+                        self::$description = $text;
+                    }
+                    return self::$description;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -80,17 +111,28 @@ class Os56Parser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.entry-content > p');
+        $paragraphs = $parser->find('.entry-content');
+        $paragraphs->find('script')->remove();
+        $paragraphs->find('.yarpp-related')->remove();
         if (count($paragraphs)) {
+            $n = 0;
             foreach (current($paragraphs->get())->childNodes as $paragraph) {
                 if ($paragraph instanceof DOMElement) {
                     self::setImage($paragraph, $post);
                     self::setLink($paragraph, $post);
                 }
                 $text = htmlentities($paragraph->textContent);
-                $text = trim(str_replace('&nbsp;','',$text));
+                $text = trim(str_replace('&nbsp;', ' ', $text));
                 $text = html_entity_decode($text);
                 if (!empty($text)) {
+                    $n++;
+                    if ($n == 1) {
+                        if (self::$firstParagraph) {
+                            $text = self::$firstParagraph;
+                        } else {
+                            continue;
+                        }
+                    }
                     $post->addItem(
                         new NewsPostItem(
                             NewsPostItem::TYPE_TEXT,
