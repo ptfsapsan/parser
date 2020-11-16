@@ -112,7 +112,7 @@ class Life24Parser implements ParserInterface
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;', ' ', $text));
                 $text = html_entity_decode($text);
-                if (!empty($text)) {
+                if (!empty($text) && $text != self::$description) {
                     if ($paragraph->nodeName == 'blockquote') {
                         $post->addItem(
                             new NewsPostItem(
