@@ -23,6 +23,7 @@ class ZarpressaParser implements ParserInterface
     private const DOMAIN = 'http://zarpressa.ru';
     private const COUNT = 10;
     private const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36 Edg/86.0.622.38';
+    private static $description;
 
     /**
      * @return array
@@ -49,11 +50,10 @@ class ZarpressaParser implements ParserInterface
                 $title = trim($item->find('title')->text());
                 $original = $item->find('link')->text();
                 $createDate = date('d.m.Y H:i:s', strtotime($item->find('pubDate')->text()));
-                $description = trim(strip_tags($item->find('description')->text()));
                 $originalParser = self::getParser($original, $curl);
+                $description = self::getDescription($originalParser) ?? $title;
                 $image = $originalParser->find('.news-gallery-big img')->attr('src');
                 $image = empty($image) ? null : sprintf('%s%s', self::DOMAIN, $image);
-                $image = filter_var($image, FILTER_VALIDATE_URL) ? $image : null;
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
@@ -65,6 +65,23 @@ class ZarpressaParser implements ParserInterface
         }
 
         return $posts;
+    }
+
+    private static function getDescription(PhpQueryObject $parser): ?string
+    {
+        $paragraphs = $parser->find('.news-text');
+        if (count($paragraphs)) {
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;', ' ', $text));
+                if (!empty($text)) {
+                    self::$description = $text;
+                    return $text;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -82,14 +99,16 @@ class ZarpressaParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.news-text div');
+        $paragraphs = $parser->find('.news-text');
         if (count($paragraphs)) {
-            foreach ($paragraphs as $paragraph) {
-                self::setImage($paragraph, $post);
-                self::setLink($paragraph, $post);
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                if ($paragraph instanceof DOMElement) {
+                    self::setImage($paragraph, $post);
+                    self::setLink($paragraph, $post);
+                }
                 $text = htmlentities($paragraph->textContent);
-                $text = trim(str_replace('&nbsp;','',$text));
-                if (!empty($text)) {
+                $text = trim(str_replace('&nbsp;', ' ', $text));
+                if (!empty($text) && $text != self::$description) {
                     $post->addItem(
                         new NewsPostItem(
                             NewsPostItem::TYPE_TEXT,
