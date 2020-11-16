@@ -21,6 +21,7 @@ class RiaLipetskParser implements ParserInterface
 
     private const LINK = 'https://rialipetsk.info/feed/';
     private const COUNT = 10;
+    private static $description;
 
     /**
      * @return array
@@ -47,8 +48,7 @@ class RiaLipetskParser implements ParserInterface
                 $original = $item->find('link')->text();
                 $createDate = date('d.m.Y H:i:s', strtotime($item->find('pubDate')->text()));
                 $originalParser = self::getParser($original, $curl);
-                $description = trim($originalParser->find('.entry-content p:first')->text());
-                $description = empty($description) ? $title : $description;
+                $description = self::getDescription($originalParser) ?? $title;
                 $image = $originalParser->find('.featured-image.page-header-image-single img')->attr('src');
                 if (empty($image)) {
                     $image = $originalParser->find('.entry-content .wp-block-image img:first')->attr('src');
@@ -67,6 +67,27 @@ class RiaLipetskParser implements ParserInterface
         return $posts;
     }
 
+    private static function getDescription(PhpQueryObject $parser): ?string
+    {
+        $paragraphs = $parser->find('.entry-content');
+        $paragraphs->find('.pvc_stats')->remove();
+        $paragraphs->find('.sharedaddy')->remove();
+        $paragraphs->find('h3')->remove();
+        if (count($paragraphs)) {
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                $text = htmlentities($paragraph->textContent);
+                $text = trim(str_replace('&nbsp;', ' ', $text));
+                $text = html_entity_decode($text);
+                if (!empty($text)) {
+                    self::$description = $text;
+                    return $text;
+                }
+            }
+        }
+
+        return null;
+    }
+
     /**
      * @param string $link
      * @param Curl $curl
@@ -83,29 +104,20 @@ class RiaLipetskParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $header = $parser->find('.entry-content h3 span')->text();
-        if (!empty($header)) {
-            $post->addItem(
-                new NewsPostItem(
-                    NewsPostItem::TYPE_HEADER,
-                    trim($header),
-                    null,
-                    null,
-                    3,
-                )
-            );
-        }
         $paragraphs = $parser->find('.entry-content');
         $paragraphs->find('.pvc_stats')->remove();
-        $paragraphs = $paragraphs->find('p:gt(0)');
+        $paragraphs->find('.sharedaddy')->remove();
+        $paragraphs->find('h3')->remove();
         if (count($paragraphs)) {
-            foreach ($paragraphs as $paragraph) {
-                self::setImage($paragraph, $post);
-                self::setLink($paragraph, $post);
+            foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                if ($paragraph instanceof DOMElement) {
+                    self::setImage($paragraph, $post);
+                    self::setLink($paragraph, $post);
+                }
                 $text = htmlentities($paragraph->textContent);
-                $text = trim(str_replace('&nbsp;','',$text));
+                $text = trim(str_replace('&nbsp;', ' ', $text));
                 $text = html_entity_decode($text);
-                if (!empty($text)) {
+                if (!empty($text) && $text != self::$description) {
                     $post->addItem(
                         new NewsPostItem(
                             NewsPostItem::TYPE_TEXT,
