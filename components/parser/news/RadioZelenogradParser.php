@@ -8,6 +8,7 @@ use app\components\Helper;
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
+use DOMComment;
 use DOMElement;
 use Exception;
 use linslin\yii2\curl\Curl;
@@ -61,9 +62,13 @@ class RadioZelenogradParser implements ParserInterface
 
     private static function getDescription(PhpQueryObject $parser): ?string
     {
-        $paragraphs = $parser->find('.colLeft article .text');
+        $paragraphs = $parser->find('h1')->siblings('.text');
+        $paragraphs->find('noscript')->remove();
         if (count($paragraphs)) {
             foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                if ($paragraph instanceof DOMComment) {
+                    continue;
+                }
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;', '', $text));
                 $text = html_entity_decode($text);
@@ -90,9 +95,13 @@ class RadioZelenogradParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.colLeft article .text');
+        $paragraphs = $parser->find('h1')->siblings('.text');
+        $paragraphs->find('noscript')->remove();
         if (count($paragraphs)) {
             foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                if ($paragraph instanceof DOMComment) {
+                    continue;
+                }
                 if ($paragraph instanceof DOMElement) {
                     self::setImage($paragraph, $post);
                     self::setLink($paragraph, $post);
@@ -100,7 +109,6 @@ class RadioZelenogradParser implements ParserInterface
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;', '', $text));
                 $text = html_entity_decode($text);
-                $text = preg_replace('/<!--.+-->/ui', '', $text);
                 if (!empty($text) && $text != self::$description) {
                     $post->addItem(
                         new NewsPostItem(
