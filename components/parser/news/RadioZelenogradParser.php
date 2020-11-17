@@ -39,15 +39,14 @@ class RadioZelenogradParser implements ParserInterface
                 }
                 $title = trim($item->find('a')->text());
                 $original = $item->find('a')->attr('href');
-                $original = sprintf('%s%s', self::DOMAIN, $original);
+                $original = trim(sprintf('%s%s', self::DOMAIN, $original));
                 $createDate = trim($item->find('.cnt span.published')->text());
                 $createDate = sprintf('%s %s', substr($createDate, 0, 10), date('H:i:s'));
                 $image = $item->find('div.img-responsive')->attr('style');
                 $image = str_replace(['background-image: url(', ');'], '', $image);
                 $image = sprintf('%s%s', self::DOMAIN, $image);
                 $originalParser = self::getParser($original, $curl);
-                $description = self::getDescription($originalParser);
-                $description = $description ?? $title;
+                $description = self::getDescription($originalParser) ?? $title;
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
