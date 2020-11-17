@@ -53,7 +53,7 @@ class ZarpressaParser implements ParserInterface
                 $createDate = date('d.m.Y H:i:s', strtotime($item->find('pubDate')->text()));
                 $originalParser = self::getParser($original, $curl);
                 $description = self::getDescription($originalParser) ?? $title;
-                $image = $originalParser->find('.news-gallery-big img')->attr('src');
+                $image = $originalParser->find('.news-gallery img:first')->attr('src');
                 self::$mainImageSrc = $image;
                 $image = empty($image) ? null : sprintf('%s%s', self::DOMAIN, $image);
                 try {
@@ -82,6 +82,8 @@ class ZarpressaParser implements ParserInterface
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;', '', $text));
                 $text = html_entity_decode($text);
+                $text = str_replace("\n", '', $text);
+                $text = str_replace("\r", '', $text);
                 if (!empty($text)) {
                     self::$description = $text;
                     return $text;
@@ -122,6 +124,8 @@ class ZarpressaParser implements ParserInterface
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;', '', $text));
                 $text = html_entity_decode($text);
+                $text = str_replace("\n", '', $text);
+                $text = str_replace("\r", '', $text);
                 if (!empty($text) && $text != self::$description && $text != '.') {
                     $post->addItem(
                         new NewsPostItem(
