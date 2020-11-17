@@ -71,6 +71,8 @@ class RadioZelenogradParser implements ParserInterface
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;', '', $text));
                 $text = html_entity_decode($text);
+                $text = str_replace("\n", '', $text);
+                $text = str_replace("\r", '', $text);
                 if (!empty($text)) {
                     self::$description = $text;
                     return $text;
@@ -108,6 +110,8 @@ class RadioZelenogradParser implements ParserInterface
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;', '', $text));
                 $text = html_entity_decode($text);
+                $text = str_replace("\n", '', $text);
+                $text = str_replace("\r", '', $text);
                 if (!empty($text) && $text != self::$description) {
                     $post->addItem(
                         new NewsPostItem(
