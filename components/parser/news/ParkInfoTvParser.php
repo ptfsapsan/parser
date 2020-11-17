@@ -67,19 +67,23 @@ class ParkInfoTvParser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
-        $paragraphs = $parser->find('.text-inner:gt(0):not(:last) p');
-        if (count($paragraphs)) {
-            foreach (current($paragraphs->get())->childNodes as $paragraph) {
-                $text = htmlentities($paragraph->textContent);
-                $text = trim(str_replace('&nbsp;','',$text));
-                $text = html_entity_decode($text);
-                if (!empty($text)) {
-                    $post->addItem(
-                        new NewsPostItem(
-                            NewsPostItem::TYPE_TEXT,
-                            $text,
-                        )
-                    );
+        $paragraphs = $parser->find('#imContent .ff1:not(.fs22):not(.cf3)');
+        $paragraphs->find('a')->remove();
+        $paragraphs->find('i')->remove();
+        foreach ($paragraphs as $paragraph) {
+            if ($paragraph->childNodes->count() > 0) {
+                foreach ($paragraph->childNodes as $childNode) {
+                    $text = htmlentities($childNode->textContent);
+                    $text = trim(str_replace('&nbsp;', '', $text));
+                    $text = html_entity_decode($text);
+                    if (!empty($text)) {
+                        $post->addItem(
+                            new NewsPostItem(
+                                NewsPostItem::TYPE_TEXT,
+                                $text,
+                            )
+                        );
+                    }
                 }
             }
         }
