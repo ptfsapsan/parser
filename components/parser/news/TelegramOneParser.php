@@ -6,6 +6,7 @@ namespace app\components\parser\news;
 
 use app\components\Helper;
 use app\components\parser\NewsPost;
+use app\components\parser\NewsPostItem;
 use app\components\parser\ParserInterface;
 use Exception;
 use linslin\yii2\curl\Curl;
@@ -55,15 +56,50 @@ class TelegramOneParser implements ParserInterface
                 $original = sprintf('%s%s', self::DOMAIN, $original);
                 $originalParser = self::getParser($original, $curl);
                 $original = $originalParser->find('#copyTarget')->attr('value');
+                if (empty($original)) {
+                    continue;
+                }
                 $createDate = $item->find('.post_date')->text();
                 $createDate = date('d.m.Y H:i:s', self::getTimestampFromString($createDate));
                 $image = $item->find('.tgme_widget_message_photo_wrap:first')->attr('href');
                 $image = empty($image) ? null : $image;
-                $description = $item->find('.tgme_widget_message_text.js-message_text')->text();
+                $paragraphs = $item->find('.tgme_widget_message_text.js-message_text .tgme_widget_message_text.js-message_text');
+                $texts = [];
+                foreach (current($paragraphs->get())->childNodes as $paragraph) {
+                    $text = htmlentities($paragraph->textContent);
+                    $text = trim(str_replace('&nbsp;', '', $text));
+                    $text = html_entity_decode($text);
+                    $text = str_replace('■', '', $text);
+                    if (!empty($text)) {
+                        $texts[] = $text;
+                    }
+                }
+                if (!count($texts)) {
+                    continue;
+                } elseif (count($texts) == 1) {
+                    $sentences = explode('. ', current($texts));
+                    $title = array_shift($sentences);
+                    $description = implode('. ', $sentences);
+                    $texts = [];
+                } else {
+                    $title = array_shift($texts);
+                    $description = array_shift($texts);
+                }
+
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
                     continue;
+                }
+                if (count($texts)) {
+                    foreach ($texts as $text) {
+                        $post->addItem(
+                            new NewsPostItem(
+                                NewsPostItem::TYPE_TEXT,
+                                $text,
+                            )
+                        );
+                    }
                 }
                 $posts[] = $post;
                 $n++;
