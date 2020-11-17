@@ -24,6 +24,7 @@ class Life24Parser implements ParserInterface
     private const COUNT = 10;
     private static $description = null;
     private static $mainImageSrc = null;
+    private static $firstParagraph = null;
 
     /**
      * @return array
@@ -51,7 +52,10 @@ class Life24Parser implements ParserInterface
                 $createDate = date('d.m.Y H:i:s', strtotime($item->find('pubDate')->text()));
                 $originalParser = self::getParser($original, $curl);
                 $description = self::getDescription($originalParser) ?? $title;
-                $image = $originalParser->find('img.n24_image')->attr('data-src');
+                $image = $originalParser->find('.n24_body img:first')->attr('src');
+                if (empty($image)) {
+                    $image = $originalParser->find('.n24_body img:first')->attr('data-src');
+                }
                 self::$mainImageSrc = $image;
                 $image = empty($image)
                     ? null
@@ -71,15 +75,29 @@ class Life24Parser implements ParserInterface
 
     private static function getDescription(PhpQueryObject $parser): ?string
     {
+        self::$description = null;
+        self::$firstParagraph = null;
         $paragraphs = $parser->find('.n24_text');
         if (count($paragraphs)) {
             foreach (current($paragraphs->get())->childNodes as $paragraph) {
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;', ' ', $text));
                 $text = html_entity_decode($text);
+                $text = str_replace("\n", ' ', $text);
+                $text = str_replace("\r", ' ', $text);
+                $text = trim($text);
                 if (!empty($text)) {
-                    self::$description = $text;
-                    return $text;
+                    $texts = explode('. ', $text);
+                    if (count($texts) > 2) {
+                        self::$description = sprintf('%s. %s.', $texts[0], $texts[1]);
+                        array_shift($texts);
+                        array_shift($texts);
+                        self::$firstParagraph = implode('. ', $texts);
+                    } else {
+                        self::$description = $text;
+                    }
+
+                    return self::$description;
                 }
             }
         }
@@ -102,6 +120,14 @@ class Life24Parser implements ParserInterface
 
     private static function setOriginalData(PhpQueryObject $parser, NewsPost $post): NewsPost
     {
+        if (!empty(self::$firstParagraph)) {
+            $post->addItem(
+                new NewsPostItem(
+                    NewsPostItem::TYPE_TEXT,
+                    self::$firstParagraph,
+                )
+            );
+        }
         $paragraphs = $parser->find('.n24_text');
         if (count($paragraphs)) {
             foreach (current($paragraphs->get())->childNodes as $paragraph) {
@@ -112,7 +138,9 @@ class Life24Parser implements ParserInterface
                 $text = htmlentities($paragraph->textContent);
                 $text = trim(str_replace('&nbsp;', ' ', $text));
                 $text = html_entity_decode($text);
-                if (!empty($text) && $text != self::$description) {
+                $text = str_replace("\n", ' ', $text);
+                $text = str_replace("\r", ' ', $text);
+                if (!empty($text) && strpos($text, self::$description) !== 0) {
                     if ($paragraph->nodeName == 'blockquote') {
                         $post->addItem(
                             new NewsPostItem(
