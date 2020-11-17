@@ -23,6 +23,7 @@ class ArsVestParser implements ParserInterface
     private const DOMAIN = 'https://www.arsvest.ru';
     private const COUNT = 10;
     private static $firstParagraph = 0;
+    private static $mainImageSrc = null;
 
     /**
      * @return array
@@ -53,7 +54,10 @@ class ArsVestParser implements ParserInterface
                 $createDate = date('d.m.Y H:i:s', strtotime($createDate));
                 $originalParser = self::getParser($original, $curl);
                 $image = $originalParser->find('.article .text img:first')->attr('src');
-                $image = empty($image) ? null : $image;
+                self::$mainImageSrc = $image;
+                $image = empty($image)
+                    ? null
+                    : (strpos($image, 'http') === false ? sprintf('%s%s', self::DOMAIN, $image) : $image);
                 $description = self::getDescription($originalParser) ?? $title;
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
@@ -134,7 +138,7 @@ class ArsVestParser implements ParserInterface
             return;
         }
         $src = $item->find('img')->attr('src');
-        if (empty($src)) {
+        if (empty($src) || $src == self::$mainImageSrc) {
             return;
         }
         if (strpos($src, 'http') === false) {
