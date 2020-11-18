@@ -57,9 +57,13 @@ class Life24Parser implements ParserInterface
                     $image = $originalParser->find('.n24_body img:first')->attr('data-src');
                 }
                 self::$mainImageSrc = $image;
-                $image = empty($image)
-                    ? null
-                    : (strpos($image, 'http') === false ? sprintf('%s%s', self::DOMAIN, $image) : $image);
+                if (empty($image)) {
+                    $image = null;
+                } elseif (strpos($image, 'http') === false) {
+                    $image = strpos($image, '//') === 0
+                        ? sprintf('https:%s', $image)
+                        : sprintf('%s%s', self::DOMAIN, $image);
+                }
                 try {
                     $post = new NewsPost(self::class, $title, $description, $createDate, $original, $image);
                 } catch (Exception $e) {
